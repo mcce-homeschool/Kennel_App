@@ -3,9 +3,11 @@
 Local-first, static, multi-page records app for a dog breeding program. No backend, no build step. Hosted on GitHub Pages; data lives in browser.
 
 ## Read first, every session
-- `Data_Model_Architecture_Proposal_v2.md` — data model, entities, storage, integrity rules
-- `Stage1_Stage2_Build_Brief_v2.md` — validation, screens, conventions, build order (Stages 1–2)
-- `Stage3_Build_Brief_v1.md` — Pairings & Litters schema, validation, screens, build order (Stage 3)
+- `docs/Data_Model_Architecture_Proposal_v2-1.md` — data model, entities, storage, integrity rules
+- `docs/Stage1_Stage2_Build_Brief_v2.md` — validation, screens, conventions, build order (Stages 1–2)
+- `docs/Stage3_Build_Brief_v1-1.md` — Pairings & Litters schema, validation, screens, build order (Stage 3)
+- `docs/Sample_Data_and_Reset_Brief_v2.md` — sample data packet + reset/clear behavior across all Stage 1–3 tables
+- `docs/Dog_Breeding_App_Requirements_Discovery-1.md` — original requirements discovery (background/vision; scope superseded by the docs above)
 
 These docs are source of truth. Conflict → stop and flag, don't diverge silently. Undocumented decision → ask, don't invent.
 
