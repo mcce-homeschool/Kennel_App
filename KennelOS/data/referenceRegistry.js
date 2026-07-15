@@ -1,13 +1,19 @@
 // referenceRegistry.js — the single declared list of every foreign key that
 // points at each entity, plus the generic guard that drives hard-delete blocking
-// (Data Model doc §10, Build Brief A2/B1).
+// (Data Model v3 §10, Stage4 Revision v2 §4).
+//
+// Stage 4 note: every relationship now has ONE canonical stored side; the
+// reverse is always a derived query, never a second stored pointer (Data Model
+// v3 §1, sixth design principle). That means every entry below points at a field
+// that is actually written somewhere — there is no `Sale.contract_id`,
+// `StudService.contract_id`, or `Pairing.stud_service_id` to guard, because
+// those fields don't exist.
 //
 // Why a registry instead of ad-hoc checks in each repo:
 //  - It stays HONEST per stage. `findBlockingReferences` skips any entry whose
-//    table doesn't exist in the current schema version, so at Stage 2 a Dog's
-//    blockers are genuinely only "sire/dam of another dog" and "subject/partner
-//    of an event" — it never claims to check litters/sales/stud-services that
-//    don't exist yet.
+//    table doesn't exist in the current schema version — a harmless no-op now
+//    that all nine tables exist from version(1), but kept so a future unshipped
+//    table can't silently break the guard.
 //  - It can't silently rot: adding a referencing table later means appending one
 //    line here, not remembering to update a scattered check.
 //
@@ -19,57 +25,73 @@
 //       compound index }
 import { db, existingTableNames } from './db.js';
 
-// --- Dog: what can point at a Dog (Data Model doc §10) ---------------------
+// --- Dog: what can point at a Dog (Data Model v3 §10) -----------------------
 export const DOG_REFERENCES = [
-  { table: 'dogs',   field: 'sire_id',        label: 'sire of another dog' },
-  { table: 'dogs',   field: 'dam_id',         label: 'dam of another dog' },
+  { table: 'dogs',          field: 'sire_id',        label: 'sire of another dog' },
+  { table: 'dogs',          field: 'dam_id',         label: 'dam of another dog' },
   {
     table: 'events', field: 'subject_id', label: 'subject of an event',
     compoundIndex: '[subject_type+subject_id]', discriminatorValue: 'dog'
   },
-  { table: 'events', field: 'related_dog_id', label: 'partner on an event' },
-  // Stage 3 (this stage): a Dog is also referenceable as a parent on a pairing or
-  // a litter. findBlockingReferences skips these while the tables don't exist, so
-  // Stage 2 behavior is unchanged; once version(2) lands they become live blockers
-  // and the Dog Detail "can't delete" message picks them up with no UI change.
-  { table: 'pairings', field: 'sire_id', label: 'sire in a pairing' },
-  { table: 'pairings', field: 'dam_id',  label: 'dam in a pairing' },
-  { table: 'litters',  field: 'sire_id', label: 'sire of a litter' },
-  { table: 'litters',  field: 'dam_id',  label: 'dam of a litter' }
-  // Stage 6+ append: sales.dog_id, stud_services.our_dog_id/partner_dog_id
+  { table: 'events',        field: 'related_dog_id', label: 'partner on an event' },
+  { table: 'pairings',      field: 'sire_id',        label: 'sire in a pairing' },
+  { table: 'pairings',      field: 'dam_id',         label: 'dam in a pairing' },
+  { table: 'litters',       field: 'sire_id',        label: 'sire of a litter' },
+  { table: 'litters',       field: 'dam_id',         label: 'dam of a litter' },
+  { table: 'sales',         field: 'dog_id',         label: 'placed via a sale' },
+  { table: 'stud_services', field: 'our_dog_id',     label: 'our dog in a stud service' },
+  { table: 'stud_services', field: 'partner_dog_id', label: 'partner dog in a stud service' }
 ];
 
-// --- Litter: what can point at a Litter (Data Model doc §10) ----------------
+// --- Litter: what can point at a Litter (Data Model v3 §10) -----------------
 // A litter can't be hard-deleted while any Dog still has litter_id pointing at it
 // (its puppy roster). Archive instead.
 export const LITTER_REFERENCES = [
   { table: 'dogs', field: 'litter_id', label: 'puppy roster member' }
 ];
 
-// --- Pairing: what can point at a Pairing ----------------------------------
-// A linked litter (Litter.pairing_id — the canonical litter↔pairing link) or any
-// Event logged against the pairing blocks hard delete.
+// --- Pairing: what can point at a Pairing -----------------------------------
+// A linked litter (Litter.pairing_id), a linked stud service (StudService.pairing_id
+// — canonical, mirrors Litter.pairing_id), or any Event logged against the pairing
+// blocks hard delete.
 export const PAIRING_REFERENCES = [
-  { table: 'litters', field: 'pairing_id', label: 'linked litter' },
+  { table: 'litters',       field: 'pairing_id', label: 'linked litter' },
   {
     table: 'events', field: 'subject_id', label: 'subject of an event',
     compoundIndex: '[subject_type+subject_id]', discriminatorValue: 'pairing'
-  }
-  // Stage 6+ append: stud_services.pairing_id
+  },
+  { table: 'stud_services', field: 'pairing_id', label: 'linked stud service' }
 ];
 
-// --- Contact: what can point at a Contact ---------------------------------
+// --- Contact: what can point at a Contact -----------------------------------
+// Now includes the merged-in buyer role via sales.buyer_contact_id (Stage 4 —
+// there is no separate Buyer entity; a buyer is a Contact, Data Model v3 §5.5).
 export const CONTACT_REFERENCES = [
-  { table: 'dogs', field: 'owner_contact_id',    label: 'owner of a dog' },
-  { table: 'dogs', field: 'co_owner_contact_ids', label: 'co-owner of a dog', multiEntry: true }
-  // Stage 6+ append: stud_services.partner_contact_id
+  { table: 'dogs',          field: 'owner_contact_id',     label: 'owner of a dog' },
+  { table: 'dogs',          field: 'co_owner_contact_ids', label: 'co-owner of a dog', multiEntry: true },
+  { table: 'sales',         field: 'buyer_contact_id',     label: 'buyer on a sale' },
+  { table: 'stud_services', field: 'partner_contact_id',   label: 'partner contact in a stud service' }
 ];
 
-// --- Kennel: what can point at a Kennel ------------------------------------
+// --- Kennel: what can point at a Kennel -------------------------------------
 export const KENNEL_REFERENCES = [
   { table: 'contacts', field: 'kennel_id', label: 'kennel of a contact' },
   { table: 'dogs',     field: 'kennel_id', label: 'kennel of a dog' }
 ];
+
+// --- Sale: what can point at a Sale (Stage 4) -------------------------------
+export const SALE_REFERENCES = [
+  { table: 'contracts', field: 'related_sale_id', label: 'documented by a contract' }
+];
+
+// --- StudService: what can point at a StudService (Stage 4) ----------------
+export const STUD_SERVICE_REFERENCES = [
+  { table: 'contracts', field: 'related_stud_service_id', label: 'documented by a contract' }
+];
+
+// --- Contract: a leaf entity — nothing points at a Contract (Stage 4). Always
+// hard-deletable; Data Model v3 §5.7.
+export const CONTRACT_REFERENCES = [];
 
 // Count rows matching one registry entry for the given target id.
 async function countReferences(ref, id) {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Dog — KennelOS</title>
+  <title>Sale — KennelOS</title>
   <link rel="stylesheet" href="../assets/app.css">
   <link rel="manifest" href="../manifest.json">
   <link rel="icon" href="../assets/icons/favicon-32.png" sizes="32x32">
@@ -18,9 +18,9 @@
   <main>
     <div class="page-header">
       <div>
-        <a class="muted" href="dogs.html">← All dogs</a>
-        <h1 id="dog-title">Dog</h1>
-        <div id="dog-subtitle" class="page-subtitle"></div>
+        <a class="muted" href="sales.html">← All sales</a>
+        <h1 id="sale-title">Sale</h1>
+        <div id="sale-subtitle" class="page-subtitle"></div>
       </div>
       <div id="header-actions" class="pill-row"></div>
     </div>
@@ -35,19 +35,11 @@
       <div id="profile-body"></div>
     </section>
 
-    <!-- Health Timeline (added in the Events step) -->
-    <section id="timeline-section"></section>
-    <!-- Pairings this dog appears in (Stage 3) -->
-    <section id="pairings-section"></section>
-    <!-- Sales / placements for this dog (Stage 4) -->
-    <section id="sales-section"></section>
-    <!-- Stud services this dog appears in (Stage 4) -->
-    <section id="stud-services-section"></section>
-    <!-- Pedigree (added in the Pedigree step) -->
-    <section id="pedigree-section"></section>
+    <!-- Contracts (derived: contracts.related_sale_id = this sale) -->
+    <section id="contracts-section"></section>
   </main>
 
   <script type="module" src="../app.js"></script>
-  <script type="module" src="./dog.js"></script>
+  <script type="module" src="./sale.js"></script>
 </body>
 </html>

@@ -89,8 +89,9 @@ export async function promptClearSampleData() {
 
   if (result.cleared) {
     const parts = [`${result.counts.dogs} dog(s)`, `${result.counts.pairings} pairing(s)`,
-      `${result.counts.litters} litter(s)`, `${result.counts.events} event(s)`,
-      `${result.counts.contacts} contact(s)`, `${result.counts.kennels} kennel(s)`];
+      `${result.counts.litters} litter(s)`, `${result.counts.stud_services} stud service(s)`,
+      `${result.counts.sales} sale(s)`, `${result.counts.contracts} contract(s)`,
+      `${result.counts.events} event(s)`, `${result.counts.contacts} contact(s)`, `${result.counts.kennels} kennel(s)`];
     if (result.counts.archived) parts.push(`${result.counts.archived} archived instead of deleted`);
     window.alert(`Sample data cleared — removed ${parts.join(', ')}.`);
   }

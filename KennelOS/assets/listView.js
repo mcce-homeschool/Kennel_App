@@ -16,7 +16,10 @@ export function createListView(opts) {
     rowClass = () => '',   // (record) => extra <tr> class
     onRowClick,            // (record) => void
     load,                  // async ({ includeArchived }) => records[]
-    emptyText = 'No records yet.'
+    emptyText = 'No records yet.',
+    baseFilter = () => true // (record) => bool — a fixed predicate applied before
+                             // search/filters/archived, e.g. the Buyer view on
+                             // Contacts (a filtered view, not a separate table/page)
   } = opts;
 
   let all = [];
@@ -70,6 +73,7 @@ export function createListView(opts) {
 
   function visibleRecords() {
     return all.filter((r) => {
+      if (!baseFilter(r)) return false;
       if (!state.showArchived && r.is_archived) return false;
       if (state.q && search?.text) {
         if (!search.text(r).toLowerCase().includes(state.q)) return false;

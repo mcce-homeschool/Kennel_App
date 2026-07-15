@@ -14,7 +14,13 @@ import { contactRepo } from './contactRepo.js';
 import { kennelRepo } from './kennelRepo.js';
 import { pairingRepo } from './pairingRepo.js';
 import { litterRepo } from './litterRepo.js';
-import { findBlockingReferences, DOG_REFERENCES, PAIRING_REFERENCES, LITTER_REFERENCES } from './referenceRegistry.js';
+import { saleRepo } from './saleRepo.js';
+import { contractRepo } from './contractRepo.js';
+import { studServiceRepo } from './studServiceRepo.js';
+import {
+  findBlockingReferences, DOG_REFERENCES, PAIRING_REFERENCES, LITTER_REFERENCES,
+  SALE_REFERENCES, STUD_SERVICE_REFERENCES
+} from './referenceRegistry.js';
 import {
   getSampleDataManifest,
   setSampleDataManifest,
@@ -62,7 +68,8 @@ function monthsFromToday(n) {
 export async function seedSampleData() {
   const manifest = {
     seededAt: new Date().toISOString(),
-    dogs: [], events: [], contacts: [], kennels: [], pairings: [], litters: []
+    dogs: [], events: [], contacts: [], kennels: [], pairings: [], litters: [],
+    sales: [], contracts: [], stud_services: []
   };
 
   // Kennels — Thornfield is the user's own kennel; Meadow Ridge is Dana Ruiz's
@@ -92,7 +99,23 @@ export async function seedSampleData() {
     name: 'Marcus Webb', contact_type: ['buyer_referrer'], phone: '555-0105'
   });
   await contactRepo.archive(marcus.id);
-  manifest.contacts.push(patricia.id, dana.id, sam.id, tessa.id, marcus.id);
+
+  // Stage 4: buyers are Contacts, not a separate table (Data Model v3 §5.5).
+  // Priya buys Hazel (waitlist fulfilled by a completed sale); Owen exercises
+  // the empty-waitlist demo (active, no Sale record yet); Ellen owns the
+  // external female used in the sample stud service.
+  const priya = await contactRepo.create({
+    name: 'Priya Shah', contact_type: ['buyer'], waitlist_status: 'fulfilled',
+    first_contact_source: 'Instagram', phone: '555-0106', email: 'priya.shah@example.com'
+  });
+  const owen = await contactRepo.create({
+    name: 'Owen Farrow', contact_type: ['buyer'], waitlist_status: 'active',
+    first_contact_source: 'Referral', phone: '555-0107'
+  });
+  const ellen = await contactRepo.create({
+    name: 'Ellen Brooks', contact_type: ['breeder'], phone: '555-0108'
+  });
+  manifest.contacts.push(patricia.id, dana.id, sam.id, tessa.id, marcus.id, priya.id, owen.id, ellen.id);
 
   // Dogs — ancestors first so each generation can reference the last. Every
   // sample dog is Boston Terrier (brief §6).
@@ -163,7 +186,16 @@ export async function seedSampleData() {
     kennel_id: thornfield.id
   });
 
-  manifest.dogs.push(ash.id, willow.id, juniper.id, gunnar.id, fern.id, birch.id, hazel.id, percy.id);
+  // Nell — external female, Ellen Brooks' dog, the partner side of the sample
+  // outgoing stud service below. Her kennel identity flows through
+  // owner_contact_id, same pattern as Gunnar.
+  const nell = await dogRepo.create({
+    call_name: 'Nell', sex: 'female', breed: BREED,
+    date_of_birth: '2022-05-14', dob_is_estimated: true,
+    ownership_type: 'external', owner_contact_id: ellen.id, status: 'external_reference'
+  });
+
+  manifest.dogs.push(ash.id, willow.id, juniper.id, gunnar.id, fern.id, birch.id, hazel.id, percy.id, nell.id);
 
   // Pairing P2 — same pair, planned only, no litter yet. Exercises the "Create
   // Litter from this Pairing" empty state and an empty pairing timeline.
@@ -172,8 +204,47 @@ export async function seedSampleData() {
     planned_date: monthsFromToday(4)
   });
 
-  manifest.pairings.push(pairingP1.id, pairingP2.id);
+  // Pairing P3 — the actual breeding produced by the sample Stud Service below.
+  // StudService.pairing_id is the canonical link (Data Model v3 §5.8); there is
+  // no Pairing.stud_service_id, so this pairing carries no back-pointer of its own.
+  const pairingP3 = await pairingRepo.create({
+    sire_id: birch.id, dam_id: nell.id, pairing_type: 'actual', method: 'ai_chilled',
+    status: 'confirmed_pregnant', planned_date: '2026-05-01'
+  });
+
+  manifest.pairings.push(pairingP1.id, pairingP2.id, pairingP3.id);
   manifest.litters.push(litter.id);
+
+  // Stage 4 — Stud Service: Birch (our dog) services Nell (Ellen's outside
+  // female). Links to Pairing P3 via the canonical pairing_id.
+  const studServiceBirch = await studServiceRepo.create({
+    direction: 'outgoing', our_dog_id: birch.id, partner_dog_id: nell.id, partner_contact_id: ellen.id,
+    fee_amount: 1200, fee_structure: 'flat_fee', pairing_id: pairingP3.id,
+    status: 'completed', result_notes: 'Successful AI breeding; pregnancy confirmed by ultrasound.'
+  });
+  const studServiceContract = await contractRepo.create({
+    contract_type: 'stud_service', status: 'signed', related_stud_service_id: studServiceBirch.id,
+    title: 'Stud Service Agreement — Birch × Nell', signed_date: '2026-04-15',
+    terms_summary: 'Flat fee, one breeding attempt, health-tested sire.'
+  });
+  manifest.stud_services.push(studServiceBirch.id);
+  manifest.contracts.push(studServiceContract.id);
+
+  // Stage 4 — Sale: Hazel placed with Priya Shah (pet home, delivered). Contract
+  // owns related_sale_id (canonical); there is no Sale.contract_id.
+  const hazelSale = await saleRepo.create({
+    dog_id: hazel.id, buyer_contact_id: priya.id, sale_date: '2025-12-20',
+    price: 2500, deposit_amount: 500, deposit_date: '2025-11-01', balance_paid_date: '2025-12-20',
+    placement_type: 'pet', status: 'delivered', lead_source: 'Instagram',
+    notes: 'Went home with a family in Concord, NH — regular updates from the family.'
+  });
+  const hazelContract = await contractRepo.create({
+    contract_type: 'sale', status: 'signed', related_sale_id: hazelSale.id,
+    title: 'Puppy Purchase Agreement — Hazel', signed_date: '2025-12-15',
+    terms_summary: 'Pet-home placement, spay/neuter clause, health guarantee.'
+  });
+  manifest.sales.push(hazelSale.id);
+  manifest.contracts.push(hazelContract.id);
 
   // Events — spread across all three subject types to cover most of the catalog
   // (brief §6).
@@ -255,16 +326,34 @@ export async function seedSampleData() {
 
 // --- Clearing -----------------------------------------------------------
 
-const ENTITY_REPOS = { dog: dogRepo, pairing: pairingRepo, litter: litterRepo };
-const ENTITY_REGISTRIES = { dog: DOG_REFERENCES, pairing: PAIRING_REFERENCES, litter: LITTER_REFERENCES };
+const ENTITY_REPOS = {
+  dog: dogRepo, pairing: pairingRepo, litter: litterRepo,
+  sale: saleRepo, stud_service: studServiceRepo
+};
+const ENTITY_REGISTRIES = {
+  dog: DOG_REFERENCES, pairing: PAIRING_REFERENCES, litter: LITTER_REFERENCES,
+  sale: SALE_REFERENCES, stud_service: STUD_SERVICE_REFERENCES
+};
 
 // Human-readable label for a conflict message. Dogs already have a name; a
-// pairing/litter doesn't, so build one from its dam/sire the same way the UI
-// does (Pairing/Litter Detail's own title).
+// pairing/litter/sale/stud-service doesn't, so build one from its own fields
+// the same way the UI's own title does.
 async function labelFor(entityType, id) {
   if (entityType === 'dog') {
     const d = await db.dogs.get(id);
     return d ? d.call_name : id;
+  }
+  if (entityType === 'sale') {
+    const s = await db.sales.get(id);
+    if (!s) return id;
+    const [dog, buyer] = await Promise.all([db.dogs.get(s.dog_id), db.contacts.get(s.buyer_contact_id)]);
+    return `Sale (${dog?.call_name || '—'} → ${buyer?.name || '—'})`;
+  }
+  if (entityType === 'stud_service') {
+    const s = await db.stud_services.get(id);
+    if (!s) return id;
+    const [ours, partner] = await Promise.all([db.dogs.get(s.our_dog_id), db.dogs.get(s.partner_dog_id)]);
+    return `StudService (${ours?.call_name || '—'} × ${partner?.call_name || '—'})`;
   }
   const row = await db.table(entityType === 'pairing' ? 'pairings' : 'litters').get(id);
   if (!row) return id;
@@ -274,22 +363,28 @@ async function labelFor(entityType, id) {
 }
 
 // Contamination check (brief §5.2): find any real (non-manifest) record that
-// now points at a manifest Dog/Pairing/Litter via one of the reference
-// registries. Reuses the same registries the live hard-delete guard uses, so
-// this stays accurate as more reference kinds are added.
+// now points at a manifest Dog/Pairing/Litter/Sale/StudService via one of the
+// reference registries. Reuses the same registries the live hard-delete guard
+// uses, so this stays accurate as more reference kinds are added. Contract is
+// never checked here — CONTRACT_REFERENCES is empty (a leaf), so a manifest
+// contract can never be contaminated.
 async function findContaminatingReferences(manifest) {
   const manifestSets = {
     dogs: new Set(manifest.dogs),
     events: new Set(manifest.events || []),
     pairings: new Set(manifest.pairings || []),
-    litters: new Set(manifest.litters || [])
+    litters: new Set(manifest.litters || []),
+    sales: new Set(manifest.sales || []),
+    stud_services: new Set(manifest.stud_services || []),
+    contracts: new Set(manifest.contracts || [])
   };
 
   // conflicts: Map key `${entityType}:${id}` -> { entityType, id, refs: [{label, row}] }
   const conflicts = new Map();
 
   for (const [entityType, ids] of [
-    ['dog', manifest.dogs], ['pairing', manifest.pairings || []], ['litter', manifest.litters || []]
+    ['dog', manifest.dogs], ['pairing', manifest.pairings || []], ['litter', manifest.litters || []],
+    ['sale', manifest.sales || []], ['stud_service', manifest.stud_services || []]
   ]) {
     const registry = ENTITY_REGISTRIES[entityType];
     for (const id of ids) {
@@ -323,6 +418,9 @@ export async function clearSampleData({ archiveConflicting = false } = {}) {
   // partial-seed failure or a manifest written by an older app version.
   manifest.pairings = manifest.pairings || [];
   manifest.litters = manifest.litters || [];
+  manifest.sales = manifest.sales || [];
+  manifest.contracts = manifest.contracts || [];
+  manifest.stud_services = manifest.stud_services || [];
 
   const conflicts = await findContaminatingReferences(manifest);
 
@@ -337,7 +435,7 @@ export async function clearSampleData({ archiveConflicting = false } = {}) {
 
   // Archive conflicting records (grouped by entity type), tracking which ids
   // to exclude from the bulk delete below.
-  const archivedIds = { dog: [], pairing: [], litter: [] };
+  const archivedIds = { dog: [], pairing: [], litter: [], sale: [], stud_service: [] };
   if (conflicts.size > 0) {
     for (const { entityType, id } of conflicts.values()) {
       await ENTITY_REPOS[entityType].archive(id);
@@ -348,27 +446,39 @@ export async function clearSampleData({ archiveConflicting = false } = {}) {
   const dogIdsToDelete = manifest.dogs.filter((id) => !archivedIds.dog.includes(id));
   const pairingIdsToDelete = manifest.pairings.filter((id) => !archivedIds.pairing.includes(id));
   const litterIdsToDelete = manifest.litters.filter((id) => !archivedIds.litter.includes(id));
+  const saleIdsToDelete = manifest.sales.filter((id) => !archivedIds.sale.includes(id));
+  const studServiceIdsToDelete = manifest.stud_services.filter((id) => !archivedIds.stud_service.includes(id));
 
   const counts = {
     events: manifest.events.length,
     litters: litterIdsToDelete.length,
     pairings: pairingIdsToDelete.length,
+    stud_services: studServiceIdsToDelete.length,
+    sales: saleIdsToDelete.length,
+    contracts: manifest.contracts.length,
     dogs: dogIdsToDelete.length,
     contacts: manifest.contacts.length,
     kennels: manifest.kennels.length,
     archived: archivedIds.dog.length + archivedIds.pairing.length + archivedIds.litter.length
+      + archivedIds.sale.length + archivedIds.stud_service.length
   };
 
-  // Dependency order: events -> litters -> pairings -> dogs -> contacts ->
-  // kennels. Litters and pairings must clear before dogs, since a Litter
-  // references dogs via dam_id/sire_id and dogs' own litter_id pointers need
-  // to go with the same pass. This is a known, self-contained, unreferenced
-  // set, so it bypasses the single-record hardDelete guard (which exists to
-  // protect one record at a time, not to bulk-clear a whole known set — brief §5).
-  await db.transaction('rw', db.events, db.litters, db.pairings, db.dogs, db.contacts, db.kennels, async () => {
+  // Dependency order: events -> contracts -> litters -> stud_services ->
+  // pairings -> sales -> dogs -> contacts -> kennels. Contract references
+  // sales/stud_services so it must clear first (it's a leaf itself — nothing
+  // ever references a Contract, so it's never in archivedIds). Litters and
+  // stud_services reference pairings/dogs, sales reference dogs/contacts, so
+  // all of those clear before dogs/contacts. This is a known, self-contained,
+  // unreferenced set, so it bypasses the single-record hardDelete guard (which
+  // exists to protect one record at a time, not to bulk-clear a whole known
+  // set — brief §5).
+  await db.transaction('rw', db.events, db.contracts, db.litters, db.stud_services, db.pairings, db.sales, db.dogs, db.contacts, db.kennels, async () => {
     if (manifest.events.length) await db.events.bulkDelete(manifest.events);
+    if (manifest.contracts.length) await db.contracts.bulkDelete(manifest.contracts);
     if (litterIdsToDelete.length) await db.litters.bulkDelete(litterIdsToDelete);
+    if (studServiceIdsToDelete.length) await db.stud_services.bulkDelete(studServiceIdsToDelete);
     if (pairingIdsToDelete.length) await db.pairings.bulkDelete(pairingIdsToDelete);
+    if (saleIdsToDelete.length) await db.sales.bulkDelete(saleIdsToDelete);
     if (dogIdsToDelete.length) await db.dogs.bulkDelete(dogIdsToDelete);
     if (manifest.contacts.length) await db.contacts.bulkDelete(manifest.contacts);
     if (manifest.kennels.length) await db.kennels.bulkDelete(manifest.kennels);
