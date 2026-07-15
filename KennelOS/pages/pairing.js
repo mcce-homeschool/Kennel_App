@@ -6,7 +6,8 @@
 import { pairingRepo, ReferenceBlockedError } from '../data/pairingRepo.js';
 import { litterRepo } from '../data/litterRepo.js';
 import { dogRepo } from '../data/dogRepo.js';
-import { PAIRING_TYPE, PAIRING_METHOD, PAIRING_STATUS, LITTER_STATUS } from '../data/vocab.js';
+import { studServiceRepo } from '../data/studServiceRepo.js';
+import { PAIRING_TYPE, PAIRING_METHOD, PAIRING_STATUS, LITTER_STATUS, STUD_SERVICE_DIRECTION, STUD_SERVICE_STATUS } from '../data/vocab.js';
 import { esc, badge, fmtDate, param, confirmAction } from '../assets/ui.js';
 import { renderTimeline } from '../assets/timeline.js';
 
@@ -18,8 +19,15 @@ const els = {
   body: document.getElementById('profile-body'),
   error: document.getElementById('page-error'),
   litter: document.getElementById('litter-section'),
+  studService: document.getElementById('stud-service-section'),
   timeline: document.getElementById('timeline-section')
 };
+
+// Set when arriving via "Create Pairing from this Stud Service" — the id of the
+// stud service to write pairing_id back onto after this pairing is created
+// (StudService owns pairing_id; there is no Pairing.stud_service_id to set here —
+// Stage4 Revision v2 §5).
+let sourceStudServiceId = null;
 
 const blankPairing = () => ({
   sire_id: '', dam_id: '', pairing_type: '', method: '', status: '',
@@ -198,6 +206,7 @@ function enterEdit() {
   renderEdit();
   renderProfileActions();
   renderLitterSection();   // hide derived panels while editing the profile
+  renderStudServiceSection();
   renderTimelineSection();
 }
 
@@ -208,6 +217,7 @@ function cancel() {
   renderView();
   renderProfileActions();
   renderLitterSection();
+  renderStudServiceSection();
   renderTimelineSection();
 }
 
@@ -217,6 +227,12 @@ async function save() {
   try {
     if (ctx.mode === 'new') {
       const saved = await pairingRepo.create(candidate);
+      // Write the canonical link back onto the source stud service (StudService
+      // owns pairing_id — this repo's own update() is the only thing allowed to
+      // write it, per the ownership rule in Stage4 Revision v2 §5).
+      if (sourceStudServiceId) {
+        await studServiceRepo.update(sourceStudServiceId, { pairing_id: saved.id });
+      }
       location.href = `pairing.html?id=${encodeURIComponent(saved.id)}`;
       return;
     }
@@ -279,6 +295,27 @@ async function renderLitterSection() {
     </section>`;
 }
 
+// --- Linked Stud Service panel (derived — StudService owns pairing_id, so
+// there is nothing to link/create from this side; Data Model v3 §5.8) --------
+async function renderStudServiceSection() {
+  if (!els.studService) return;
+  if (ctx.mode !== 'view' || !ctx.original) { els.studService.innerHTML = ''; return; }
+  const studServices = await studServiceRepo.getByPairing(ctx.original.id);
+  if (!studServices.length) { els.studService.innerHTML = ''; return; }
+
+  const inner = `<ul class="linked-list" style="margin:14px 0 0; padding:0; list-style:none;">` + studServices.map((s) => `
+    <li class="row-between" style="padding:8px 0; border-top:1px solid var(--border);">
+      <span>${badge(STUD_SERVICE_DIRECTION, s.direction)} <strong>${esc(dogName(s.our_dog_id) || '—')} × ${esc(dogName(s.partner_dog_id) || '—')}</strong> ${badge(STUD_SERVICE_STATUS, s.status)}</span>
+      <a class="btn btn-sm" href="stud-service.html?id=${encodeURIComponent(s.id)}">Open stud service →</a>
+    </li>`).join('') + `</ul>`;
+
+  els.studService.innerHTML = `
+    <section class="card" style="margin-top:16px;">
+      <h2 style="margin:0;">Linked Stud Service</h2>
+      ${inner}
+    </section>`;
+}
+
 // --- Timeline ------------------------------------------------------------
 function renderTimelineSection() {
   if (!els.timeline) return;
@@ -309,6 +346,7 @@ function renderAll() {
   if (ctx.mode === 'view') renderView();
   else renderEdit();
   renderLitterSection();
+  renderStudServiceSection();
   renderTimelineSection();
 }
 
@@ -320,6 +358,24 @@ async function main() {
   if (isNew) {
     ctx.mode = 'new';
     ctx.draft = blankPairing();
+    // Pre-fill from a stud service via "Create Pairing from this Stud Service"
+    // (Data Model v3 §5.8 direction mapping; Stage4 Revision v2 §5).
+    const studServiceId = param('stud_service');
+    if (studServiceId) {
+      const ss = await studServiceRepo.getById(studServiceId);
+      if (ss) {
+        sourceStudServiceId = ss.id;
+        if (ss.direction === 'outgoing') {
+          ctx.draft.sire_id = ss.our_dog_id || '';
+          ctx.draft.dam_id = ss.partner_dog_id || '';
+        } else if (ss.direction === 'incoming') {
+          ctx.draft.sire_id = ss.partner_dog_id || '';
+          ctx.draft.dam_id = ss.our_dog_id || '';
+        }
+        ctx.draft.pairing_type = 'actual';
+        ctx.draft.status = 'planned';
+      }
+    }
     renderTitle();
     renderEdit();
     renderProfileActions();

@@ -8,8 +8,13 @@ import { contactRepo } from '../data/contactRepo.js';
 import { litterRepo } from '../data/litterRepo.js';
 import { pairingRepo } from '../data/pairingRepo.js';
 import { kennelRepo } from '../data/kennelRepo.js';
+import { saleRepo } from '../data/saleRepo.js';
+import { studServiceRepo } from '../data/studServiceRepo.js';
 import { getMyContactId } from '../data/kennelSetup.js';
-import { SEX, DOG_STATUS, OWNERSHIP_TYPE, PAIRING_TYPE, PAIRING_STATUS } from '../data/vocab.js';
+import {
+  SEX, DOG_STATUS, OWNERSHIP_TYPE, PAIRING_TYPE, PAIRING_STATUS,
+  PLACEMENT_TYPE, SALE_STATUS, STUD_SERVICE_DIRECTION, STUD_SERVICE_STATUS
+} from '../data/vocab.js';
 import { esc, badge, fmtDate, todayYMD, param, confirmAction } from '../assets/ui.js';
 import { renderTimeline } from '../assets/timeline.js';
 import { renderPedigree } from '../assets/pedigree.js';
@@ -28,6 +33,8 @@ const els = {
   error: document.getElementById('page-error'),
   timeline: document.getElementById('timeline-section'),
   pairings: document.getElementById('pairings-section'),
+  sales: document.getElementById('sales-section'),
+  studServices: document.getElementById('stud-services-section'),
   pedigree: document.getElementById('pedigree-section')
 };
 
@@ -346,6 +353,8 @@ function enterEdit() {
   renderProfileActions();
   renderTimelineSection(); // hide timeline while editing the profile
   renderPairingsSection(); // hide pairings while editing too
+  renderSalesSection();
+  renderStudServicesSection();
   renderPedigreeSection(); // hide pedigree while editing too
 }
 
@@ -357,6 +366,8 @@ function cancel() {
   renderProfileActions();
   renderTimelineSection();
   renderPairingsSection();
+  renderSalesSection();
+  renderStudServicesSection();
   renderPedigreeSection();
 }
 
@@ -479,6 +490,64 @@ async function renderPairingsSection() {
     </section>`;
 }
 
+// Derived "Sales" panel (Stage 4): placements recorded for this dog. Shown when
+// there are existing records, or for a dog that could plausibly be sold (owned/
+// co-owned) — read-only here; sales are edited from their own page.
+async function renderSalesSection() {
+  if (!els.sales) return;
+  if (ctx.mode !== 'view' || !ctx.original) { els.sales.innerHTML = ''; return; }
+  const d = ctx.original;
+  const sales = await saleRepo.getByDog(d.id);
+  if (!sales.length && !['owned', 'co_owned'].includes(d.ownership_type)) { els.sales.innerHTML = ''; return; }
+
+  sales.sort((a, b) => (b.sale_date || b.created_at || '').localeCompare(a.sale_date || a.created_at || ''));
+  const rowsHtml = sales.length
+    ? `<ul class="linked-list" style="margin:14px 0 0; padding:0; list-style:none;">` + sales.map((s) => `
+        <li class="row-between" style="padding:8px 0; border-top:1px solid var(--border);">
+          <span>${badge(PLACEMENT_TYPE, s.placement_type)} <strong>${esc(contactName(s.buyer_contact_id) || '—')}</strong> ${badge(SALE_STATUS, s.status)}${s.sale_date ? ` <span class="faint">${esc(fmtDate(s.sale_date))}</span>` : ''}</span>
+          <a class="btn btn-sm" href="sale.html?id=${encodeURIComponent(s.id)}">Open →</a>
+        </li>`).join('') + `</ul>`
+    : `<p class="muted" style="margin:14px 0 0;">No sales recorded for this dog yet.</p>`;
+
+  els.sales.innerHTML = `
+    <section class="card" style="margin-top:16px;">
+      <div class="row-between">
+        <h2 style="margin:0;">Sales</h2>
+        <a class="btn btn-sm" href="sale.html?new=1&dog=${encodeURIComponent(d.id)}">+ Add Sale</a>
+      </div>
+      ${rowsHtml}
+    </section>`;
+}
+
+// Derived "Stud Services" panel (Stage 4): stud services where this dog appears
+// on either side. Shown for breeding-age dogs or a dog with existing records.
+async function renderStudServicesSection() {
+  if (!els.studServices) return;
+  if (ctx.mode !== 'view' || !ctx.original) { els.studServices.innerHTML = ''; return; }
+  const d = ctx.original;
+  const studServices = await studServiceRepo.getForDog(d.id);
+  if (!studServices.length && !BREEDING_STATUSES.includes(d.status)) { els.studServices.innerHTML = ''; return; }
+
+  const rowsHtml = studServices.length
+    ? `<ul class="linked-list" style="margin:14px 0 0; padding:0; list-style:none;">` + studServices.map((s) => {
+        const partnerId = s.our_dog_id === d.id ? s.partner_dog_id : s.our_dog_id;
+        return `<li class="row-between" style="padding:8px 0; border-top:1px solid var(--border);">
+          <span>${badge(STUD_SERVICE_DIRECTION, s.direction)} with <strong>${esc(dogName(partnerId) || '—')}</strong> ${badge(STUD_SERVICE_STATUS, s.status)}</span>
+          <a class="btn btn-sm" href="stud-service.html?id=${encodeURIComponent(s.id)}">Open →</a>
+        </li>`;
+      }).join('') + `</ul>`
+    : `<p class="muted" style="margin:14px 0 0;">No stud services recorded for this dog yet.</p>`;
+
+  els.studServices.innerHTML = `
+    <section class="card" style="margin-top:16px;">
+      <div class="row-between">
+        <h2 style="margin:0;">Stud Services</h2>
+        <a class="btn btn-sm" href="stud-service.html?new=1&dog=${encodeURIComponent(d.id)}">+ Add Stud Service</a>
+      </div>
+      ${rowsHtml}
+    </section>`;
+}
+
 // Pedigree centered on this dog (only for a saved dog in view mode). Clicking a
 // node opens the full Pedigree page re-centered there.
 function renderPedigreeSection() {
@@ -511,6 +580,8 @@ function renderAll() {
   else renderEdit();
   renderTimelineSection();
   renderPairingsSection();
+  renderSalesSection();
+  renderStudServicesSection();
   renderPedigreeSection();
 }
 

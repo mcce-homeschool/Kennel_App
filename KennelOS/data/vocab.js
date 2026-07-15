@@ -64,7 +64,72 @@ export const CONTACT_TYPE = [
   { value: 'groomer',        label: 'Groomer',        badge: 'badge-purple' },
   { value: 'buyer_referrer', label: 'Buyer referrer', badge: 'badge-amber' },
   { value: 'co_owner',       label: 'Co-owner',       badge: 'badge-neutral' },
+  { value: 'buyer',          label: 'Buyer',          badge: 'badge-blue' },
   { value: 'other',          label: 'Other',          badge: 'badge-gray' }
+];
+
+// --- Buyer-view / Sale / Contract / StudService vocabularies (Stage 4,
+// Data Model v3 §5.6–5.9, Stage4 Revision v2) --------------------------------
+// waitlist_status lives on Contact (Buyer merged into Contact, v3 §5.5) — it
+// powers the Buyer-view filter on the Contact List screen.
+export const WAITLIST_STATUS = [
+  { value: 'none',      label: 'None',      badge: 'badge-gray' },
+  { value: 'active',    label: 'Active',    badge: 'badge-blue' },
+  { value: 'fulfilled', label: 'Fulfilled', badge: 'badge-green' }
+];
+
+export const PLACEMENT_TYPE = [
+  { value: 'pet',            label: 'Pet',            badge: 'badge-neutral' },
+  { value: 'show',           label: 'Show',           badge: 'badge-purple' },
+  { value: 'breeding_rights', label: 'Breeding rights', badge: 'badge-green' },
+  { value: 'co_own',         label: 'Co-own',         badge: 'badge-blue' }
+];
+
+export const SALE_STATUS = [
+  { value: 'reserved',      label: 'Reserved',      badge: 'badge-blue' },
+  { value: 'deposit_paid',  label: 'Deposit paid',  badge: 'badge-amber' },
+  { value: 'paid_in_full',  label: 'Paid in full',  badge: 'badge-green' },
+  { value: 'delivered',     label: 'Delivered',     badge: 'badge-green' },
+  { value: 'returned',      label: 'Returned',      badge: 'badge-red' },
+  { value: 'cancelled',     label: 'Cancelled',     badge: 'badge-gray' }
+];
+
+export const CONTRACT_TYPE = [
+  { value: 'sale',         label: 'Sale',         badge: 'badge-blue' },
+  { value: 'stud_service', label: 'Stud service', badge: 'badge-purple' },
+  { value: 'co_own',       label: 'Co-own',       badge: 'badge-green' },
+  { value: 'lease',        label: 'Lease',        badge: 'badge-amber' },
+  { value: 'other',        label: 'Other',        badge: 'badge-gray' }
+];
+
+// Not a locked state machine (Stage4 Revision v2 §7) — moves any direction, no
+// confirmation dialogs. Default on create is 'draft'.
+export const CONTRACT_STATUS = [
+  { value: 'draft',     label: 'Draft',     badge: 'badge-gray' },
+  { value: 'sent',      label: 'Sent',      badge: 'badge-blue' },
+  { value: 'signed',    label: 'Signed',    badge: 'badge-green' },
+  { value: 'declined',  label: 'Declined',  badge: 'badge-red' },
+  { value: 'cancelled', label: 'Cancelled', badge: 'badge-red' },
+  { value: 'void',      label: 'Void',      badge: 'badge-gray' }
+];
+
+export const STUD_SERVICE_DIRECTION = [
+  { value: 'outgoing', label: 'Outgoing — our dog is the stud', badge: 'badge-blue' },
+  { value: 'incoming', label: 'Incoming — our dog is the dam',  badge: 'badge-purple' }
+];
+
+export const FEE_STRUCTURE = [
+  { value: 'flat_fee',       label: 'Flat fee',       badge: 'badge-neutral' },
+  { value: 'pick_of_litter', label: 'Pick of litter', badge: 'badge-neutral' },
+  { value: 'flat_plus_pick', label: 'Flat + pick',    badge: 'badge-neutral' },
+  { value: 'other',          label: 'Other',          badge: 'badge-gray' }
+];
+
+export const STUD_SERVICE_STATUS = [
+  { value: 'arranged', label: 'Arranged', badge: 'badge-blue' },
+  { value: 'completed', label: 'Completed', badge: 'badge-green' },
+  { value: 'failed',    label: 'Failed',    badge: 'badge-red' },
+  { value: 'cancelled', label: 'Cancelled', badge: 'badge-gray' }
 ];
 
 // Look up the {value,label,badge} descriptor for a value in a vocab list.

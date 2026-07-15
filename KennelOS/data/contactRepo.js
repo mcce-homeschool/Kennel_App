@@ -38,5 +38,13 @@ export const contactRepo = {
     const byId = new Map();
     for (const d of [...owned, ...coOwned]) byId.set(d.id, d);
     return [...byId.values()];
+  },
+
+  // Distinct first_contact_source values already entered — feeds the free-text
+  // autocomplete (Stage4 Revision v2 §3, built like `breed`: suggested, never
+  // enforced).
+  async getFirstContactSources() {
+    const all = await db.contacts.toArray();
+    return [...new Set(all.map((c) => c.first_contact_source).filter(Boolean))].sort();
   }
 };

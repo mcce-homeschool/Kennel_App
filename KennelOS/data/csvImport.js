@@ -16,7 +16,8 @@ import { contactRepo } from './contactRepo.js';
 import { kennelRepo } from './kennelRepo.js';
 import { pairingRepo } from './pairingRepo.js';
 import { litterRepo } from './litterRepo.js';
-import { SEX, OWNERSHIP_TYPE, DOG_STATUS, CONTACT_TYPE, PAIRING_TYPE, PAIRING_METHOD, PAIRING_STATUS, LITTER_STATUS } from './vocab.js';
+import { saleRepo } from './saleRepo.js';
+import { SEX, OWNERSHIP_TYPE, DOG_STATUS, CONTACT_TYPE, PAIRING_TYPE, PAIRING_METHOD, PAIRING_STATUS, LITTER_STATUS, PLACEMENT_TYPE, SALE_STATUS } from './vocab.js';
 
 // --- Parsing --------------------------------------------------------------
 // Headers are normalized to lower_snake_case so "Registered Name", "registered
@@ -542,7 +543,147 @@ const LITTER_MAPPING = {
   repo: litterRepo
 };
 
-const MAPPINGS = { dog: DOG_MAPPING, contact: CONTACT_MAPPING, pairing: PAIRING_MAPPING, litter: LITTER_MAPPING };
+// =========================================================================
+// Sale mapping (Stage 4)
+// =========================================================================
+// Natural key: dog + buyer + sale_date (Stage4 Revision v2 §6) — a dateless
+// sale routes to needs-review by design (sale_date is optional on the entity,
+// so this is expected, not a bug). Dog is resolved against EXISTING dogs only
+// (same rule as sire/dam elsewhere). buyer_name is DIFFERENT from every other
+// relationship column in this file: it resolves against Contacts, but an
+// unmatched name is NOT flagged for review — it's created inline as a Contact
+// (never a Buyer — there is no Buyer table, Data Model v3 §5.5) at commit time,
+// via the mapping.prepareRecord hook below.
+const SALE_MAPPING = {
+  entity: 'sale',
+  label: 'Sales',
+  templateHeaders: [
+    'dog_registered_name', 'buyer_name', 'sale_date', 'placement_type', 'status',
+    'price', 'deposit_amount', 'deposit_date', 'balance_paid_date', 'lead_source', 'notes'
+  ],
+  requiredForCreate: ['dog_id', 'placement_type', 'status'],
+
+  async loadExisting() {
+    const [sales, dogs, contacts] = await Promise.all([
+      saleRepo.getAll({ includeArchived: true }),
+      dogRepo.getAll({ includeArchived: true }),
+      contactRepo.getAll({ includeArchived: true })
+    ]);
+    this._dogNames = buildDogNameIndex(dogs);
+    this._contactsById = new Map(contacts.map((c) => [c.id, c]));
+    this._contactByName = new Map();
+    for (const c of contacts) if (c.name) this._contactByName.set(c.name.trim().toLowerCase(), c);
+    return sales;
+  },
+
+  buildIndex(existing) {
+    const byKey = new Map();
+    for (const s of existing) {
+      const buyerName = (this._contactsById.get(s.buyer_contact_id)?.name || '').trim().toLowerCase();
+      const key = nkParts(s.dog_id, buyerName || null, s.sale_date);
+      if (key) byKey.set(key, s);
+    }
+    return { byKey, dogNames: this._dogNames, contactByName: this._contactByName };
+  },
+
+  classify(row, index, i) {
+    const reasons = [];
+    const record = {};
+
+    const dogNameRaw = col(row, 'dog_registered_name', 'dog_name');
+    let dogId = '';
+    if (dogNameRaw) {
+      const hit = index.dogNames.get(dogNameRaw.toLowerCase());
+      if (hit) { dogId = hit.id; record.dog_id = hit.id; }
+      else reasons.push(`Dog "${dogNameRaw}" not found.`);
+    }
+
+    const buyerName = col(row, 'buyer_name', 'buyer');
+    let buyerNameKey = '';
+    let toCreateBuyer = '';
+    if (buyerName) {
+      buyerNameKey = buyerName.trim().toLowerCase();
+      const hit = index.contactByName.get(buyerNameKey);
+      if (hit) record.buyer_contact_id = hit.id;
+      else toCreateBuyer = buyerName.trim(); // created inline on commit — never flagged
+    }
+
+    const placementType = normEnum(PLACEMENT_TYPE, col(row, 'placement_type', 'placement'));
+    if (placementType === null) reasons.push(`Unrecognized placement_type "${col(row, 'placement_type', 'placement')}".`);
+    else if (placementType) record.placement_type = placementType;
+
+    const status = normEnum(SALE_STATUS, col(row, 'status'));
+    if (status === null) reasons.push(`Unrecognized status "${col(row, 'status')}".`);
+    else if (status) record.status = status;
+
+    const saleRaw = col(row, 'sale_date');
+    const saleDate = normDate(saleRaw);
+    if (saleDate === null) reasons.push(`Unrecognized sale_date "${saleRaw}".`);
+    else if (saleDate) record.sale_date = saleDate;
+
+    for (const [key, ...aliases] of [
+      ['deposit_amount'], ['price'], ['lead_source'], ['notes']
+    ]) {
+      const v = col(row, key, ...aliases);
+      if (v) record[key] = key === 'price' || key === 'deposit_amount' ? Number(v) : v;
+    }
+    for (const key of ['deposit_date', 'balance_paid_date']) {
+      const raw = col(row, key);
+      const d = normDate(raw);
+      if (d === null && raw) reasons.push(`Unrecognized ${key} "${raw}" (ignored).`);
+      else if (d) record[key] = d;
+    }
+
+    // Natural key → match-or-create. Uses the buyer NAME (not id) so a
+    // not-yet-created buyer still matches consistently within this import.
+    const key = (dogId && buyerNameKey && saleDate) ? nkParts(dogId, buyerNameKey, saleDate) : null;
+    let status_ = 'create';
+    let match = null;
+    if (!key) {
+      status_ = 'review';
+      if (!dogNameRaw) reasons.push('No dog_registered_name — cannot form a natural key.');
+      if (!buyerName) reasons.push('No buyer_name — cannot form a natural key.');
+      if (!saleDate) reasons.push('No sale_date — cannot form a natural key.');
+    } else {
+      match = index.byKey.get(key) || null;
+      status_ = match ? 'update' : 'create';
+    }
+
+    if (status_ === 'create') {
+      const missing = this.requiredForCreate.filter((f) => !record[f]);
+      if (missing.length) { status_ = 'review'; reasons.push(`Missing required field(s) for a new sale: ${missing.join(', ')}.`); }
+    }
+    if (!dogId && dogNameRaw) status_ = 'review'; // unresolved dog is always flagged, unlike buyer
+    if (toCreateBuyer) reasons.push(`Buyer "${toCreateBuyer}" not found — will be created as a new Contact.`);
+
+    const display = `${dogNameRaw || '?'} → ${buyerName || '?'}${saleDate ? ` (${saleDate})` : ''}`;
+    return {
+      index: i, raw: row, entity: 'sale', display,
+      record, changes: { ...record },
+      status: status_, match, matchLabel: match ? SALE_MAPPING.describe(match) : '',
+      reasons,
+      decision: status_ === 'review' ? 'skip' : status_,
+      decisionTarget: match ? match.id : null,
+      _buyerNameToCreate: toCreateBuyer || null
+    };
+  },
+
+  // Runs just before commit writes the row (create or update). The one place a
+  // Sale row differs from every other mapping: an unmatched buyer_name becomes
+  // a real Contact here, never a silent drop and never a "needs review" stall.
+  async prepareRecord(r) {
+    if (!r._buyerNameToCreate) return;
+    const contact = await contactRepo.create({ name: r._buyerNameToCreate, contact_type: ['buyer'] });
+    r.record.buyer_contact_id = contact.id;
+    r.changes.buyer_contact_id = contact.id;
+  },
+
+  describe: (s) => `Sale — ${s.sale_date || 'no date'}` + (s.is_archived ? ' (archived)' : ''),
+
+  repo: saleRepo
+};
+
+const MAPPINGS = { dog: DOG_MAPPING, contact: CONTACT_MAPPING, pairing: PAIRING_MAPPING, litter: LITTER_MAPPING, sale: SALE_MAPPING };
 
 export function getMapping(entity) {
   const m = MAPPINGS[entity];
@@ -576,6 +717,10 @@ export async function commitPlan(entity, plan) {
   const result = { created: 0, updated: 0, skipped: 0, failed: [] };
   for (const r of plan) {
     try {
+      // Optional per-mapping hook: mutate r.record/r.changes just before the
+      // write (Sale uses this to create an unmatched buyer as a Contact inline
+      // — the one place a relationship column isn't resolve-or-review).
+      if (mapping.prepareRecord) await mapping.prepareRecord(r);
       if (r.decision === 'create') {
         await mapping.repo.create(r.record);
         result.created++;

@@ -4,7 +4,8 @@
 import { contactRepo } from '../data/contactRepo.js';
 import { kennelRepo } from '../data/kennelRepo.js';
 import { dogRepo, ReferenceBlockedError } from '../data/dogRepo.js';
-import { CONTACT_TYPE, DOG_STATUS } from '../data/vocab.js';
+import { saleRepo } from '../data/saleRepo.js';
+import { CONTACT_TYPE, DOG_STATUS, WAITLIST_STATUS, SALE_STATUS, PLACEMENT_TYPE } from '../data/vocab.js';
 import { esc, badge, badges, param, confirmAction } from '../assets/ui.js';
 
 const els = {
@@ -13,15 +14,24 @@ const els = {
   profileActions: document.getElementById('profile-actions'),
   body: document.getElementById('profile-body'),
   error: document.getElementById('page-error'),
-  dogs: document.getElementById('dogs-section')
+  dogs: document.getElementById('dogs-section'),
+  sales: document.getElementById('sales-section')
 };
 
-const blank = () => ({ name: '', kennel_id: '', contact_type: [], phone: '', email: '', address: '', notes: '' });
+const blank = () => ({
+  name: '', kennel_id: '', contact_type: [], phone: '', email: '', address: '',
+  waitlist_status: '', first_contact_source: '', notes: ''
+});
 
-const ctx = { mode: 'view', original: null, draft: null, kennels: [] };
+const ctx = { mode: 'view', original: null, draft: null, kennels: [], firstContactSources: [] };
 
 async function loadKennels() {
-  ctx.kennels = await kennelRepo.getAll({ includeArchived: true });
+  const [kennels, sources] = await Promise.all([
+    kennelRepo.getAll({ includeArchived: true }),
+    contactRepo.getFirstContactSources()
+  ]);
+  ctx.kennels = kennels;
+  ctx.firstContactSources = sources;
 }
 function kennelName(id) { return ctx.kennels.find((k) => k.id === id)?.kennel_name || ''; }
 
@@ -37,6 +47,8 @@ function renderView() {
     <dl class="dl-meta" style="margin-top:14px;">
       ${row('Name', esc(c.name))}
       ${row('Type', badges(CONTACT_TYPE, c.contact_type))}
+      ${row('Waitlist', c.waitlist_status && c.waitlist_status !== 'none' ? badge(WAITLIST_STATUS, c.waitlist_status) : '')}
+      ${row('First contact source', esc(c.first_contact_source))}
       ${row('Kennel', esc(kennelName(c.kennel_id)))}
       ${row('Phone', esc(c.phone))}
       ${row('Email', esc(c.email))}
@@ -59,6 +71,9 @@ function renderEdit() {
     <label class="check-inline" style="margin-right:14px;">
       <input type="checkbox" data-type="${esc(t.value)}"${(c.contact_type || []).includes(t.value) ? ' checked' : ''}> ${esc(t.label)}
     </label>`).join('');
+  const waitlistOpts = `<option value="">— none —</option>` + WAITLIST_STATUS.filter((w) => w.value !== 'none')
+    .map((w) => `<option value="${esc(w.value)}"${w.value === c.waitlist_status ? ' selected' : ''}>${esc(w.label)}</option>`).join('');
+  const sourceList = ctx.firstContactSources.map((s) => `<option value="${esc(s)}"></option>`).join('');
 
   els.body.innerHTML = `
     <div class="form-grid" id="c-form" style="margin-top:14px;">
@@ -71,6 +86,8 @@ function renderEdit() {
       </div>
       <div class="field"><label>Phone</label><input id="f-phone" type="text" value="${esc(c.phone)}"></div>
       <div class="field"><label>Email</label><input id="f-email" type="email" value="${esc(c.email)}"></div>
+      <div class="field"><label>Waitlist</label><select id="f-waitlist_status">${waitlistOpts}</select></div>
+      <div class="field"><label>First contact source</label><input id="f-first_contact_source" type="text" list="source-list" value="${esc(c.first_contact_source)}"><datalist id="source-list">${sourceList}</datalist></div>
       <div class="field field-wide"><label>Type</label><div class="pill-row" style="gap:0;">${typeChecks}</div></div>
       <div class="field field-wide"><label>Address</label><textarea id="f-address">${esc(c.address)}</textarea></div>
       <div class="field field-wide"><label>Notes</label><textarea id="f-notes">${esc(c.notes)}</textarea></div>
@@ -89,6 +106,8 @@ function readForm() {
     contact_type: types,
     phone: val('f-phone').trim(),
     email: val('f-email').trim(),
+    waitlist_status: val('f-waitlist_status') || 'none',
+    first_contact_source: val('f-first_contact_source').trim(),
     address: val('f-address').trim(),
     notes: val('f-notes')
   };
@@ -127,6 +146,24 @@ async function renderDogsSection() {
   });
 }
 
+// --- Sales (as buyer) list -------------------------------------------------
+async function renderSalesSection() {
+  els.sales.innerHTML = '';
+  if (ctx.mode !== 'view' || !ctx.original) return;
+  const sales = await saleRepo.getByBuyer(ctx.original.id);
+  if (!sales.length) return; // no "Buyers" panel noise on non-buyer contacts
+  const dogs = await dogRepo.getAll({ includeArchived: true });
+  const dogsById = new Map(dogs.map((d) => [d.id, d]));
+  const inner = `<ul class="linked-list" style="margin:14px 0 0; padding:0; list-style:none;">` + sales.map((s) => {
+    const dog = dogsById.get(s.dog_id);
+    return `<li class="row-between" style="padding:8px 0; border-top:1px solid var(--border);">
+      <span>${badge(PLACEMENT_TYPE, s.placement_type)} <strong>${esc(dog ? dog.call_name : '—')}</strong> ${badge(SALE_STATUS, s.status)}${s.sale_date ? ` <span class="faint">${esc(s.sale_date)}</span>` : ''}</span>
+      <a class="btn btn-sm" href="sale.html?id=${encodeURIComponent(s.id)}">Open →</a>
+    </li>`;
+  }).join('') + `</ul>`;
+  els.sales.innerHTML = `<section class="card" style="margin-top:16px;"><h2 style="margin-top:0;">Sales (as buyer)</h2>${inner}</section>`;
+}
+
 // --- Actions -------------------------------------------------------------
 function renderProfileActions() {
   if (ctx.mode === 'view') {
@@ -161,6 +198,7 @@ function enterEdit() {
   renderEdit();
   renderProfileActions();
   renderDogsSection();
+  renderSalesSection();
 }
 
 function cancel() {
@@ -170,6 +208,7 @@ function cancel() {
   renderView();
   renderProfileActions();
   renderDogsSection();
+  renderSalesSection();
 }
 
 async function save() {
@@ -222,6 +261,7 @@ function renderAll() {
   if (ctx.mode === 'view') renderView();
   else renderEdit();
   renderDogsSection();
+  renderSalesSection();
 }
 
 async function main() {

@@ -13,35 +13,33 @@ import Dexie from '../vendor/dexie.min.mjs';
 export const db = new Dexie('KennelOSBreedingApp');
 
 // --- Schema ---------------------------------------------------------------
-// version(1) covers the Stage 1–2 tables only: dogs, events, contacts, kennels.
-// Schema is ADDITIVE — later stages add tables in a NEW db.version(N).stores({...})
-// block. NEVER edit version(1) (CLAUDE.md / Build Brief A2) — EXCEPT dogs.kennel_id
-// below, added directly per the Own-Kennel Identity addendum: this is a solo,
-// single-device build with a hard-reset test cycle and no live data to migrate,
-// so the migration constraint that rule protects against doesn't apply yet.
+// Data Model Architecture Proposal v3 §2 collapses the version(1)/(2)/(3) ladder
+// that carried Stages 1–3 into a SINGLE version(1) block covering all nine
+// tables. That ladder only exists to protect real-data migrations, and nothing
+// has shipped — there is no live data to migrate, so this is a deliberate,
+// documented reset (v3 §2, Stage4 Revision v2 §1). The NEXT `.version(2)` block
+// should be added only at the first real release; from then on, additive
+// versioning applies as Dexie expects and this block is never edited again.
 //
 // Index notes:
 //  - events '[subject_type+subject_id]' is a COMPOUND index, required for fast
 //    "timeline for this dog/pairing/litter" lookups. Do not split into two.
 //  - dogs '*co_owner_contact_ids' is a MULTI-ENTRY index so "dogs co-owned by X"
 //    is a real query, not a full scan.
+//  - Every canonical FK (Stage 4: sales/contracts/stud_services) is indexed, so
+//    every reverse lookup in referenceRegistry.js is an index probe, never a scan.
 //  - Only fields we actually query/filter on are indexed; all other fields still
 //    persist, they just aren't indexed.
 db.version(1).stores({
-  dogs: 'id, sire_id, dam_id, litter_id, owner_contact_id, *co_owner_contact_ids, status, ownership_type, sex, breed, kennel_id, is_archived',
-  events: 'id, [subject_type+subject_id], event_type, event_date, related_dog_id, is_archived',
-  contacts: 'id, kennel_id, is_archived',
-  kennels: 'id, is_archived'
-});
-
-// version(2) adds the Stage 3 Breeding Workflow tables: pairings, litters. This
-// is a NEW, ADDITIVE block — version(1) above is untouched (CLAUDE.md / Stage 3
-// Brief §2). dogs.litter_id and events '[subject_type+subject_id]' already exist
-// from version(1) and need no change; a Dog with status "puppy" simply points its
-// existing litter_id at one of these new litter rows.
-db.version(2).stores({
-  pairings: 'id, sire_id, dam_id, status, pairing_type, is_archived',
-  litters:  'id, pairing_id, sire_id, dam_id, status, whelp_date, is_archived'
+  dogs:          'id, sire_id, dam_id, litter_id, owner_contact_id, *co_owner_contact_ids, status, ownership_type, sex, breed, kennel_id, is_archived',
+  events:        'id, [subject_type+subject_id], event_type, event_date, related_dog_id, is_archived',
+  contacts:      'id, kennel_id, waitlist_status, is_archived',
+  kennels:       'id, is_archived',
+  pairings:      'id, sire_id, dam_id, status, pairing_type, is_archived',
+  litters:       'id, pairing_id, sire_id, dam_id, status, whelp_date, is_archived',
+  sales:         'id, dog_id, buyer_contact_id, status, placement_type, is_archived',
+  contracts:     'id, contract_type, status, related_sale_id, related_stud_service_id, is_archived',
+  stud_services: 'id, our_dog_id, partner_dog_id, partner_contact_id, direction, status, pairing_id, is_archived'
 });
 
 // --- First-run storage durability ----------------------------------------
