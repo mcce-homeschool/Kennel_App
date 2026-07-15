@@ -15,6 +15,16 @@ async function firstRunPersistence() {
   await requestPersistentStorage();
 }
 
+// Registered against this module's own URL (not the page's) so it resolves to
+// the same sw.js/scope from both index.html and /pages/*.html. A service
+// worker with a fetch handler is required by Chrome/Android before it will
+// offer to install the app, and it's what makes offline-after-first-load work.
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  const swUrl = new URL('./sw.js', import.meta.url);
+  navigator.serviceWorker.register(swUrl, { scope: new URL('./', import.meta.url) });
+}
+
 // The kennel-setup wizard follows the sample-data choice, not precedes it:
 // picking "Explore with sample data" reloads the page (Thornfield Kennels
 // already fills that role), so only the "blank kennel" branch — or a later
@@ -26,6 +36,7 @@ async function firstRunFlow() {
 
 function boot() {
   renderNav();
+  registerServiceWorker();
   firstRunPersistence();
   renderSampleBanner();
   renderKennelBanner();
