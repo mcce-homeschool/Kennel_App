@@ -144,6 +144,13 @@ export const BOARDING_REASON_SUGGESTIONS = [
   'Stud service', 'Co-owner rotation', 'Foster', 'Grow-out', 'Owner travel', 'Whelp assist', 'Other'
 ];
 
+// Suggest-not-enforce starter set for a recorded COI's `method` (Stage 5, Build
+// Brief §1.5/§2.1) — Dog.recorded_coi.method is free text; a combobox surfaces
+// these without forcing an enum. NOT a validated vocab and never a badge: the
+// value describes how the breeder's lab/registry derived the number, not a state
+// the app owns. No new event types come with it.
+export const COI_METHOD_SUGGESTIONS = ['genomic', 'pedigree', 'registry', 'other'];
+
 // --- Event type catalog (Data Model doc §5.2; Stage4.5 Addendum §C3/D1) ----
 // Each type carries a badge color and the type-specific `details` fields shown
 // as a short form (Build Brief B1: one small form per event_type, not a generic

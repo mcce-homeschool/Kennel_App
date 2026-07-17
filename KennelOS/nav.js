@@ -7,6 +7,7 @@
 // Dogs, Contacts, Import/Export, Settings.
 
 export const NAV_ITEMS = [
+  { label: 'Dashboard',     path: 'pages/dashboard.html',     stageIntroduced: 5 },
   { label: 'Dogs',          path: 'pages/dogs.html',          stageIntroduced: 2 },
   { label: 'Pairings',      path: 'pages/pairings.html',      stageIntroduced: 3 },
   { label: 'Litters',       path: 'pages/litters.html',       stageIntroduced: 3 },
@@ -21,6 +22,8 @@ export const NAV_ITEMS = [
   { label: 'Location Board', path: 'pages/board.html',        stageIntroduced: '4.5' },
   { label: 'Upcoming',      path: 'pages/upcoming.html',       stageIntroduced: '4.5' },
   { label: 'Scheduled Placements', path: 'pages/scheduled-placements.html', stageIntroduced: '4.5' },
+  { label: 'Reminders',     path: 'pages/reminders.html',      stageIntroduced: 5 },
+  { label: 'Reports',       path: 'pages/reports.html',        stageIntroduced: 5 },
   { label: 'Import/Export', path: 'pages/import-export.html', stageIntroduced: 1 }
 ];
 

@@ -124,18 +124,24 @@ export async function seedSampleData() {
   });
   await dogRepo.archive(willow.id);
 
+  // Juniper carries a recorded COI (Stage 5 §9) — genomic, from Embark. It's a
+  // user-attested value on the Dog record, not computed by the app.
   const juniper = await dogRepo.create({
     call_name: 'Juniper', sex: 'female', breed: BREED,
     date_of_birth: '2019-11-03', sire_id: ash.id, dam_id: willow.id,
-    ownership_type: 'owned', status: 'active_breeding', kennel_id: thornfield.id
+    ownership_type: 'owned', status: 'active_breeding', kennel_id: thornfield.id,
+    recorded_coi: { value: 6.25, method: 'genomic', source: 'Embark', as_of_date: '2023-03-01' }
   });
 
   // Gunnar stays kennel_id: null — external, owned by Dana Ruiz. His kennel
-  // identity flows through owner_contact_id, not kennel_id.
+  // identity flows through owner_contact_id, not kennel_id. His recorded COI uses
+  // a DIFFERENT method/source (pedigree, AKC 5-gen) so the mixed-provenance
+  // display is exercised (Stage 5 §9).
   const gunnar = await dogRepo.create({
     call_name: 'Gunnar', sex: 'male', breed: BREED,
     date_of_birth: '2018-06-01', dob_is_estimated: true,
-    ownership_type: 'external', owner_contact_id: dana.id, status: 'external_reference'
+    ownership_type: 'external', owner_contact_id: dana.id, status: 'external_reference',
+    recorded_coi: { value: 4.1, method: 'pedigree', source: 'AKC 5-gen', as_of_date: '2022-11-15' }
   });
 
   // Pairing P1 — the actual, whelped breeding that produced Fern/Birch/Hazel.
@@ -240,8 +246,10 @@ export async function seedSampleData() {
   // Events — spread across all three subject types to cover most of the catalog
   // (brief §6).
   const dogEvents = [
-    // Juniper
+    // Juniper — annual vaccines with a now-OVERDUE reminder (Stage 5 §9): the
+    // rabies booster reminder has slipped past its date and is still pending.
     { subject_id: juniper.id, event_type: 'vaccination', event_date: '2026-01-10', title: 'Annual vaccines',
+      reminder_date: daysFromToday(-10),
       details: { vaccine: 'DHPP + Rabies', lot_number: 'B4471' } },
     { subject_id: juniper.id, event_type: 'heat_cycle', event_date: '2026-02-02', title: 'Heat cycle',
       details: { cycle_start: '2026-02-02' } },
@@ -290,9 +298,23 @@ export async function seedSampleData() {
       details: { vaccine: 'DHPP', lot_number: 'C1029' } },
     { subject_id: hazel.id, event_type: 'note', event_date: '2025-12-20', title: 'Placed in pet home',
       details: {}, notes: 'Went home with a family in Concord, NH — regular updates from the family.' },
-    // Percy — future-dated, tests the "upcoming" treatment
+    // Percy — future-dated, tests the "upcoming" treatment. Also carries a
+    // DUE-SOON reminder (Stage 5 §9): within the reminder view's 30-day window.
     { subject_id: percy.id, event_type: 'vet_visit', event_date: '2026-08-15', title: 'Annual checkup',
-      details: { reason: 'Annual checkup', vet: 'Dr. Patricia Nguyen' } }
+      reminder_date: daysFromToday(14),
+      details: { reason: 'Annual checkup', vet: 'Dr. Patricia Nguyen' } },
+    // Birch — an UPCOMING reminder (Stage 5 §9): beyond the 30-day window, so it
+    // lands in the reminder view's "Upcoming" bucket. A preventative that also
+    // demonstrates complete-and-chain (log the next dose, carrying a new reminder).
+    { subject_id: birch.id, event_type: 'preventative', event_date: daysFromToday(-2), title: 'Heartworm preventative',
+      reminder_date: daysFromToday(90),
+      details: { product: 'Heartgard', dose: '1 chew' } },
+    // Fern — a DISMISSED reminder (Stage 5 §9): already handled, so it's off the
+    // pending buckets but visible under the reminder view's "Show dismissed"
+    // toggle. Exercises reminder_dismissed (a plain field, not archive/status).
+    { subject_id: fern.id, event_type: 'vaccination', event_date: '2026-06-01', title: 'Rabies booster',
+      reminder_date: daysFromToday(20), reminder_dismissed: true,
+      details: { vaccine: 'Rabies', lot_number: 'C2210' } }
   ];
 
   const pairingEvents = [

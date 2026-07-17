@@ -117,6 +117,25 @@ h2 { font-size: 18px; margin: 28px 0 12px; }
 .tile p { margin: 0; color: var(--text-muted); font-size: 14px; }
 .tile .tile-icon { font-size: 26px; display: block; margin-bottom: 10px; }
 
+/* --- Dashboard stat tiles (Stage 5) ------------------------------------- */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 14px; }
+.stat {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+a.stat { transition: border-color 0.12s, transform 0.12s; }
+a.stat:hover { border-color: var(--accent); transform: translateY(-2px); }
+.stat-num { font-size: 28px; font-weight: 700; line-height: 1.1; }
+.stat-label { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+.stat.stat-alert .stat-num { color: var(--danger); }
+.stat.stat-warn .stat-num { color: var(--warn); }
+.stat.stat-zero .stat-num { color: var(--text-faint); font-weight: 600; }
+
 /* --- Buttons ------------------------------------------------------------ */
 .btn {
   display: inline-flex;
