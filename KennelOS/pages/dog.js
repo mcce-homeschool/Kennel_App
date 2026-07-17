@@ -14,7 +14,8 @@ import { studServiceRepo } from '../data/studServiceRepo.js';
 import { getMyContactId } from '../data/kennelSetup.js';
 import {
   SEX, DOG_STATUS, OWNERSHIP_TYPE, PAIRING_TYPE, PAIRING_STATUS,
-  PLACEMENT_TYPE, SALE_STATUS, STUD_SERVICE_DIRECTION, STUD_SERVICE_STATUS
+  PLACEMENT_TYPE, SALE_STATUS, STUD_SERVICE_DIRECTION, STUD_SERVICE_STATUS,
+  EVENT_TYPES, descriptor, COI_METHOD_SUGGESTIONS
 } from '../data/vocab.js';
 import { esc, badge, fmtDate, todayYMD, param, confirmAction } from '../assets/ui.js';
 import { renderTimeline } from '../assets/timeline.js';
@@ -32,7 +33,9 @@ const els = {
   profileActions: document.getElementById('profile-actions'),
   body: document.getElementById('profile-body'),
   error: document.getElementById('page-error'),
+  recordedCoi: document.getElementById('recorded-coi-section'),
   plannedTests: document.getElementById('planned-tests-section'),
+  healthTests: document.getElementById('health-tests-section'),
   timeline: document.getElementById('timeline-section'),
   pairings: document.getElementById('pairings-section'),
   sales: document.getElementById('sales-section'),
@@ -66,6 +69,7 @@ const ctx = {
   mode: 'view',        // 'new' | 'view' | 'edit'
   original: null,      // saved record (null in new mode)
   draft: null,         // working copy while editing
+  coiEditing: false,   // Recorded COI panel has its own inline edit toggle
   pickerArchived: false,
   allDogs: [],
   allContacts: [],
@@ -365,10 +369,13 @@ function clearError() { els.error.innerHTML = ''; }
 function enterEdit() {
   clearError();
   ctx.mode = 'edit';
+  ctx.coiEditing = false;
   ctx.draft = { ...ctx.original, co_owner_contact_ids: [...(ctx.original.co_owner_contact_ids || [])] };
   renderEdit();
   renderProfileActions();
+  renderRecordedCoiSection(); // hide while editing the profile
   renderPlannedTestsSection(); // hide while editing the profile too
+  renderHealthTestsSection(); // hide while editing the profile
   renderTimelineSection(); // hide timeline while editing the profile
   renderPairingsSection(); // hide pairings while editing too
   renderSalesSection();
@@ -382,7 +389,9 @@ function cancel() {
   ctx.mode = 'view';
   renderView();
   renderProfileActions();
+  renderRecordedCoiSection();
   renderPlannedTestsSection();
+  renderHealthTestsSection();
   renderTimelineSection();
   renderPairingsSection();
   renderSalesSection();
@@ -475,6 +484,127 @@ function renderTimelineSection() {
   } else {
     els.timeline.innerHTML = '';
   }
+}
+
+// Recorded COI panel (Stage 5, Build Brief §2.2). recorded_coi is an OPTIONAL,
+// user-attested value — { value, method, source, as_of_date } — NOT computed by
+// the app and NEVER presented as if it were (§2.4: the app records the result of
+// the breeder's lab/registry analysis; it offers no relatedness math of its own).
+// The panel always labels the value as user-recorded, always shows its provenance
+// beside it (a bare percentage is never shown alone), and shows a quiet empty
+// state with an add affordance when nothing is recorded. It has its own inline
+// edit toggle, independent of the Profile edit mode.
+async function renderRecordedCoiSection() {
+  if (!els.recordedCoi) return;
+  if (ctx.mode !== 'view' || !ctx.original) { els.recordedCoi.innerHTML = ''; ctx.coiEditing = false; return; }
+  const d = ctx.original;
+  const coi = d.recorded_coi || null;
+
+  if (ctx.coiEditing) {
+    const c = coi || {};
+    const methodOpts = COI_METHOD_SUGGESTIONS.map((m) => `<option value="${esc(m)}"></option>`).join('');
+    els.recordedCoi.innerHTML = `
+      <section class="card" style="margin-top:16px;">
+        <h2 style="margin:0;">Recorded COI</h2>
+        <p class="field-hint">A coefficient of inbreeding you recorded from a lab or registry — the app stores it, it does not compute or verify it.</p>
+        <div class="form-grid" style="margin-top:12px;">
+          ${field('COI value (%)', `<input id="coi-value" type="number" step="0.01" min="0" value="${esc(c.value ?? '')}" placeholder="e.g. 6.25">`, { hint: 'Leave blank and save to remove the recorded COI.' })}
+          ${field('Method', `<input id="coi-method" type="text" list="coi-method-dl" value="${esc(c.method ?? '')}" placeholder="genomic / pedigree / registry / other"><datalist id="coi-method-dl">${methodOpts}</datalist>`)}
+          ${field('Source', `<input id="coi-source" type="text" value="${esc(c.source ?? '')}" placeholder="e.g. Embark, AKC 5-gen">`)}
+          ${field('As of', `<input id="coi-as_of" type="date" value="${esc(c.as_of_date ?? '')}">`)}
+        </div>
+        <div id="coi-error"></div>
+        <div class="form-actions" style="margin-top:12px;">
+          <button class="btn btn-primary btn-sm" id="coi-save">Save</button>
+          <button class="btn btn-sm" id="coi-cancel">Cancel</button>
+        </div>
+      </section>`;
+
+    document.getElementById('coi-cancel').addEventListener('click', () => { ctx.coiEditing = false; renderRecordedCoiSection(); });
+    document.getElementById('coi-save').addEventListener('click', async () => {
+      const valRaw = document.getElementById('coi-value').value.trim();
+      const method = document.getElementById('coi-method').value.trim();
+      const source = document.getElementById('coi-source').value.trim();
+      const asOf = document.getElementById('coi-as_of').value;
+      let recorded_coi = null;
+      if (valRaw !== '') {
+        const n = Number(valRaw);
+        if (!Number.isFinite(n)) {
+          document.getElementById('coi-error').innerHTML = '<div class="inline-error">COI value must be a number (percent, e.g. 6.25).</div>';
+          return;
+        }
+        recorded_coi = { value: n, method: method || null, source: source || null, as_of_date: asOf || null };
+      }
+      try {
+        ctx.original = await dogRepo.update(d.id, { recorded_coi });
+        ctx.coiEditing = false;
+        renderRecordedCoiSection();
+      } catch (e) { document.getElementById('coi-error').innerHTML = `<div class="inline-error">${esc(e.message || String(e))}</div>`; }
+    });
+    return;
+  }
+
+  const bodyHtml = coi && coi.value != null
+    ? `<dl class="dl-meta" style="margin-top:12px;">
+        ${row('COI value', `<strong>${esc(coi.value)}%</strong>`)}
+        ${row('Method', esc(coi.method))}
+        ${row('Source', esc(coi.source))}
+        ${row('As of', coi.as_of_date ? esc(fmtDate(coi.as_of_date)) : '')}
+       </dl>
+       <p class="faint" style="margin:10px 0 0; font-size:13px;">User-recorded / attested — recorded from your lab or registry, not computed or verified by this app.</p>`
+    : `<p class="muted" style="margin:12px 0 0;">No COI recorded.</p>`;
+
+  els.recordedCoi.innerHTML = `
+    <section class="card" style="margin-top:16px;">
+      <div class="row-between">
+        <h2 style="margin:0;">Recorded COI</h2>
+        <button class="btn btn-sm" id="coi-edit">${coi && coi.value != null ? 'Edit' : '+ Add COI'}</button>
+      </div>
+      ${bodyHtml}
+    </section>`;
+  document.getElementById('coi-edit').addEventListener('click', () => { ctx.coiEditing = true; renderRecordedCoiSection(); });
+}
+
+// Health-test summary (Stage 5, Build Brief §6) — a READ-ONLY presentation of
+// this dog's recorded genetic / OFA-PennHIP / breed-specific test events with
+// their details. It computes nothing: no carrier-risk math, no genotype
+// interpretation, no clear/carrier/affected → offspring inference (that needs
+// structured locus data the app doesn't model — door left open in §11). This is
+// the "genetic analysis" of Stage 5: surfacing what was recorded, nothing more.
+// Editing/adding these events stays in the Health Timeline below.
+const HEALTH_TEST_TYPES = ['genetic_test', 'ofa_pennhip', 'breed_specific_test'];
+async function renderHealthTestsSection() {
+  if (!els.healthTests) return;
+  if (ctx.mode !== 'view' || !ctx.original) { els.healthTests.innerHTML = ''; return; }
+  const d = ctx.original;
+  const events = await eventRepo.getForSubject('dog', d.id);
+  const tests = events.filter((e) => HEALTH_TEST_TYPES.includes(e.event_type));
+
+  const detailsSummary = (ev) => {
+    const typeDef = descriptor(EVENT_TYPES, ev.event_type);
+    if (!typeDef.fields?.length || !ev.details) return '';
+    return typeDef.fields
+      .filter((f) => ev.details[f.key] != null && ev.details[f.key] !== '')
+      .map((f) => `${esc(f.label)}: ${esc(ev.details[f.key])}`)
+      .join(' · ');
+  };
+
+  const rowsHtml = tests.length
+    ? `<ul class="linked-list" style="margin:14px 0 0; padding:0; list-style:none;">` + tests.map((ev) => {
+        const summary = detailsSummary(ev);
+        return `<li style="padding:8px 0; border-top:1px solid var(--border);">
+          <div>${badge(EVENT_TYPES, ev.event_type)} <strong>${esc(ev.title)}</strong> <span class="faint">${esc(fmtDate(ev.event_date))}</span></div>
+          ${summary ? `<div class="muted" style="font-size:14px;">${summary}</div>` : ''}
+        </li>`;
+      }).join('') + `</ul>`
+    : `<p class="muted" style="margin:14px 0 0;">No health-test events recorded yet.</p>`;
+
+  els.healthTests.innerHTML = `
+    <section class="card" style="margin-top:16px;">
+      <h2 style="margin:0;">Health-Test Summary</h2>
+      <p class="field-hint">Recorded genetic, OFA/PennHIP, and breed-specific test results for this dog — a read-only view of what's been logged. Add or edit these in the Health Timeline below.</p>
+      ${rowsHtml}
+    </section>`;
 }
 
 // Planned Tests panel + advisory completeness view (Test Planning Addendum §6.2).
@@ -709,7 +839,9 @@ function renderAll() {
   renderHeaderActions();
   if (ctx.mode === 'view') renderView();
   else renderEdit();
+  renderRecordedCoiSection();
   renderPlannedTestsSection();
+  renderHealthTestsSection();
   renderTimelineSection();
   renderPairingsSection();
   renderSalesSection();

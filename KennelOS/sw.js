@@ -6,7 +6,7 @@
 // never re-fetches a stale precached file on its own; only a CACHE_NAME change
 // (which changes these bytes, so the browser detects a new service worker,
 // installs it, and purges the old cache in `activate`) rolls it over.
-const CACHE_NAME = 'kennelos-shell-v4';
+const CACHE_NAME = 'kennelos-shell-v5';
 
 const PRECACHE_URLS = [
   './',
@@ -54,6 +54,8 @@ const PRECACHE_URLS = [
   'pages/active-breeding.js',
   'pages/board.html',
   'pages/board.js',
+  'pages/dashboard.html',
+  'pages/dashboard.js',
   'pages/contact-import.html',
   'pages/contact-import.js',
   'pages/contact.html',
@@ -72,6 +74,8 @@ const PRECACHE_URLS = [
   'pages/dogs.js',
   'pages/event-import.html',
   'pages/event-import.js',
+  'pages/health-tests-report.html',
+  'pages/health-tests-report.js',
   'pages/import-export.html',
   'pages/import-export.js',
   'pages/kennels.html',
@@ -82,6 +86,10 @@ const PRECACHE_URLS = [
   'pages/litter.js',
   'pages/litters.html',
   'pages/litters.js',
+  'pages/litters-report.html',
+  'pages/litters-report.js',
+  'pages/live-births.html',
+  'pages/live-births.js',
   'pages/pairing-import.html',
   'pages/pairing-import.js',
   'pages/pairing.html',
@@ -90,6 +98,11 @@ const PRECACHE_URLS = [
   'pages/pairings.js',
   'pages/pedigree.html',
   'pages/pedigree.js',
+  'pages/placements-report.html',
+  'pages/placements-report.js',
+  'pages/reminders.html',
+  'pages/reminders.js',
+  'pages/reports.html',
   'pages/roster.html',
   'pages/roster.js',
   'pages/sale-import.html',
@@ -106,6 +119,8 @@ const PRECACHE_URLS = [
   'pages/stud-service.js',
   'pages/stud-services.html',
   'pages/stud-services.js',
+  'pages/stud-services-report.html',
+  'pages/stud-services-report.js',
   'pages/upcoming.html',
   'pages/upcoming.js',
   'vendor/dexie.min.mjs',

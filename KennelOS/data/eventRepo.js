@@ -133,6 +133,57 @@ export const HistoryEvent = {
     return rows.sort((a, b) => (a.event_date < b.event_date ? -1 : a.event_date > b.event_date ? 1 : 0));
   },
 
+  // Reminder engine read (Stage 5, Build Brief §3.3) — a SIBLING to
+  // getBoardRows/getUpcoming, deliberately never fused with them. A "reminder"
+  // is any event carrying a non-null reminder_date that is neither archived nor
+  // dismissed; it is not tied to event type or duration. reminder_date is the
+  // single future-dated mechanism in the app.
+  //
+  // The overdue/due-soon/upcoming split is a DISPLAY concern computed from these
+  // rows (Build Brief §3.3), not baked in here — this read just returns every
+  // pending reminder sorted soonest-first. Uses the reminder_date index range
+  // probe (aboveOrEqual('') selects all rows that HAVE a reminder_date, since a
+  // null/absent reminder_date carries no index entry).
+  async getReminders() {
+    const rows = await db.events
+      .where('reminder_date').aboveOrEqual('')
+      .and((e) => !e.is_archived)
+      .and((e) => !e.reminder_dismissed)
+      .toArray();
+    return rows.sort((a, b) => (a.reminder_date < b.reminder_date ? -1 : a.reminder_date > b.reminder_date ? 1 : 0));
+  },
+
+  // Dismissed reminders (Build Brief §3.5) — the "reveal dismissed" toggle on
+  // the reminder view. Same index probe as getReminders, but the complement:
+  // non-null reminder_date, not archived, dismissed. Kept a separate read so
+  // getReminders stays exactly "what's pending" and pages never touch db.
+  async getDismissedReminders() {
+    const rows = await db.events
+      .where('reminder_date').aboveOrEqual('')
+      .and((e) => !e.is_archived)
+      .and((e) => !!e.reminder_dismissed)
+      .toArray();
+    return rows.sort((a, b) => (a.reminder_date < b.reminder_date ? -1 : a.reminder_date > b.reminder_date ? 1 : 0));
+  },
+
+  // Dismiss a reminder (Build Brief §3.4): the event stays on its timeline and
+  // in every other read — only its reminder drops off getReminders(). Dismissal
+  // is NOT archiving and NOT a status change (archive ≠ status discipline).
+  dismissReminder(id) {
+    return HistoryEvent.update(id, { reminder_dismissed: true });
+  },
+
+  // Un-dismiss — restores a previously dismissed reminder to the pending view.
+  undismissReminder(id) {
+    return HistoryEvent.update(id, { reminder_dismissed: false });
+  },
+
+  // Snooze (Build Brief §3.4): reuse the one reminder_date, pushed to a later
+  // day. There is deliberately no separate snooze field — snooze IS a date edit.
+  snoozeReminder(id, newDate) {
+    return HistoryEvent.update(id, { reminder_date: newDate });
+  },
+
   // Distinct test-name tokens already logged, across all dogs (Test Planning
   // Addendum §3) — the append-only "seen in events" half of the shared
   // vocabulary union. Nothing here is ever purged, even if a kennel panel

@@ -126,7 +126,8 @@ const DOG_MAPPING = {
   templateHeaders: [
     'call_name', 'registered_name', 'sex', 'date_of_birth', 'breed',
     'sire_registered_name', 'dam_registered_name', 'ownership_type', 'status',
-    'color_markings', 'registry', 'registration_number', 'microchip_id', 'notes'
+    'color_markings', 'registry', 'registration_number', 'microchip_id',
+    'coi_value', 'coi_method', 'coi_source', 'coi_as_of', 'notes'
   ],
   requiredForCreate: ['call_name', 'sex', 'breed', 'ownership_type', 'status'],
 
@@ -177,6 +178,29 @@ const DOG_MAPPING = {
     ]) {
       const v = col(row, key, ...aliases);
       if (v) record[key] = v;
+    }
+
+    // Recorded COI (Stage 5, Build Brief Â§2.3). Gated on a numeric coi_value:
+    // present+numeric stores { value, method, source, as_of_date } (the last
+    // three null when their columns are blank); present+non-numeric soft-warns
+    // and drops the stray value (row kept), same posture as the end-date-on-
+    // instant warning; absent stores no COI at all (even if method/source were
+    // given). recorded_coi is a plain unindexed field, never an FK.
+    const coiRaw = col(row, 'coi_value', 'coi');
+    if (coiRaw !== '') {
+      const coiNum = Number(coiRaw);
+      if (!Number.isFinite(coiNum)) reasons.push(`Unrecognized coi_value "${coiRaw}" (ignored).`);
+      else {
+        const coiAsOfRaw = col(row, 'coi_as_of', 'coi_as_of_date');
+        const coiAsOf = normDate(coiAsOfRaw);
+        if (coiAsOf === null && coiAsOfRaw) reasons.push(`Unrecognized coi_as_of "${coiAsOfRaw}" (ignored).`);
+        record.recorded_coi = {
+          value: coiNum,
+          method: col(row, 'coi_method') || null,
+          source: col(row, 'coi_source') || null,
+          as_of_date: coiAsOf || null
+        };
+      }
     }
 
     // Sire / dam: resolve names against EXISTING dogs (Data Model Â§8.2). A named
@@ -701,7 +725,7 @@ const EVENT_MAPPING = {
   label: 'Events',
   templateHeaders: [
     'dog_registered_name', 'event_type', 'event_date', 'event_end_date', 'title',
-    'related_contact_name', 'details_json', 'notes'
+    'related_contact_name', 'reminder_date', 'details_json', 'notes'
   ],
   requiredForCreate: ['subject_id', 'event_type', 'event_date', 'title'],
 
@@ -774,6 +798,16 @@ const EVENT_MAPPING = {
       if (hit) record.related_contact_id = hit.id;
       else reasons.push(`Related contact "${relatedName}" not found — leave the CSV column blank or add the contact first (never auto-created).`);
     }
+
+    // reminder_date (Stage 5, Build Brief §3.6) — the reminder engine's one
+    // future-dated field. Unparseable → soft-warn, drop the value, keep the row
+    // (same posture as event_end_date above). Blank is normal (most events carry
+    // no reminder). A reminder_date earlier than event_date is only a soft UI
+    // warning, never enforced here.
+    const reminderRaw = col(row, 'reminder_date');
+    const reminderDate = normDate(reminderRaw);
+    if (reminderDate === null && reminderRaw) reasons.push(`Unrecognized reminder_date "${reminderRaw}" (ignored).`);
+    else if (reminderDate) record.reminder_date = reminderDate;
 
     const detailsRaw = col(row, 'details_json');
     let detailsError = false;

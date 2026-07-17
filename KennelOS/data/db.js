@@ -33,9 +33,19 @@ export const db = new Dexie('KennelOSBreedingApp');
 //    persist, they just aren't indexed. `events.event_end_date` (Stage 4.5) is a
 //    deliberate example: a plain nullable YYYY-MM-DD field, never queried/sorted
 //    on directly, so it carries no index (Stage4.5 Addendum §C1).
+//  - events '.reminder_date' (Stage 5, Build Brief §3.2) IS indexed: the reminder
+//    engine's getReminders() range-probes it. This is the ONE index Stage 5 adds,
+//    and the last one that gets to ride an edit to this collapsed version(1) block
+//    (nothing has shipped — reconcile by Reset App + re-seed, no `.version(2)`).
+//    Every further index after the first real release goes in an additive
+//    `.version(2)` block that is never edited again (Build Brief §8).
+//  - Stage 5 also adds two PLAIN fields — `events.reminder_dismissed` (boolean)
+//    and `dogs.recorded_coi` (object) — that are deliberately UNindexed: they
+//    persist and ride the JSON backup, but nothing queries them by key, so they
+//    stay out of the index strings below (Build Brief §2.1/§3.2).
 db.version(1).stores({
   dogs:          'id, sire_id, dam_id, litter_id, owner_contact_id, *co_owner_contact_ids, status, ownership_type, sex, breed, kennel_id, is_archived',
-  events:        'id, [subject_type+subject_id], event_type, event_date, related_dog_id, related_contact_id, is_archived',
+  events:        'id, [subject_type+subject_id], event_type, event_date, reminder_date, related_dog_id, related_contact_id, is_archived',
   contacts:      'id, kennel_id, waitlist_status, is_archived',
   kennels:       'id, is_archived',
   pairings:      'id, sire_id, dam_id, status, pairing_type, is_archived',

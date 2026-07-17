@@ -3,7 +3,7 @@
 Local-first, static, multi-page records app for a dog breeding program. No backend, no build step. Hosted on GitHub Pages; data lives in browser.
 
 ## Read first, every session
-Canonical model = v3. Stage 4 (Sales, Contracts, Stud Services) built. Stage 4.5 (this doc list's last two entries) reconciles Stage 4's gaps and adds scheduling/logistics. Stage 5 next.
+Canonical model = v3. Stage 4 (Sales, Contracts, Stud Services) built. Stage 4.5 reconciles Stage 4's gaps and adds scheduling/logistics. Stage 5 (recorded COI, reminder engine, dashboard, analytics, health-test summary) is now built per `docs/Stage5_Build_Brief_v1.md` — the brief records a delta from v3 (§1): app-computed COI is dropped in favor of an optional user-recorded COI on Dog. Where the brief and v3 disagree, the brief wins for Stage 5 scope.
 
 - `docs/Data_Model_Architecture_Proposal_v3.md` — canonical data model, entities, storage, integrity rules. Current-state through Stage 4.5 (folds in Stage 4 + the Stage 4.5 additive fields/types/views); test-planning fields (§5.11) are marked designed-but-not-yet-built. Changelog in §16.
 - `docs/Stage1_Stage2_Build_Brief_v2.md` — validation, screens, conventions, build order (Stages 1–2)
@@ -15,12 +15,13 @@ Canonical model = v3. Stage 4 (Sales, Contracts, Stud Services) built. Stage 4.5
 - `docs/Test_Planning_and_Vocabulary_Addendum_v1.md` — `planned_tests`/`preferred_tests` fields, independent of stage sequencing
 - `docs/Dog_Breeding_App_Requirements_Discovery-1.md` — original requirements discovery (background/vision; scope superseded by the docs above)
 - `docs/Stage4.5_Reconciliation_and_Logistics_Addendum_v1.md` — reconciles Stage 4's CSV/`governingContract`/sample-data gaps, folds in Scheduling & Logistics (`event_end_date`, `related_contact_id`, `boarding`/`placement` catalog types, Location/Status Board, Upcoming Deliverables), the current as-built state for all of that
+- `docs/Stage5_Build_Brief_v1.md` — Stage 5 build brief: recorded COI (`Dog.recorded_coi`, replaces app-computed COI), the reminder engine (`Event.reminder_date` indexed + `reminder_dismissed`, `reminders.html`), dashboard, analytics reports (Reports hub), and the read-only health-test summary. §1 lists the delta from the v3 model; §11 records the doors left open (computed COI, relatedness/pairing prediction, genotype analysis, recurrence rules, financials, test-completeness audit).
 
 These docs are source of truth. Conflict → stop and flag, don't diverge silently. Undocumented decision → ask, don't invent.
 
-## Scope: Stages 1–4.5 complete; Stage 5 next
-Built: Dogs, Contacts, Kennels, Import/Export (1–2); Pairings, Litters (3); Sales, Contracts, Stud Services (4, buyer merged into Contact — no Buyer table); Event CSV/StudService CSV import, `governingContract` UI, Location/Status Board, Upcoming Deliverables, Scheduled Placements report, `boarding`/`placement` event types (4.5).
-Stage 5 (dashboard, advanced breeder tools, COI/genetic analysis, reminder engine) is next and NOT started — don't assume any of it exists yet; treat it the way Stage 4 used to be treated here.
+## Scope: Stages 1–5 complete
+Built: Dogs, Contacts, Kennels, Import/Export (1–2); Pairings, Litters (3); Sales, Contracts, Stud Services (4, buyer merged into Contact — no Buyer table); Event CSV/StudService CSV import, `governingContract` UI, Location/Status Board, Upcoming Deliverables, Scheduled Placements report, `boarding`/`placement` event types (4.5); recorded COI (`Dog.recorded_coi`), reminder engine (`reminders.html`), dashboard, analytics Reports hub, per-dog health-test summary (5).
+Stage 5 is the last built stage. It added exactly one index (`events.reminder_date`) and two plain fields (`Dog.recorded_coi`, `Event.reminder_dismissed`) to the collapsed `version(1)` block — no `.version(2)`, no `referenceRegistry.js` change, `schema_version`/`format_version` still 1. Deliberately NOT built (doors in Stage5 brief §11): app-computed COI, relatedness/pairing-COI, genotype/Mendelian analysis, a recurrence-rule engine, a financial ledger, the test-completeness audit. Don't assume any of those exist.
 Photos/attachments remain descoped (no `attachments` table, `attachmentRepo`, Photos tab, thumbnails) — see data model v3 §12 for the deferred reintroduction path if that ever changes.
 
 ## Architecture non-negotiables
