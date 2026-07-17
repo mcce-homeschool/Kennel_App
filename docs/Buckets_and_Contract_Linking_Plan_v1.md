@@ -14,10 +14,10 @@ Format references (match these, don't invent new patterns):
 - A sale/stud-service may have **more than one** contract (sale + addendum) — by design. Show all linked; the picker links an additional one.
 - Pages call repos only (no `db.*`). `esc()` everything interpolated. Badges via `badge(vocab, value)`. Dates via `fmtDate`. Archived excluded by default.
 
-## Open decisions (flagged — easy to change, please confirm if you disagree)
-1. **Sale/Stud cards drop the current filter dropdowns.** Moving Sales and Stud Services from the `listView` table to breeding-style cards removes their Placement/Status/Direction dropdown filters (the breeding tab has none). Recommended: proceed without them to match the breeding-tab format. If you want filtering back, we'd add a lightweight seg-tab filter later.
-2. **A leading "All" tab** on Contacts and Dogs. Recommended: keep an "All" tab first on both so nothing is ever hidden and the current default (flat list + CSV export) is preserved. The four/four buckets you named still cover every record across the tabs, so "All" is optional — say the word to drop it.
-3. **Within-group sort where you didn't specify one** (Not-breeding groups, Puppies, External): defaulting to a sensible order, noted inline below.
+## Decisions (resolved)
+1. **Sale/Stud cards drop the filter dropdowns** — confirmed. No Placement/Status/Direction filters on the card views (matches the breeding tab).
+2. **"All" tab is included, positioned LAST** on both Contacts and Dogs (not leading). A bare URL with no `?group`/`?bucket` still lands on All, so the current flat-list + CSV default is preserved; the All tab is simply rendered at the end of the strip.
+3. **Within-group sort defaults confirmed** as noted inline below (Not-breeding groups & Puppies youngest/oldest, External A–Z).
 
 ---
 
@@ -64,14 +64,14 @@ Replace the single "Buyers only" pill toggle with a `.seg-tabs` strip patterned 
 - **`contacts.html`:** swap the `#contacts-view-toggle` pill-row (line 29) for:
   ```html
   <nav class="seg-tabs" aria-label="Contact groups">
-    <a class="seg-tab" href="contacts.html">All</a>            <!-- active when no ?group -->
     <a class="seg-tab" href="contacts.html?group=clients">Clients</a>
     <a class="seg-tab" href="contacts.html?group=network">Network</a>
     <a class="seg-tab" href="contacts.html?group=care">Care team</a>
     <a class="seg-tab" href="contacts.html?group=other">Other</a>
+    <a class="seg-tab" href="contacts.html">All</a>              <!-- last; active when no ?group -->
   </nav>
   ```
-  Mark the current tab `active`/`aria-current` in JS from `param('group')` (keep `#contacts-title`/`#contacts-subtitle` for per-group copy).
+  Mark the current tab `active`/`aria-current` in JS from `param('group')` (a bare `contacts.html` = All). Keep `#contacts-title`/`#contacts-subtitle` for per-group copy.
 - **`contacts.js`:** read `const group = param('group')`. Define predicates over a contact `c` (`type = c.contact_type || []`):
   - **clients** — `type.includes('buyer') || (c.waitlist_status && c.waitlist_status !== 'none')` *(this is exactly the existing `isBuyer`)*
   - **network** — `type.includes('breeder') || type.includes('co_owner')`
@@ -88,15 +88,15 @@ Replace the single "Buyers only" pill toggle with a `.seg-tabs` strip patterned 
 Toggle strip + bucketed rendering. Breeding and Not-breeding need in-tab section headings, so this rides on a small `listView` enhancement (Work Area 4).
 
 - **`dogs.html`:** add a `.seg-tabs` nav above `#dog-list`:
-  `All | Puppies | Breeding | Not breeding | External`, links `dogs.html?bucket=puppies` etc., active from `param('bucket')`.
+  `Puppies | Breeding | Not breeding | External | All` (All **last**), links `dogs.html?bucket=puppies` etc.; bare `dogs.html` = All, active from `param('bucket')`.
 - **Bucket → `DOG_STATUS`:**
   | Bucket | Statuses |
   |---|---|
-  | All | (no status filter — current behavior, keeps default CSV/search) |
   | Puppies | `puppy` |
   | Breeding | `active_breeding` |
   | Not breeding | `retired_breeding`, `pet_home`, `deceased` |
   | External | `external_reference` |
+  | All | (no status filter — current behavior, keeps default CSV/search) |
 - **`dogs.js`:** read `param('bucket')`, set `baseFilter` to the status test, and set `sort`/`groupBy` per bucket:
   - **Breeding** — `baseFilter: d => d.status === 'active_breeding'`; `groupBy` on `d.sex` with ordered groups `[male, female, unknown]` (labels from `SEX`, or the single letters M/F/U to match `dogs.js` `sexBadge`); within-group `sort` = **DOB ascending (oldest→youngest)**, undated rows last.
   - **Not breeding** — `baseFilter: d => ['retired_breeding','pet_home','deceased'].includes(d.status)`; `groupBy` on `d.status` with ordered groups `[retired_breeding, pet_home, deceased]` (labels from `DOG_STATUS`); within-group `sort` = DOB ascending *(order not specified by you — matching Breeding for consistency; easy to change)*.
