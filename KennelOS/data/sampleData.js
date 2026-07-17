@@ -65,6 +65,16 @@ function monthsFromToday(n) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
+// YYYY-MM-DD for `n` days from today (negative = past) — used for the sample
+// boarding (Stage4.5 Addendum §C6) and placement (§D5) events so they stay
+// "currently ongoing" / "still upcoming" regardless of when the packet is seeded.
+function daysFromToday(n) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  const p = (v) => String(v).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 export async function seedSampleData() {
   const manifest = {
     seededAt: new Date().toISOString(),
@@ -272,6 +282,13 @@ export async function seedSampleData() {
       details: { vaccine: 'DHPP', lot_number: 'C1029' } },
     { subject_id: fern.id, event_type: 'evaluation', event_date: '2026-06-15', title: 'Puppy evaluation',
       details: { evaluator: 'Dr. Patricia Nguyen', temperament_notes: 'Confident, food-motivated.', structure_notes: 'Level topline, good angulation.' } },
+    // Fern — scheduled drop-off (Stage4.5 Addendum §D5): a second Thornfield
+    // puppy going home next week, deliberately with NO Sale record yet — a
+    // placement event never carries a stored link to one (§D1). Owen is already
+    // the sample's active-waitlist buyer, so this doubles as his placement.
+    { subject_id: fern.id, event_type: 'placement', event_date: daysFromToday(7), title: 'Scheduled pickup',
+      related_contact_id: owen.id,
+      details: { placement_time: '10:00 AM', location: 'Thornfield Kennels', notes: 'Fern going home with the Farrows.' } },
     // Birch — health-tested after promotion to breeding stock
     { subject_id: birch.id, event_type: 'milestone', event_date: '2025-10-15', title: 'Eyes open',
       details: { description: 'Eyes open' } },
@@ -281,6 +298,12 @@ export async function seedSampleData() {
       details: { vaccine: 'DHPP', lot_number: 'C1029' } },
     { subject_id: birch.id, event_type: 'genetic_test', event_date: '2026-06-20', title: 'Panel results',
       details: { panel_name: 'Embark Breeder Panel', lab: 'Embark', result: 'Clear' } },
+    // Birch's outgoing stud stay with Ellen (Stage4.5 Addendum §C6) — the sample
+    // boarding event, ongoing (no event_end_date) so it always shows on the
+    // Location/Status Board regardless of when the packet is seeded.
+    { subject_id: birch.id, event_type: 'boarding', event_date: daysFromToday(-3), title: 'Boarding for stud service',
+      related_contact_id: ellen.id,
+      details: { location: "Ellen Brooks' home", boarding_reason: 'Stud service', dropoff_time: '9:00 AM', notes: 'Staying with Ellen for the Nell breeding.' } },
     // Hazel
     { subject_id: hazel.id, event_type: 'vaccination', event_date: '2026-05-01', title: 'Puppy shots (2nd round)',
       details: { vaccine: 'DHPP', lot_number: 'C1029' } },
