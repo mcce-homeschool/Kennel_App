@@ -33,9 +33,14 @@ export function createListView(opts) {
     baseFilter = () => true, // (record) => bool — a fixed predicate applied before
                               // search/filters/archived, e.g. the Buyer view on
                               // Contacts (a filtered view, not a separate table/page)
-    csv = null              // optional { filename, columns:[{header, value:(r)=>string}] } —
+    csv = null,             // optional { filename, columns:[{header, value:(r)=>string}] } —
                              // adds an "Export visible to CSV" button (Navigation
                              // Consolidation Plan v1 §3/§6: Roster's export moves onto Dogs)
+    sort = null,            // optional (a,b)=>number comparator applied to visibleRecords()
+    groupBy = null          // optional { key:(record)=>value, groups:[{value,label}] } —
+                             // partitions the sorted rows into labeled sections, each with
+                             // its own <table>, under the one shared toolbar. Omit for the
+                             // single-table behavior every existing caller already gets.
   } = opts;
 
   let all = [];
@@ -106,7 +111,7 @@ export function createListView(opts) {
   mount.appendChild(tableWrap);
 
   function visibleRecords() {
-    return all.filter((r) => {
+    const rows = all.filter((r) => {
       if (!baseFilter(r)) return false;
       if (!state.showArchived && r.is_archived) return false;
       if (state.q && search?.text) {
@@ -118,6 +123,7 @@ export function createListView(opts) {
       }
       return true;
     });
+    return sort ? rows.slice().sort(sort) : rows;
   }
 
   // Columns marked `collapse: true` hide on narrow screens (CSS) and move into
@@ -125,12 +131,7 @@ export function createListView(opts) {
   // horizontal scroll on a phone. Columns without the flag are always shown.
   const hasCollapse = columns.some((c) => c.collapse);
 
-  function render() {
-    const rows = visibleRecords();
-    if (!rows.length) {
-      tableWrap.innerHTML = `<div class="card empty-state">${esc(emptyText)}</div>`;
-      return;
-    }
+  function tableHtml(rows) {
     const head = columns.map((c) => `<th class="${c.collapse ? 'col-collapse' : ''}">${esc(c.header)}</th>`).join('')
       + (hasCollapse ? `<th class="col-toggle"></th>` : '');
     const body = rows.map((r, i) => {
@@ -148,16 +149,19 @@ export function createListView(opts) {
         : '';
       return mainRow + detailRow;
     }).join('');
-    tableWrap.innerHTML = `<table class="data"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+    return `<table class="data"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+  }
 
+  // Wires row-click and collapse-toggle handlers for one rendered table. `rows`
+  // must be the exact array that produced `root`'s markup (data-idx indexes into it).
+  function wireTable(root, rows) {
     if (onRowClick) {
-      tableWrap.querySelectorAll('tbody tr.list-row').forEach((tr) => {
+      root.querySelectorAll('tbody tr.list-row').forEach((tr) => {
         tr.addEventListener('click', () => onRowClick(rows[Number(tr.dataset.idx)]));
       });
     }
-
     if (hasCollapse) {
-      tableWrap.querySelectorAll('.row-toggle-btn').forEach((btn) => {
+      root.querySelectorAll('.row-toggle-btn').forEach((btn) => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           const detailRow = btn.closest('tr').nextElementSibling;
@@ -168,6 +172,33 @@ export function createListView(opts) {
         });
       });
     }
+  }
+
+  function render() {
+    const rows = visibleRecords();
+    if (!rows.length) {
+      tableWrap.innerHTML = `<div class="card empty-state">${esc(emptyText)}</div>`;
+      return;
+    }
+
+    if (!groupBy) {
+      tableWrap.innerHTML = tableHtml(rows);
+      wireTable(tableWrap, rows);
+      return;
+    }
+
+    // Partition the already-sorted rows into the declared groups, in array
+    // order, each rendered as its own labeled section + table (Work Area 4).
+    const buckets = groupBy.groups
+      .map((g) => ({ g, rows: rows.filter((r) => groupBy.key(r) === g.value) }))
+      .filter((b) => b.rows.length);
+    tableWrap.innerHTML = buckets.map(({ g, rows: gRows }, gi) =>
+      `<h2 style="margin-top:${gi === 0 ? '0' : '24px'};">${esc(g.label)} <span class="muted" style="font-size:14px;">(${gRows.length})</span></h2>
+       <div class="group-table" data-group-idx="${gi}">${tableHtml(gRows)}</div>`
+    ).join('');
+    buckets.forEach(({ rows: gRows }, gi) => {
+      wireTable(tableWrap.querySelector(`.group-table[data-group-idx="${gi}"]`), gRows);
+    });
   }
 
   async function refresh() {

@@ -90,7 +90,7 @@ async function main() {
       stat(dueSoon, `Due within ${DUE_SOON_DAYS} days`, { href: 'reminders.html', tone: 'warn' }),
       stat(upcomingPlacements, 'Upcoming placements', { href: 'scheduled-placements.html' }),
       stat(awayCount, 'Dogs away (boarding)', { href: 'board.html' }),
-      stat(waitlistActive, 'Active waitlist', { href: 'contacts.html?buyer=1' })
+      stat(waitlistActive, 'Active waitlist', { href: 'contacts.html?group=clients' })
     ].join(''), 'Live counts you can act on — each tile opens the full list.');
 }
 
