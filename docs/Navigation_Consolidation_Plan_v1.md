@@ -1,6 +1,9 @@
 # Navigation Consolidation Plan v1
 
-**Status:** Proposed — plan only, no code changed yet.
+**Status:** Built. Today and Breeding hubs, the five-item main bar, and the
+Reports/Import-Export corner menu shipped first; the People buyer segment, the
+Placements & Contracts segment tabs, and the Dogs CSV export + narrow-screen
+column collapse followed (see Changelog).
 **Scope:** Reshape the top nav and consolidate the 40 built pages into a small set of
 job-oriented hubs. No schema change, no repo-layer change, no data migration. This is a
 presentation/navigation reorganization only.
@@ -155,3 +158,16 @@ remembered-across-tabs.
   **Today**, reordered so reminders + due-outs are at the top and the stock overview is at
   the bottom; (b) **Breeding** is one screen showing pairing → attached litter → resulting
   puppy dog records, most-recent-first, ~4–5 shown with a "Show more" for the rest.
+- **v1 build, part 2** — Closed the two gaps left after the initial Today/Breeding/nav-bar
+  build: (a) **Placements & Contracts** gained a `seg-tabs` pill row (Sales / Stud Services /
+  Contracts) on all three pages so the hub is actually reachable as one job, matching the
+  Buyers toggle pattern already on People; (b) **Dogs** gained an "Export visible to CSV"
+  button (`listView.js`'s new optional `csv` config, same column set as `roster.html`) —
+  Roster itself is untouched and still reachable, per §8 (no page deleted in v1). Also added
+  a `collapse` flag to `listView.js` columns: on narrow screens a column so marked drops out
+  of the table and into a per-row "▸ more details" expando instead of forcing horizontal
+  scroll. Dogs uses it (Registered name / Breed / DOB collapse; Call name, a compact M/F/U
+  Sex badge, and Status stay pinned) — the mechanism is generic and available to any other
+  `listView.js` page that needs it later. `sw.js` cache bumped to v8 (content-only change to
+  already-precached files; the fetch handler is cache-first, so already-installed clients
+  need the cache name to change to pick this up).

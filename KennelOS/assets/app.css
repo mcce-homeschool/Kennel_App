@@ -304,6 +304,20 @@ table.data tbody tr.clickable:hover { background: var(--accent-soft); }
 table.data tbody tr.row-review { background: var(--warn-soft); }
 table.data tbody tr.row-review td { border-bottom-color: #e6d5ad; }
 
+/* --- Responsive column collapse (listView.js `collapse` columns) -------- */
+.col-toggle { width: 32px; text-align: center; }
+.row-toggle-btn { background: none; border: none; cursor: pointer; font-size: 14px; line-height: 1; padding: 6px; color: var(--text-muted); }
+table.data tr.row-detail[hidden] { display: none; }
+table.data tr.row-detail td { background: var(--surface-2); padding: 10px 14px; }
+table.data tr.row-detail .dl-meta { margin: 0; }
+@media (min-width: 641px) {
+  .col-toggle { display: none; }
+  table.data tr.row-detail { display: none; }
+}
+@media (max-width: 640px) {
+  table.data th.col-collapse, table.data td.col-collapse { display: none; }
+}
+
 .empty-state { text-align: center; color: var(--text-muted); padding: 40px 20px; }
 
 /* --- Forms / edit-in-place --------------------------------------------- */
@@ -417,6 +431,21 @@ table.data tbody tr.row-review td { border-bottom-color: #e6d5ad; }
 .row-between { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .stack-sm > * + * { margin-top: 8px; }
 .pill-row { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* --- Hub segment tabs (Navigation Consolidation Plan v1 §6: People, Placements
+   & Contracts) — small pill row switching between the pages folded into a hub. */
+.seg-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.seg-tab {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 14px;
+}
+.seg-tab:hover { background: var(--accent-soft); }
+.seg-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 .dl-meta { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; }
 .dl-meta dt { color: var(--text-muted); font-size: 13px; }
 .dl-meta dd { margin: 0; }
