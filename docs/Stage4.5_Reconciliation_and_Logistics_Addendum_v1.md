@@ -83,14 +83,14 @@ Stage 4's Sale Detail offers to add the buyer to `dog.co_owner_contact_ids` on a
 
 **New Stage 4 acceptance checks (append to Sample brief §8):**
 
-- [ ] Buyers-as-Contacts: Priya, Owen, Ellen exist as Contacts; **no `buyers` table/array** anywhere.
-- [ ] Owen shows in the Buyers/waitlist view with `waitlist_status: active` and **no** linked Sale.
-- [ ] Hazel's Sale resolves buyer → Priya (a Contact), and Sale Detail's Contract panel lists the signed sale contract with a status badge.
-- [ ] Sale Detail shows the **governing-contract** line (A2) resolving to the signed contract.
-- [ ] Birch's StudService links to **P3** via `pairing_id`; Stud Service Detail's Contract panel shows the signed stud-service contract.
-- [ ] Clearing sample data with a **real** Contract pointed at a sample Sale/StudService is **blocked** with the specific message and offers archive-instead (exercises `SALE_REFERENCES` / `STUD_SERVICE_REFERENCES` in the contamination check).
-- [ ] Contract is confirmed hard-deletable with nothing blocking (leaf; `CONTRACT_REFERENCES` empty).
-- [ ] After Part C: at least one sample **boarding** event exists (see C6) and appears on the Location/Status Board.
+- [x] Buyers-as-Contacts: Priya, Owen, Ellen exist as Contacts; **no `buyers` table/array** anywhere.
+- [x] Owen shows in the Buyers/waitlist view with `waitlist_status: active` and **no** linked Sale.
+- [x] Hazel's Sale resolves buyer → Priya (a Contact), and Sale Detail's Contract panel lists the signed sale contract with a status badge.
+- [x] Sale Detail shows the **governing-contract** line (A2) resolving to the signed contract.
+- [x] Birch's StudService links to **P3** via `pairing_id`; Stud Service Detail's Contract panel shows the signed stud-service contract.
+- [x] Clearing sample data with a **real** Contract pointed at a sample Sale/StudService is **blocked** with the specific message and offers archive-instead (exercises `SALE_REFERENCES` / `STUD_SERVICE_REFERENCES` in the contamination check).
+- [x] Contract is confirmed hard-deletable with nothing blocking (leaf; `CONTRACT_REFERENCES` empty).
+- [x] After Part C: at least one sample **boarding** event exists (see C6) and appears on the Location/Status Board.
 
 ## A5. Two small UI-discoverability gaps (`Stage4_As_Built_v1.md` §11 #2/#3)
 
@@ -224,31 +224,33 @@ Steps 1–4 make logistics usable; 5–6 close the Stage 4 debts; 7–8 deliver 
 
 ## Acceptance Checklist
 
+> **All items verified 2026-07-17** against the as-built code (inspection, not a full manual app run). The end-on-instant soft-warn (§C3 / the "duration" item below) was the one gap found open and was closed the same day in the event CSV importer.
+
 **Stage 4 normalization**
-- [ ] `MAPPINGS` registers `dog, contact, pairing, litter, sale, event, stud_service`; **no** `contract` mapping (deliberate, A1.3).
-- [ ] Event CSV: keyless rows → needs-review; unmatched dog/contact → needs-review (neither auto-created); malformed `details_json` → per-row error, never a silent drop; `event_end_date`/`related_contact_name` columns import boarding rows correctly.
-- [ ] StudService CSV: a repeat service for an existing `our_dog+partner_dog+direction` surfaces as an **ambiguous match** in preview (not a silent overwrite); unmatched `partner_contact_name` inline-creates a Contact; unmatched dogs → needs-review.
-- [ ] Sale Detail shows a derived **governing-contract** line that reads the signed contract, or "none signed yet" — and updates when a contract's status changes.
-- [ ] The co-own placement write to `co_owner_contact_ids` goes through `dogRepo.update()` (no direct `db.dogs` write from the sale form).
-- [ ] All A4 sample-data checks pass.
-- [ ] Landing tiles reach Sales/Stud Services/Contracts/Board/Upcoming; a Waitlist/Buyers entry exists.
+- [x] `MAPPINGS` registers `dog, contact, pairing, litter, sale, event, stud_service`; **no** `contract` mapping (deliberate, A1.3).
+- [x] Event CSV: keyless rows → needs-review; unmatched dog/contact → needs-review (neither auto-created); malformed `details_json` → per-row error, never a silent drop; `event_end_date`/`related_contact_name` columns import boarding rows correctly.
+- [x] StudService CSV: a repeat service for an existing `our_dog+partner_dog+direction` surfaces as an **ambiguous match** in preview (not a silent overwrite); unmatched `partner_contact_name` inline-creates a Contact; unmatched dogs → needs-review.
+- [x] Sale Detail shows a derived **governing-contract** line that reads the signed contract, or "none signed yet" — and updates when a contract's status changes.
+- [x] The co-own placement write to `co_owner_contact_ids` goes through `dogRepo.update()` (no direct `db.dogs` write from the sale form).
+- [x] All A4 sample-data checks pass.
+- [x] Landing tiles reach Sales/Stud Services/Contracts/Board/Upcoming; a Waitlist/Buyers entry exists.
 
 **Logistics (Part C)**
-- [ ] `events` `version(1)` line includes `related_contact_id`; deleting a Contact referenced only by a boarding event is **blocked** (archive allowed); reconciled via Reset App with no `.version(2)`.
-- [ ] `event_end_date` is present on records, absent from the schema string, and rides the JSON backup (`schema_version` still `1`).
-- [ ] Every catalog type has a `duration`; a non-null end on an `instant` type soft-warns.
-- [ ] The Location/Status Board query filters on `event_type ∈ {boarding}` — **not** on `duration`; active medications/heat cycles never appear on it.
-- [ ] A sample boarding event shows on the board with the right contact link; past boardings fall off but remain on the dog's timeline.
+- [x] `events` `version(1)` line includes `related_contact_id`; deleting a Contact referenced only by a boarding event is **blocked** (archive allowed); reconciled via Reset App with no `.version(2)`.
+- [x] `event_end_date` is present on records, absent from the schema string, and rides the JSON backup (`schema_version` still `1`).
+- [x] Every catalog type has a `duration`; a non-null end on an `instant` type soft-warns.
+- [x] The Location/Status Board query filters on `event_type ∈ {boarding}` — **not** on `duration`; active medications/heat cycles never appear on it.
+- [x] A sample boarding event shows on the board with the right contact link; past boardings fall off but remain on the dog's timeline.
 
 **Upcoming / drop-offs (Part D)**
-- [ ] `placement` is an `instant` type; a placement event carries buyer via `related_contact_id` and has **no** stored link to any Sale.
-- [ ] The Upcoming Deliverables view is a **separate** read (`event_date >= today`, `duration: instant`); the board query is byte-for-byte unchanged.
-- [ ] Filtering Upcoming to `placement` (or running the Scheduled Placements report) shows all future drop-offs at a glance and exports to CSV.
-- [ ] The Sale→placement prompt pre-fills a form and creates no schema link.
-- [ ] Exactly one drop-off model exists (`placement` events **or** a Sale field — not both).
+- [x] `placement` is an `instant` type; a placement event carries buyer via `related_contact_id` and has **no** stored link to any Sale.
+- [x] The Upcoming Deliverables view is a **separate** read (`event_date >= today`, `duration: instant`); the board query is byte-for-byte unchanged.
+- [x] Filtering Upcoming to `placement` (or running the Scheduled Placements report) shows all future drop-offs at a glance and exports to CSV.
+- [x] The Sale→placement prompt pre-fills a form and creates no schema link.
+- [x] Exactly one drop-off model exists (`placement` events **or** a Sale field — not both).
 
 **Docs**
-- [ ] Every "hand alongside" pointer references `v3` (+ as-built / this doc where relevant); CLAUDE.md points here for reconciliation state.
+- [x] Every "hand alongside" pointer references `v3` (+ as-built / this doc where relevant); CLAUDE.md points here for reconciliation state.
 
 ---
 
