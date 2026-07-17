@@ -1,8 +1,12 @@
 // sw.js — app-shell cache so KennelOS installs as a PWA and keeps working
 // offline after the first load, per CLAUDE.md. Registered from app.js with a
 // scope of this file's own directory (the KennelOS root), so it covers /pages/
-// too. Bump CACHE_NAME whenever the precache list changes to roll caches over.
-const CACHE_NAME = 'kennelos-shell-v1';
+// too. Bump CACHE_NAME whenever the precache list changes to roll caches over
+// — the fetch handler below is cache-first, so an already-installed client
+// never re-fetches a stale precached file on its own; only a CACHE_NAME change
+// (which changes these bytes, so the browser detects a new service worker,
+// installs it, and purges the old cache in `activate`) rolls it over.
+const CACHE_NAME = 'kennelos-shell-v2';
 
 const PRECACHE_URLS = [
   './',
@@ -28,7 +32,9 @@ const PRECACHE_URLS = [
   'assets/icons/maskable-512.png',
   'data/appReset.js',
   'data/contactRepo.js',
+  'data/contractRepo.js',
   'data/csvImport.js',
+  'data/dateUtils.js',
   'data/db.js',
   'data/dogRepo.js',
   'data/eventRepo.js',
@@ -39,23 +45,33 @@ const PRECACHE_URLS = [
   'data/pairingRepo.js',
   'data/referenceRegistry.js',
   'data/repoBase.js',
+  'data/saleRepo.js',
   'data/sampleData.js',
   'data/settings.js',
+  'data/studServiceRepo.js',
   'data/vocab.js',
   'pages/active-breeding.html',
   'pages/active-breeding.js',
+  'pages/board.html',
+  'pages/board.js',
   'pages/contact-import.html',
   'pages/contact-import.js',
   'pages/contact.html',
   'pages/contact.js',
   'pages/contacts.html',
   'pages/contacts.js',
+  'pages/contract.html',
+  'pages/contract.js',
+  'pages/contracts.html',
+  'pages/contracts.js',
   'pages/dog-import.html',
   'pages/dog-import.js',
   'pages/dog.html',
   'pages/dog.js',
   'pages/dogs.html',
   'pages/dogs.js',
+  'pages/event-import.html',
+  'pages/event-import.js',
   'pages/import-export.html',
   'pages/import-export.js',
   'pages/kennels.html',
@@ -76,6 +92,22 @@ const PRECACHE_URLS = [
   'pages/pedigree.js',
   'pages/roster.html',
   'pages/roster.js',
+  'pages/sale-import.html',
+  'pages/sale-import.js',
+  'pages/sale.html',
+  'pages/sale.js',
+  'pages/sales.html',
+  'pages/sales.js',
+  'pages/scheduled-placements.html',
+  'pages/scheduled-placements.js',
+  'pages/stud-service-import.html',
+  'pages/stud-service-import.js',
+  'pages/stud-service.html',
+  'pages/stud-service.js',
+  'pages/stud-services.html',
+  'pages/stud-services.js',
+  'pages/upcoming.html',
+  'pages/upcoming.js',
   'vendor/dexie.min.mjs',
   'vendor/papaparse.min.mjs'
 ];
