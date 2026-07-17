@@ -54,11 +54,10 @@ badge and a text **"Remove"** button, then shows four always-visible controls: a
    boolean in `ctx`, e.g. `ctx.plannedTestsAddOpen`, so it survives re-render after an
    add). Re-rendering the section after an add/copy is fine — just respect the flag.
 
-**DECISION to confirm with the user before merging:** #8 is implemented as "hide the
-*logged* planned rows (they live in the Health-Test Summary now)," NOT "delete the
-whole Planned Tests panel." This is the only reading consistent with #1 and #9 (which
-assume the panel and its add control survive). If the user actually wants the entire
-planned-tests concept removed from Dog Detail, that's a larger change — stop and ask.
+**DECISION (confirmed by user):** #8 means "hide the *logged* planned rows (they live in
+the Health-Test Summary now)," NOT "delete the whole Planned Tests panel." The panel and
+its add/copy control stay; only planned tokens that have a matching logged event drop out
+of the list.
 
 Nothing in `dogRepo` changes; `planned_tests` storage and `addPlannedTests()` stay.
 
@@ -329,6 +328,50 @@ Watch-outs:
 
 ---
 
+## 12 — Stud Service: "Sent" and "Returned" date fields
+
+Add two optional date fields to StudService so shipping/travel dates for the arrangement
+(e.g. chilled/frozen semen shipped out and returned, or a dog sent to the partner and
+back) live directly on the record. This is the dedicated home; the existing
+`boarding`-event-on-the-dog prompt stays as-is for physical dog travel.
+
+**Field keys:** `sent_date`, `returned_date`. Both plain nullable `YYYY-MM-DD` strings,
+both **optional**.
+
+- **No `db.js` change.** These are never queried/filtered/sorted at the DB level, so —
+  exactly like the existing `result_notes` / `notes` fields — they are NOT added to the
+  `stud_services` index string. Dexie persists arbitrary fields; they ride
+  create/update and the JSON backup automatically. Do not add a `.version(2)` block.
+- **`KennelOS/data/studServiceRepo.js`:** no change to `REQUIRED_FIELDS` (optional
+  fields). The base repo passes them through. No validation.
+- **`KennelOS/pages/stud-service.js`:**
+  - `blankStudService()` — add `sent_date: '', returned_date: ''`.
+  - `renderView()` — add two rows after `Status` (this page's `row()` still shows `—`
+    for blanks, which is consistent with the rest of stud-service view; item #11's
+    empty-hiding was scoped to `dog.js` only):
+    ```js
+    ${row('Sent', s.sent_date ? esc(fmtDate(s.sent_date)) : '')}
+    ${row('Returned', s.returned_date ? esc(fmtDate(s.returned_date)) : '')}
+    ```
+  - `renderEdit()` — add two `type="date"` inputs (`#f-sent_date`, `#f-returned_date`),
+    e.g. after the `Status` field. Suggested hint on Sent: "Date the dog/semen was sent
+    out (optional)."
+  - `readForm()` — read both: `sent_date: val('f-sent_date'), returned_date: val('f-returned_date')`.
+  - `updateWarnings()` — optional soft warning (warn-don't-block, matches page posture):
+    if both set and `returned_date < sent_date`, push "Returned date is before the sent
+    date."
+- **Doc update:** `Data_Model_Architecture_Proposal_v3.md` §5.8 table — add `sent_date`
+  and `returned_date` (optional, date) rows + changelog entry (additive, unindexed,
+  zero migration).
+- **CSV import (optional, only if the user wants it):** the `stud_service` mapping in
+  `data/importExport.js` could gain `sent_date` / `returned_date` columns. Not required
+  for this batch.
+
+Item #10's stud-services sort stays on `created_at` desc — `sent_date` is optional and
+often blank, so `created_at` remains the reliable ordering key.
+
+---
+
 ## Cross-cutting / testing
 
 - Serve over HTTP (`python3 -m http.server` in `KennelOS/`), never `file://`.
@@ -339,7 +382,8 @@ Watch-outs:
   fields showing no dashes; kennels page on a ~360px viewport with no horizontal page
   scroll.
 - Doc updates for the two enum additions (#2 dog `for_sale`, #6 stud-service
-  `in_progress`) in `Data_Model_Architecture_Proposal_v3.md` + its changelog. These are
-  the only spec divergences; everything else is UI-only.
+  `in_progress`) and the two new StudService fields (#12 `sent_date`/`returned_date`) in
+  `Data_Model_Architecture_Proposal_v3.md` + its changelog. These are the only spec
+  divergences; everything else is UI-only.
 - No `db.js`/`referenceRegistry.js` changes. No `.version(2)`.
 ```
