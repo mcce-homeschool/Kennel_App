@@ -1,7 +1,7 @@
 // contacts.js — Contact List screen, using the shared listView component.
-// "Buyers" is a filtered Contact view (?buyer=1), not a separate table/repo/page
-// (Data Model v3 §5.5) — a contact with a `buyer` role and/or a non-null
-// waitlist_status.
+// Buckets are filtered Contact views (?group=…), not separate tables/repos/pages
+// (Data Model v3 §5.5) — Clients is exactly the old `isBuyer` predicate (a
+// contact with a `buyer` role and/or a non-null waitlist_status).
 import { contactRepo } from '../data/contactRepo.js';
 import { kennelRepo } from '../data/kennelRepo.js';
 import { createListView } from '../assets/listView.js';
@@ -9,32 +9,53 @@ import { badges, badge, esc, param } from '../assets/ui.js';
 import { CONTACT_TYPE, WAITLIST_STATUS } from '../data/vocab.js';
 
 const mount = document.getElementById('contact-list');
-const buyerView = !!param('buyer');
+const group = param('group');
 
-function isBuyer(c) {
+function isClient(c) {
   return (c.contact_type || []).includes('buyer') || (c.waitlist_status && c.waitlist_status !== 'none');
 }
+function isNetwork(c) {
+  const t = c.contact_type || [];
+  return t.includes('breeder') || t.includes('co_owner');
+}
+function isCareTeam(c) {
+  const t = c.contact_type || [];
+  return t.includes('vet') || t.includes('groomer');
+}
+function isOther(c) {
+  return !isClient(c) && !isNetwork(c) && !isCareTeam(c);
+}
 
-function renderViewToggle() {
-  const toggle = document.getElementById('contacts-view-toggle');
-  toggle.innerHTML = buyerView
-    ? `<a class="btn btn-sm" href="contacts.html">← All contacts</a>`
-    : `<a class="btn btn-sm" href="contacts.html?buyer=1">Buyers only →</a>`;
-  if (buyerView) {
-    document.getElementById('contacts-title').textContent = 'Buyers';
-    document.getElementById('contacts-subtitle').textContent =
-      'Contacts with a buyer role or a waitlist status — a filtered view of Contacts, not a separate table.';
-  }
+const GROUPS = {
+  clients: { predicate: isClient, title: 'Clients', subtitle: 'Contacts with a buyer role or a waitlist status.' },
+  network: { predicate: isNetwork, title: 'Network', subtitle: 'Other breeders and co-owners.' },
+  care: { predicate: isCareTeam, title: 'Care team', subtitle: 'Vets and groomers.' },
+  other: { predicate: isOther, title: 'Other', subtitle: 'Contacts not tagged as a client, network, or care-team role.' }
+};
+
+function renderTabs() {
+  const active = GROUPS[group] ? group : null;
+  document.querySelectorAll('#contacts-group-tabs .seg-tab').forEach((tab) => {
+    const tabGroup = new URL(tab.href).searchParams.get('group');
+    const isActive = tabGroup === active;
+    tab.classList.toggle('active', isActive);
+    if (isActive) tab.setAttribute('aria-current', 'page'); else tab.removeAttribute('aria-current');
+  });
+  const info = GROUPS[group];
+  document.getElementById('contacts-title').textContent = info ? info.title : 'Contacts';
+  document.getElementById('contacts-subtitle').textContent = info
+    ? info.subtitle
+    : 'Vets, co-owners, other breeders, buyers, and referral sources.';
 }
 
 async function init() {
-  renderViewToggle();
+  renderTabs();
   const kennels = await kennelRepo.getAll({ includeArchived: true });
   const kennelName = (id) => kennels.find((k) => k.id === id)?.kennel_name || '';
 
   createListView({
     mount,
-    baseFilter: buyerView ? isBuyer : () => true,
+    baseFilter: GROUPS[group]?.predicate || (() => true),
     search: {
       placeholder: 'Search name, email, phone…',
       text: (c) => `${c.name || ''} ${c.email || ''} ${c.phone || ''}`
@@ -43,17 +64,20 @@ async function init() {
       { id: 'type', label: 'Type', options: CONTACT_TYPE, match: (c, v) => (c.contact_type || []).includes(v) },
       { id: 'waitlist', label: 'Waitlist', options: WAITLIST_STATUS.filter((w) => w.value !== 'none'), match: (c, v) => c.waitlist_status === v }
     ],
+    // Name + Type stay visible at every width; Waitlist/Kennel/Phone/Email
+    // collapse behind the row's "more details" toggle on phones so the table
+    // never forces horizontal scroll on a narrow screen.
     columns: [
       { header: 'Name', cell: (c) => `<strong>${esc(c.name)}</strong>` },
       { header: 'Type', cell: (c) => badges(CONTACT_TYPE, c.contact_type) },
-      { header: 'Waitlist', cell: (c) => c.waitlist_status && c.waitlist_status !== 'none' ? badge(WAITLIST_STATUS, c.waitlist_status) : '<span class="faint">—</span>' },
-      { header: 'Kennel', cell: (c) => c.kennel_id ? esc(kennelName(c.kennel_id)) : '<span class="faint">—</span>' },
-      { header: 'Phone', cell: (c) => c.phone ? esc(c.phone) : '<span class="faint">—</span>' },
-      { header: 'Email', cell: (c) => c.email ? esc(c.email) : '<span class="faint">—</span>' }
+      { header: 'Waitlist', collapse: true, cell: (c) => c.waitlist_status && c.waitlist_status !== 'none' ? badge(WAITLIST_STATUS, c.waitlist_status) : '<span class="faint">—</span>' },
+      { header: 'Kennel', collapse: true, cell: (c) => c.kennel_id ? esc(kennelName(c.kennel_id)) : '<span class="faint">—</span>' },
+      { header: 'Phone', collapse: true, cell: (c) => c.phone ? esc(c.phone) : '<span class="faint">—</span>' },
+      { header: 'Email', collapse: true, cell: (c) => c.email ? esc(c.email) : '<span class="faint">—</span>' }
     ],
     onRowClick: (c) => { location.href = `contact.html?id=${encodeURIComponent(c.id)}`; },
     load: (o) => contactRepo.getAll(o),
-    emptyText: buyerView ? 'No buyers yet.' : 'No contacts yet. Click “+ Add Contact” to create the first one.'
+    emptyText: GROUPS[group] ? `No ${GROUPS[group].title.toLowerCase()} yet.` : 'No contacts yet. Click “+ Add Contact” to create the first one.'
   });
 }
 

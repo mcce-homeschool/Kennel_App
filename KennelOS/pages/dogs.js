@@ -3,10 +3,11 @@
 import { dogRepo } from '../data/dogRepo.js';
 import { contactRepo } from '../data/contactRepo.js';
 import { createListView } from '../assets/listView.js';
-import { badge, fmtDate, esc } from '../assets/ui.js';
+import { badge, fmtDate, esc, param } from '../assets/ui.js';
 import { descriptor, SEX, DOG_STATUS, OWNERSHIP_TYPE } from '../data/vocab.js';
 
 const mount = document.getElementById('dog-list');
+const bucket = param('bucket');
 
 // Compact single-letter badge (M/F/U) — Call name, Sex, and Status are the only
 // columns that stay visible on a narrow screen, so Sex has to fit in that space.
@@ -16,7 +17,46 @@ function sexBadge(sex) {
   return `<span class="badge ${d.badge}" title="${esc(d.label)}">${letter}</span>`;
 }
 
+// DOB ascending (oldest first), undated rows always last regardless of the
+// empty-string-sorts-first quirk of plain string comparison.
+function dobAscUndatedLast(a, b) {
+  if (!a.date_of_birth && !b.date_of_birth) return 0;
+  if (!a.date_of_birth) return 1;
+  if (!b.date_of_birth) return -1;
+  return a.date_of_birth.localeCompare(b.date_of_birth);
+}
+const dobDesc = (a, b) => (b.date_of_birth || '').localeCompare(a.date_of_birth || '');
+const nameAsc = (a, b) => (a.call_name || '').localeCompare(b.call_name || '');
+
+const NOT_BREEDING_STATUSES = ['retired_breeding', 'pet_home', 'deceased'];
+
+const BUCKETS = {
+  puppies: { baseFilter: (d) => d.status === 'puppy', sort: dobDesc },
+  breeding: {
+    baseFilter: (d) => d.status === 'active_breeding',
+    sort: dobAscUndatedLast,
+    groupBy: { key: (d) => d.sex, groups: ['male', 'female', 'unknown'].map((v) => ({ value: v, label: descriptor(SEX, v).label })) }
+  },
+  not_breeding: {
+    baseFilter: (d) => NOT_BREEDING_STATUSES.includes(d.status),
+    sort: dobAscUndatedLast,
+    groupBy: { key: (d) => d.status, groups: NOT_BREEDING_STATUSES.map((v) => ({ value: v, label: descriptor(DOG_STATUS, v).label })) }
+  },
+  external: { baseFilter: (d) => d.status === 'external_reference', sort: nameAsc }
+};
+
+function renderTabs() {
+  document.querySelectorAll('#dogs-bucket-tabs .seg-tab').forEach((tab) => {
+    const tabBucket = new URL(tab.href).searchParams.get('bucket');
+    const isActive = tabBucket === (BUCKETS[bucket] ? bucket : null);
+    tab.classList.toggle('active', isActive);
+    if (isActive) tab.setAttribute('aria-current', 'page'); else tab.removeAttribute('aria-current');
+  });
+}
+
 async function init() {
+  renderTabs();
+  const active = BUCKETS[bucket] || {};
   // Breed filter options come from the data (free-text breeds already entered).
   const [breeds, contacts] = await Promise.all([
     dogRepo.getBreeds(),
@@ -27,6 +67,9 @@ async function init() {
 
   createListView({
     mount,
+    baseFilter: active.baseFilter || (() => true),
+    sort: active.sort || null,
+    groupBy: active.groupBy || null,
     search: {
       placeholder: 'Search by name…',
       text: (d) => `${d.call_name || ''} ${d.registered_name || ''}`
@@ -50,7 +93,7 @@ async function init() {
     ],
     onRowClick: (d) => { location.href = `dog.html?id=${encodeURIComponent(d.id)}`; },
     load: (o) => dogRepo.getAll(o),
-    emptyText: 'No dogs yet. Click “+ Add Dog” to create the first record.',
+    emptyText: BUCKETS[bucket] ? 'No dogs in this bucket yet.' : 'No dogs yet. Click “+ Add Dog” to create the first record.',
     // Roster's CSV export (Navigation Consolidation Plan v1 §3/§6) — same column
     // set as roster.html, now available directly from the Dogs hub.
     csv: {

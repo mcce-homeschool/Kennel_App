@@ -8,6 +8,11 @@ const mount = document.getElementById('contract-list');
 
 createListView({
   mount,
+  // The fallout: contracts not tied to any sale or stud service (co-own,
+  // lease, other, and any unlinked sale/stud contract). Sale/stud-service
+  // contracts live on their Sales/Stud Services cards instead.
+  baseFilter: (c) => !c.related_sale_id && !c.related_stud_service_id,
+  sort: (a, b) => (b.signed_date || b.created_at || '').localeCompare(a.signed_date || a.created_at || ''),
   search: {
     placeholder: 'Search title, terms…',
     text: (c) => `${c.title || ''} ${c.terms_summary || ''}`
@@ -24,5 +29,5 @@ createListView({
   ],
   onRowClick: (c) => { location.href = `contract.html?id=${encodeURIComponent(c.id)}`; },
   load: (o) => contractRepo.getAll(o),
-  emptyText: 'No contracts yet. Click “+ Add Contract” to create the first one.'
+  emptyText: 'No other contracts yet. Sale and stud-service contracts live on their Sales and Stud Services cards.'
 });
