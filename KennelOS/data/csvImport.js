@@ -754,8 +754,16 @@ const EVENT_MAPPING = {
 
     const endRaw = col(row, 'event_end_date');
     const eventEnd = normDate(endRaw);
+    // event_end_date only belongs on a `span`-duration type (boarding, heat_cycle,
+    // medication). A non-null end on an `instant` type is the soft warning the
+    // eventRepo comment delegates here (Stage4.5 Addendum §C3): note it and drop
+    // the stray value — never a hard block, and instant events stay end-date-free,
+    // matching the UI form that hides the field for instant types.
+    const typeDef = eventType ? eventTypesFor('dog').find((t) => t.value === eventType) : null;
     if (eventEnd === null && endRaw) reasons.push(`Unrecognized event_end_date "${endRaw}" (ignored).`);
-    else if (eventEnd) record.event_end_date = eventEnd;
+    else if (eventEnd && typeDef && typeDef.duration === 'instant') {
+      reasons.push(`event_end_date is only for span events; "${eventTypeRaw}" is an instant type — the end date was ignored.`);
+    } else if (eventEnd) record.event_end_date = eventEnd;
 
     const title = col(row, 'title');
     if (title) record.title = title;
