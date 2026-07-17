@@ -10,15 +10,9 @@
 import { db } from './db.js';
 import { makeRepo } from './repoBase.js';
 import { EVENT_TYPES, descriptor } from './vocab.js';
+import { todayYMD } from './dateUtils.js';
 
 const base = makeRepo('events', null);
-
-// Local date-only helper (data layer never imports from assets/ui.js).
-function todayYMD() {
-  const d = new Date();
-  const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
 
 const REQUIRED_FIELDS = ['subject_type', 'subject_id', 'event_type', 'event_date', 'title'];
 const SUBJECT_TYPES = ['dog', 'pairing', 'litter'];

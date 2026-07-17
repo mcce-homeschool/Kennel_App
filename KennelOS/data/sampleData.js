@@ -17,6 +17,7 @@ import { litterRepo } from './litterRepo.js';
 import { saleRepo } from './saleRepo.js';
 import { contractRepo } from './contractRepo.js';
 import { studServiceRepo } from './studServiceRepo.js';
+import { monthsFromToday, daysFromToday } from './dateUtils.js';
 import {
   findBlockingReferences, DOG_REFERENCES, PAIRING_REFERENCES, LITTER_REFERENCES,
   SALE_REFERENCES, STUD_SERVICE_REFERENCES
@@ -54,26 +55,6 @@ export function declineSampleData() {
 }
 
 // --- Seeding ----------------------------------------------------------------
-
-// YYYY-MM-DD for `n` months after today — used for Pairing P2's planned_date so
-// the sample packet always shows a pairing "several months out" regardless of
-// when it's seeded (brief §6).
-function monthsFromToday(n) {
-  const d = new Date();
-  d.setMonth(d.getMonth() + n);
-  const p = (v) => String(v).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
-
-// YYYY-MM-DD for `n` days from today (negative = past) — used for the sample
-// boarding (Stage4.5 Addendum §C6) and placement (§D5) events so they stay
-// "currently ongoing" / "still upcoming" regardless of when the packet is seeded.
-function daysFromToday(n) {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  const p = (v) => String(v).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
 
 export async function seedSampleData() {
   const manifest = {
