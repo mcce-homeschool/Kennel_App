@@ -1,0 +1,249 @@
+// vocab.js — controlled vocabularies (the enums from the data model) in one place,
+// each value carrying a human label and a badge color class (assets/app.css).
+// Dropdowns and badges both read from here so they never drift apart.
+
+export const SEX = [
+  { value: 'male',    label: 'Male',    badge: 'badge-blue' },
+  { value: 'female',  label: 'Female',  badge: 'badge-purple' },
+  { value: 'unknown', label: 'Unknown', badge: 'badge-gray' }
+];
+
+export const OWNERSHIP_TYPE = [
+  { value: 'owned',      label: 'Owned',      badge: 'badge-green' },
+  { value: 'co_owned',   label: 'Co-owned',   badge: 'badge-green' },
+  { value: 'external',   label: 'External',   badge: 'badge-gray' },
+  { value: 'leased_in',  label: 'Leased in',  badge: 'badge-amber' },
+  { value: 'leased_out', label: 'Leased out', badge: 'badge-amber' }
+];
+
+export const DOG_STATUS = [
+  { value: 'puppy',              label: 'Puppy',              badge: 'badge-blue' },
+  { value: 'active_breeding',    label: 'Active breeding',    badge: 'badge-green' },
+  { value: 'retired_breeding',   label: 'Retired breeding',   badge: 'badge-amber' },
+  { value: 'pet_home',           label: 'Pet home',           badge: 'badge-neutral' },
+  { value: 'deceased',           label: 'Deceased',           badge: 'badge-gray' },
+  { value: 'external_reference', label: 'External reference', badge: 'badge-gray' }
+];
+
+// --- Pairing & Litter vocabularies (Data Model doc §5.3–5.4) ---------------
+export const PAIRING_TYPE = [
+  { value: 'planned', label: 'Planned', badge: 'badge-blue' },
+  { value: 'actual',  label: 'Actual',  badge: 'badge-green' }
+];
+
+export const PAIRING_METHOD = [
+  { value: 'natural',     label: 'Natural',        badge: 'badge-neutral' },
+  { value: 'ai_fresh',    label: 'AI — fresh',     badge: 'badge-neutral' },
+  { value: 'ai_chilled',  label: 'AI — chilled',   badge: 'badge-neutral' },
+  { value: 'ai_frozen',   label: 'AI — frozen',    badge: 'badge-neutral' },
+  { value: 'surgical_ai', label: 'Surgical AI',    badge: 'badge-neutral' }
+];
+
+export const PAIRING_STATUS = [
+  { value: 'planned',            label: 'Planned',            badge: 'badge-blue' },
+  { value: 'bred',               label: 'Bred',               badge: 'badge-purple' },
+  { value: 'confirmed_pregnant', label: 'Confirmed pregnant', badge: 'badge-green' },
+  { value: 'not_pregnant',       label: 'Not pregnant',       badge: 'badge-amber' },
+  { value: 'whelped',            label: 'Whelped',            badge: 'badge-green' },
+  { value: 'failed',             label: 'Failed',             badge: 'badge-red' },
+  { value: 'cancelled',          label: 'Cancelled',          badge: 'badge-gray' }
+];
+
+export const LITTER_STATUS = [
+  { value: 'expected', label: 'Expected', badge: 'badge-blue' },
+  { value: 'whelped',  label: 'Whelped',  badge: 'badge-green' },
+  { value: 'weaning',  label: 'Weaning',  badge: 'badge-amber' },
+  { value: 'ready',    label: 'Ready',    badge: 'badge-green' },
+  { value: 'placed',   label: 'Placed',   badge: 'badge-neutral' },
+  { value: 'closed',   label: 'Closed',   badge: 'badge-gray' }
+];
+
+export const CONTACT_TYPE = [
+  { value: 'breeder',        label: 'Breeder',        badge: 'badge-green' },
+  { value: 'vet',            label: 'Vet',            badge: 'badge-blue' },
+  { value: 'groomer',        label: 'Groomer',        badge: 'badge-purple' },
+  { value: 'buyer_referrer', label: 'Buyer referrer', badge: 'badge-amber' },
+  { value: 'co_owner',       label: 'Co-owner',       badge: 'badge-neutral' },
+  { value: 'buyer',          label: 'Buyer',          badge: 'badge-blue' },
+  { value: 'other',          label: 'Other',          badge: 'badge-gray' }
+];
+
+// --- Buyer-view / Sale / Contract / StudService vocabularies (Stage 4,
+// Data Model v3 §5.6–5.9, Stage4 Revision v2) --------------------------------
+// waitlist_status lives on Contact (Buyer merged into Contact, v3 §5.5) — it
+// powers the Buyer-view filter on the Contact List screen.
+export const WAITLIST_STATUS = [
+  { value: 'none',      label: 'None',      badge: 'badge-gray' },
+  { value: 'active',    label: 'Active',    badge: 'badge-blue' },
+  { value: 'fulfilled', label: 'Fulfilled', badge: 'badge-green' }
+];
+
+export const PLACEMENT_TYPE = [
+  { value: 'pet',            label: 'Pet',            badge: 'badge-neutral' },
+  { value: 'show',           label: 'Show',           badge: 'badge-purple' },
+  { value: 'breeding_rights', label: 'Breeding rights', badge: 'badge-green' },
+  { value: 'co_own',         label: 'Co-own',         badge: 'badge-blue' }
+];
+
+export const SALE_STATUS = [
+  { value: 'reserved',      label: 'Reserved',      badge: 'badge-blue' },
+  { value: 'deposit_paid',  label: 'Deposit paid',  badge: 'badge-amber' },
+  { value: 'paid_in_full',  label: 'Paid in full',  badge: 'badge-green' },
+  { value: 'delivered',     label: 'Delivered',     badge: 'badge-green' },
+  { value: 'returned',      label: 'Returned',      badge: 'badge-red' },
+  { value: 'cancelled',     label: 'Cancelled',     badge: 'badge-gray' }
+];
+
+export const CONTRACT_TYPE = [
+  { value: 'sale',         label: 'Sale',         badge: 'badge-blue' },
+  { value: 'stud_service', label: 'Stud service', badge: 'badge-purple' },
+  { value: 'co_own',       label: 'Co-own',       badge: 'badge-green' },
+  { value: 'lease',        label: 'Lease',        badge: 'badge-amber' },
+  { value: 'other',        label: 'Other',        badge: 'badge-gray' }
+];
+
+// Not a locked state machine (Stage4 Revision v2 §7) — moves any direction, no
+// confirmation dialogs. Default on create is 'draft'.
+export const CONTRACT_STATUS = [
+  { value: 'draft',     label: 'Draft',     badge: 'badge-gray' },
+  { value: 'sent',      label: 'Sent',      badge: 'badge-blue' },
+  { value: 'signed',    label: 'Signed',    badge: 'badge-green' },
+  { value: 'declined',  label: 'Declined',  badge: 'badge-red' },
+  { value: 'cancelled', label: 'Cancelled', badge: 'badge-red' },
+  { value: 'void',      label: 'Void',      badge: 'badge-gray' }
+];
+
+export const STUD_SERVICE_DIRECTION = [
+  { value: 'outgoing', label: 'Outgoing — our dog is the stud', badge: 'badge-blue' },
+  { value: 'incoming', label: 'Incoming — our dog is the dam',  badge: 'badge-purple' }
+];
+
+export const FEE_STRUCTURE = [
+  { value: 'flat_fee',       label: 'Flat fee',       badge: 'badge-neutral' },
+  { value: 'pick_of_litter', label: 'Pick of litter', badge: 'badge-neutral' },
+  { value: 'flat_plus_pick', label: 'Flat + pick',    badge: 'badge-neutral' },
+  { value: 'other',          label: 'Other',          badge: 'badge-gray' }
+];
+
+export const STUD_SERVICE_STATUS = [
+  { value: 'arranged', label: 'Arranged', badge: 'badge-blue' },
+  { value: 'completed', label: 'Completed', badge: 'badge-green' },
+  { value: 'failed',    label: 'Failed',    badge: 'badge-red' },
+  { value: 'cancelled', label: 'Cancelled', badge: 'badge-gray' }
+];
+
+// Look up the {value,label,badge} descriptor for a value in a vocab list.
+export function descriptor(vocab, value) {
+  return vocab.find((v) => v.value === value) || { value, label: value ?? '—', badge: 'badge-gray' };
+}
+
+// Suggest-not-enforce starter set for boarding's `boarding_reason` (Stage4.5
+// Addendum §C3) — a plain string in `details`, never a validated vocab, so a
+// combobox surfaces these as suggestions without blocking free text.
+export const BOARDING_REASON_SUGGESTIONS = [
+  'Stud service', 'Co-owner rotation', 'Foster', 'Grow-out', 'Owner travel', 'Whelp assist', 'Other'
+];
+
+// --- Event type catalog (Data Model doc §5.2; Stage4.5 Addendum §C3/D1) ----
+// Each type carries a badge color and the type-specific `details` fields shown
+// as a short form (Build Brief B1: one small form per event_type, not a generic
+// key/value editor). `subjects` limits where a type can be logged; at Stage 2
+// only `dog` subjects exist, so pairing/litter-only types are intentionally
+// absent and get added with their tables in later stages.
+//
+// `duration` is 'instant' (a single dated occurrence) or 'span' (has a start —
+// event_date — and an optional open end — event_end_date). Only `boarding`,
+// `heat_cycle`, and `medication` are spans; everything else is instant. This is
+// the field the Location/Status Board deliberately does NOT filter on (Stage4.5
+// Addendum §C4/§C5) — whereabouts is a narrower set than "is a span."
+//
+// `relatedContact: true` means the type carries a top-level related_contact_id
+// (the events.related_contact_id FK, Stage4.5 Addendum §C2) — the person/kennel
+// on the other side of a boarding stay or a placement's buyer. It is NEVER a
+// field inside `details` (details.location stays a plain string; only a real
+// FK belongs at the top level).
+//
+// Field `type` is one of: text | textarea | date | number | combobox (a free-text
+// input with suggestions — suggest-not-enforce, never a validated enum).
+export const EVENT_TYPES = [
+  { value: 'vaccination',        label: 'Vaccination',        badge: 'badge-blue',    subjects: ['dog'], duration: 'instant',
+    fields: [{ key: 'vaccine', label: 'Vaccine', type: 'text' }, { key: 'lot_number', label: 'Lot #', type: 'text' }, { key: 'next_due', label: 'Next due', type: 'date' }] },
+  { value: 'preventative',       label: 'Preventative',       badge: 'badge-blue',    subjects: ['dog'], duration: 'instant',
+    fields: [{ key: 'product', label: 'Product', type: 'text' }, { key: 'dose', label: 'Dose', type: 'text' }] },
+  // panel_name/test_name/joint are `combobox` fields sourced at render time from
+  // the shared test vocabulary (Test Planning Addendum §3: Kennel.preferred_tests
+  // union distinct tokens already seen in events) — see eventForm.js's
+  // TEST_VOCAB_FIELDS. Suggest-not-enforce, same as boarding_reason below.
+  { value: 'genetic_test',       label: 'Genetic test',       badge: 'badge-purple',  subjects: ['dog'], duration: 'instant',
+    fields: [{ key: 'panel_name', label: 'Panel', type: 'combobox' }, { key: 'lab', label: 'Lab', type: 'text' }, { key: 'result', label: 'Result', type: 'text' }] },
+  { value: 'ofa_pennhip',        label: 'OFA / PennHIP',      badge: 'badge-purple',  subjects: ['dog'], duration: 'instant',
+    fields: [{ key: 'joint', label: 'Joint', type: 'combobox' }, { key: 'method', label: 'Method', type: 'text' }, { key: 'rating', label: 'Rating', type: 'text' }] },
+  { value: 'breed_specific_test', label: 'Breed-specific test', badge: 'badge-purple', subjects: ['dog'], duration: 'instant',
+    fields: [{ key: 'test_name', label: 'Test', type: 'combobox' }, { key: 'result', label: 'Result', type: 'text' }] },
+  { value: 'illness',            label: 'Illness',            badge: 'badge-red',     subjects: ['dog'], duration: 'instant',
+    fields: [{ key: 'diagnosis', label: 'Diagnosis', type: 'text' }, { key: 'treatment', label: 'Treatment', type: 'textarea' }] },
+  // Span (Stage4.5 Addendum §C5): event_date is the start, event_end_date the
+  // end (retired out of details.end_date — there's no shipped data to migrate).
+  { value: 'medication',         label: 'Medication',         badge: 'badge-blue',    subjects: ['dog'], duration: 'span',
+    fields: [{ key: 'drug', label: 'Drug', type: 'text' }, { key: 'dose', label: 'Dose', type: 'text' }, { key: 'frequency', label: 'Frequency', type: 'text' }] },
+  { value: 'surgery',            label: 'Surgery',            badge: 'badge-red',     subjects: ['dog'], duration: 'instant',
+    fields: [{ key: 'procedure', label: 'Procedure', type: 'text' }, { key: 'vet', label: 'Vet', type: 'text' }, { key: 'outcome', label: 'Outcome', type: 'textarea' }] },
+  { value: 'vet_visit',          label: 'Vet visit',          badge: 'badge-blue',    subjects: ['dog'], duration: 'instant',
+    fields: [{ key: 'reason', label: 'Reason', type: 'text' }, { key: 'vet', label: 'Vet', type: 'text' }, { key: 'findings', label: 'Findings', type: 'textarea' }] },
+  { value: 'injury',             label: 'Injury',             badge: 'badge-red',     subjects: ['dog'], duration: 'instant',
+    fields: [{ key: 'description', label: 'Description', type: 'textarea' }, { key: 'severity', label: 'Severity', type: 'text' }] },
+  { value: 'weight_check',       label: 'Weight check',       badge: 'badge-neutral', subjects: ['dog'], duration: 'instant',
+    fields: [{ key: 'weight_lbs', label: 'Weight (lbs)', type: 'number' }] },
+  { value: 'milestone',          label: 'Milestone',          badge: 'badge-green',   subjects: ['dog'], duration: 'instant',
+    fields: [{ key: 'description', label: 'Description', type: 'text' }] },
+  { value: 'title_earned',       label: 'Title earned',       badge: 'badge-green',   subjects: ['dog'], duration: 'instant',
+    fields: [{ key: 'title_abbreviation', label: 'Title', type: 'text' }, { key: 'organization', label: 'Organization', type: 'text' }] },
+  // Span (Stage4.5 Addendum §C5): event_date is the cycle start (retired out of
+  // details.cycle_start), event_end_date the (optional) end.
+  { value: 'heat_cycle',         label: 'Heat cycle',         badge: 'badge-amber',   subjects: ['dog'], duration: 'span',
+    fields: [{ key: 'notes', label: 'Notes', type: 'textarea' }] },
+  { value: 'evaluation',         label: 'Evaluation',         badge: 'badge-neutral', subjects: ['dog'], duration: 'instant',
+    fields: [{ key: 'evaluator', label: 'Evaluator', type: 'text' }, { key: 'temperament_notes', label: 'Temperament notes', type: 'textarea' }, { key: 'structure_notes', label: 'Structure notes', type: 'textarea' }] },
+  // Boarding (Stage4.5 Addendum §C3) — a span with a top-level related_contact_id
+  // (the person/kennel the dog is staying with). `location` and `boarding_reason`
+  // stay plain strings in `details`; boarding_reason is suggest-not-enforce, never
+  // a validated vocab. dropoff_time/pickup_time are inert display strings — never
+  // parsed or compared.
+  { value: 'boarding',           label: 'Boarding',           badge: 'badge-amber',   subjects: ['dog'], duration: 'span', relatedContact: true,
+    fields: [
+      { key: 'location', label: 'Location', type: 'text' },
+      { key: 'boarding_reason', label: 'Reason', type: 'combobox', options: BOARDING_REASON_SUGGESTIONS },
+      { key: 'dropoff_time', label: 'Drop-off time', type: 'text' },
+      { key: 'pickup_time', label: 'Pick-up time', type: 'text' },
+      { key: 'notes', label: 'Notes', type: 'textarea' }
+    ] },
+  // Pairing-subject types (Stage 3) — the pairing's timeline is built from these.
+  { value: 'breeding_tie',       label: 'Breeding tie',       badge: 'badge-purple',  subjects: ['pairing'], duration: 'instant',
+    fields: [{ key: 'tie_date', label: 'Tie date', type: 'date' }, { key: 'method', label: 'Method', type: 'text' }] },
+  { value: 'progesterone_test',  label: 'Progesterone test',  badge: 'badge-blue',    subjects: ['pairing'], duration: 'instant',
+    fields: [{ key: 'value', label: 'Value (ng/mL)', type: 'number' }, { key: 'lab', label: 'Lab', type: 'text' }] },
+  { value: 'ultrasound',         label: 'Ultrasound',         badge: 'badge-blue',    subjects: ['pairing'], duration: 'instant',
+    fields: [{ key: 'confirmed', label: 'Confirmed?', type: 'text' }, { key: 'estimated_count', label: 'Estimated count', type: 'number' }] },
+  { value: 'pregnancy_update',   label: 'Pregnancy update',   badge: 'badge-green',   subjects: ['pairing'], duration: 'instant',
+    fields: [{ key: 'note', label: 'Note', type: 'textarea' }] },
+  // Litter-subject type (Stage 3).
+  { value: 'whelping_summary',   label: 'Whelping summary',   badge: 'badge-green',   subjects: ['litter'], duration: 'instant',
+    fields: [{ key: 'total_born', label: 'Total born', type: 'number' }, { key: 'live_born', label: 'Live born', type: 'number' }, { key: 'notes', label: 'Notes', type: 'textarea' }] },
+  // Placement / drop-off (Stage4.5 Addendum §D1) — an instant event; subject_id
+  // is the puppy, related_contact_id is the buyer. No stored link to the Sale
+  // (prompted at the Sale, never tied to it — see saleRepo/sale.js prompt).
+  // placement_time is an inert display string, same posture as boarding's times.
+  { value: 'placement',          label: 'Placement / drop-off', badge: 'badge-green', subjects: ['dog'], duration: 'instant', relatedContact: true,
+    fields: [
+      { key: 'placement_time', label: 'Drop-off time', type: 'text' },
+      { key: 'location', label: 'Location', type: 'text' },
+      { key: 'notes', label: 'Notes', type: 'textarea' }
+    ] },
+  { value: 'note',               label: 'Note',               badge: 'badge-gray',    subjects: ['dog', 'pairing', 'litter'], duration: 'instant',
+    fields: [] }
+];
+
+// Event types loggable against a given subject_type.
+export function eventTypesFor(subjectType) {
+  return EVENT_TYPES.filter((t) => t.subjects.includes(subjectType));
+}
