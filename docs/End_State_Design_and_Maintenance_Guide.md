@@ -54,6 +54,9 @@ CLAUDE.md                      Session brief (read first)
 docs/                          Design docs (this file is the end-state map)
 KennelOS/
   index.html                   App root / landing
+  companion-view.html          Recipient-facing Companion share shell (§20) — a
+                               self-contained, read-only static file; NOT part of
+                               the app's page/nav set, but IS precached
   app.js                       Shared shell bootstrap (nav, PWA, first-run flow)
   nav.js                       Top-nav definition + rendering
   sw.js                        Service worker (app-shell precache, offline)
@@ -71,6 +74,7 @@ KennelOS/
     vocab.js                   Controlled vocabularies + event-type catalog
     csvImport.js               Generic CSV match-or-create engine + mappings
     importExport.js            JSON backup / restore
+    companionExport.js         Companion allow-list bundle builder (§20)
     appReset.js                Full "reset to first run" teardown
     sampleData.js              "Thornfield Kennels" demo seed/clear
     seedImport.js              Optional breed+test vocabulary seed
@@ -360,7 +364,10 @@ migration-requiring way.
 - **settings.js** — the primary `localStorage` user. Pages never touch `localStorage`
   directly. Keys (all under `kennelOS.*`): `lastBackupDate`, `persistRequested`,
   `sampleDataManifest`, `sampleDataCleared`, `myKennelId`, `myContactId`,
-  `myKennelSetupSkipped`. `clearAllSettings()` drops them all (used by Reset App).
+  `myKennelSetupSkipped`, `companion` (the Companion feature's per-type message
+  templates — Layer 1, §20 — stored as one JSON object keyed by recipient type via
+  `getCompanionSettings`/`setCompanionSettings`). `clearAllSettings()` drops them all
+  (used by Reset App).
 - **nudgeState.js** — a second, deliberately separate `localStorage` module (one key,
   `kennelOS.nudgeDismissals`): the derived-nudge dismissal ledger (§19). Kept out of
   `settings.js`/`clearAllSettings()` on purpose — `appReset.js` calls its own
@@ -388,7 +395,7 @@ declined (or after sample data is later cleared), offer kennel setup.
 
 App-shell cache so the app installs and works offline after first load.
 
-- `CACHE_NAME` (currently `kennelos-shell-v19`) + a `PRECACHE_URLS` list of **every**
+- `CACHE_NAME` (currently `kennelos-shell-v20`) + a `PRECACHE_URLS` list of **every**
   app file (html/js/css/icons/vendor/resources).
 - `install` precaches the list (**`cache.addAll` is atomic** — one missing/renamed
   file fails the whole install). `activate` deletes old caches. Fetch is
@@ -452,7 +459,7 @@ one implementation lives in `data/dateUtils.js`.
 
 Organized **by job, not by table**: five workflow hubs in the main bar —
 **Today / Dogs / Breeding / People / Placements & Contracts** — plus a "More" corner
-menu for **Reports** and **Import/Export**. Detail/edit/import pages are not nav
+menu for **Reports**, **Companion** (§20), and **Import/Export**. Detail/edit/import pages are not nav
 entries; `HUB_CHILDREN` maps them to the hub tab that should light up. Links are
 stored app-root-relative and prefixed at render time so they resolve from `index.html`
 or `/pages/` and any GitHub Pages sub-path.
@@ -460,7 +467,8 @@ or `/pages/` and any GitHub Pages sub-path.
 ### Page catalog (`pages/`, one `.js` + `.html` each)
 
 Hubs & landing: `today`, `dogs`, `breeding`, `contacts`, `sales`, `reports`,
-`import-export`, plus root `index.html`.
+`companion` (the Companion Messaging console, §20), `import-export`, plus root
+`index.html`.
 Dogs: `dog` (detail), `roster`, `pedigree`.
 Breeding: `pairings`/`pairing`, `litters`/`litter`, `active-breeding`, `live-births`.
 People: `contact`.
@@ -642,6 +650,85 @@ StudService record itself.
 No schema/index/reference-registry change: `StudService.type` and the three `Kennel`
 fields are plain unindexed additions (§5); the one new cross-entity link (stud→pairing
 via a nudge action) already existed as `StudService.pairing_id`.
+
+---
+
+## 20. Companion share-out (buyers & partners)
+
+A **one-way, point-in-time export** of a curated slice of a recipient's own data,
+delivered as a **no-account, read-only link** — not sync, not a login, not a live
+view. The main app stays single-user/offline/all-local; this adds *recipients*.
+
+### What it is
+
+- **Three bundle types**, all **anchored on a Contact** (the recipient) and
+  discriminated by `bundleType`:
+  - **`prospective`** — a prospective family (a client/waitlister with no sale):
+    current availability. `availablePups` (`Dog` where `status='puppy'` +
+    `disposition='available'`, projected to `{name, breed, sex}`) + the litters
+    they came from. **No price, no per-recipient private data** — it's shared
+    availability, the same for every prospect.
+  - **`family`** — a current family (a buyer with a sale): their placed dog(s)
+    (`saleRepo.getByBuyer` → dog), the litter, `pickupDates` (the pup's `placement`
+    event), sanitized `vetVisits` (`{date, label}` with a **fixed type label only**,
+    never `Event.details`/`notes`), and `contractUrls` (the governing contract's
+    `document_url`).
+  - **`partner`** — a stud/lease/co-own partner: `studServices` (compensation =
+    full four-value `fee_structure` + native-decimal `fee_amount` + `pick_status`,
+    with `breedingDates` from the linked pairing's `breeding_tie` events),
+    `externalPairings` (pairings involving their external/leased-in dogs), and
+    `contracts` (lease/co_own/other contracts where `related_contact_id` = them).
+
+- **Two-layer messaging.** Layer 1 is per-type config (`kennelName`/`tagline`/
+  `introText`/`announcement`) in `settings.js` under the `companion` key, edited in
+  the **Companion Messaging console** (`pages/companion.*`, in the "More" menu).
+  Layer 2 is **`Contact.companion_note`**, a per-recipient personal line that
+  overrides the type's announcement for that one recipient. The bundle copies the
+  resolved copy inline, so header/landing text updates without a shell deploy.
+
+### The load-bearing invariant: the allow-list builder
+
+`data/companionExport.js` is the **security spine**. `importExport.js` deliberately
+iterates whatever tables exist (a full backup); this builder does the **exact
+opposite**: `buildProspectiveBundle`/`buildFamilyBundle`/`buildPartnerBundle(contact)`
+each **construct a fresh object naming every field explicitly**, reading through
+repos (never `db.*`), copying **only** listed fields — **no record spread, no
+filter-over-a-record**. After building, `assertOnlyKeys()` runs a **positive**
+allow-list check and **aborts the send** if any unexpected top-level key is present.
+A new field added to a source table does **not** appear in a bundle until someone
+adds it here by name. No second family's data, no internal notes, no lead/source
+fields, no financials beyond the one stud `fee_amount`.
+
+### Transport & the shell
+
+- The bundle rides the **URL fragment**: `JSON.stringify` → **lz-string**
+  (`vendor/lz-string.min.mjs`, vendored + version-locked, v1.5.0) →
+  `companion-view.html#<hash>`. Send is a **real `sms:`/`mailto:` anchor** the user
+  taps (their tap is the activating gesture — never a post-async
+  `window.location` assignment). **Channel by size:** email is the default; SMS is
+  blocked above `MAX_SMS_HASH_LEN` and steered to email; email warns above
+  `MAX_EMAIL_HASH_LEN` (the console's `prepareLink`).
+- **`companion-view.html`** is the recipient shell — one self-contained, read-only
+  static file at the app root (inlined, version-locked lz-string; branches on
+  `bundleType` and `bundleVersion`; **tolerates additive fields**; theme-aware;
+  shows a prominent "snapshot as of" line). It is **infrastructure**: it must stay
+  **backward-compatible with every `bundleVersion` ever sent** — bundle evolution is
+  additive, `bundleVersion` bumps only on a breaking shape change, and a shell fix
+  must not break links sent last month.
+
+### No revocation / no expiry
+
+A hash-link, once sent, is permanent. The sensitive document is **never in the
+hash** — only `contractUrl`, a pointer; access is governed by the owner's Drive
+sharing, which they revoke independently. `updatedAt` renders prominently so a stale
+link is self-evident.
+
+### Model touch-points (all covered in §4/§5/§7)
+
+`Contract.related_contact_id` (indexed FK, `CONTACT_REFERENCES`, `getByContact`),
+`Contract.document_url`, `StudService.pick_status`, `Contact.companion_note` — the
+last three plain/unindexed. `companionExport.js` and the console/shell are pure
+composition + projection; no two-way pointers, every reverse stays a query.
 
 ---
 
