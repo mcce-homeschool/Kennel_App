@@ -26,6 +26,20 @@ export const DOG_STATUS = [
   { value: 'external_reference', label: 'External reference', badge: 'badge-gray' }
 ];
 
+// Disposition — the breeder's intent for a dog, orthogonal to `status`
+// (life-stage). Answers "keeping or selling?" for a puppy before any Sale record
+// exists, so it can't be a `status` value (a puppy can't be both `puppy` and
+// `for_sale`) and it isn't a Sale (that's an actual transaction with a buyer).
+// Nullable/unset reads as "undecided". `available` is the single stable filter
+// key a future prospective-families feed selects on. Plain unindexed field on
+// Dog (same posture as recorded_coi) — nothing queries it by key.
+export const DISPOSITION = [
+  { value: 'undecided', label: 'Undecided', badge: 'badge-gray' },
+  { value: 'keeping',   label: 'Keeping',   badge: 'badge-blue' },
+  { value: 'available', label: 'Available', badge: 'badge-green' },
+  { value: 'placed',    label: 'Placed',    badge: 'badge-neutral' }
+];
+
 // --- Pairing & Litter vocabularies (Data Model doc §5.3–5.4) ---------------
 export const PAIRING_TYPE = [
   { value: 'planned', label: 'Planned', badge: 'badge-blue' },
