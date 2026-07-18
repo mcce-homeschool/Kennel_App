@@ -4,7 +4,7 @@ import { dogRepo } from '../data/dogRepo.js';
 import { contactRepo } from '../data/contactRepo.js';
 import { createListView } from '../assets/listView.js';
 import { badge, fmtDate, esc, param } from '../assets/ui.js';
-import { descriptor, SEX, DOG_STATUS, OWNERSHIP_TYPE } from '../data/vocab.js';
+import { descriptor, SEX, DOG_STATUS, DISPOSITION, OWNERSHIP_TYPE } from '../data/vocab.js';
 
 const mount = document.getElementById('dog-list');
 const bucket = param('bucket');
@@ -76,6 +76,10 @@ async function init() {
     },
     filters: [
       { id: 'status', label: 'Status', options: DOG_STATUS, match: (d, v) => d.status === v },
+      // Disposition — "keeping vs offering". `undecided` matches both the explicit
+      // value and never-set records, so it isn't a hole prospective-family filtering
+      // could fall through.
+      { id: 'disposition', label: 'Disposition', options: DISPOSITION, match: (d, v) => (d.disposition || 'undecided') === v },
       { id: 'sex', label: 'Sex', options: SEX, match: (d, v) => d.sex === v },
       { id: 'ownership', label: 'Ownership', options: OWNERSHIP_TYPE, match: (d, v) => d.ownership_type === v },
       { id: 'breed', label: 'Breed', options: breeds.map((b) => ({ value: b, label: b })), match: (d, v) => d.breed === v }
@@ -89,7 +93,8 @@ async function init() {
       { header: 'Sex', cell: (d) => sexBadge(d.sex) },
       { header: 'Breed', collapse: true, cell: (d) => esc(d.breed || '—') },
       { header: 'DOB', collapse: true, cell: (d) => d.date_of_birth ? esc(fmtDate(d.date_of_birth)) : '<span class="faint">—</span>' },
-      { header: 'Status', cell: (d) => badge(DOG_STATUS, d.status) }
+      { header: 'Status', cell: (d) => badge(DOG_STATUS, d.status) },
+      { header: 'Disposition', collapse: true, cell: (d) => d.disposition ? badge(DISPOSITION, d.disposition) : '<span class="faint">—</span>' }
     ],
     onRowClick: (d) => { location.href = `dog.html?id=${encodeURIComponent(d.id)}`; },
     load: (o) => dogRepo.getAll(o),
@@ -105,6 +110,7 @@ async function init() {
         { header: 'Breed', value: (d) => d.breed || '' },
         { header: 'DOB', value: (d) => d.date_of_birth || '' },
         { header: 'Status', value: (d) => label(DOG_STATUS, d.status) },
+        { header: 'Disposition', value: (d) => label(DISPOSITION, d.disposition) },
         { header: 'Ownership', value: (d) => label(OWNERSHIP_TYPE, d.ownership_type) },
         { header: 'Owner', value: (d) => contactName(d.owner_contact_id) }
       ]

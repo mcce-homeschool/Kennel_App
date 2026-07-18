@@ -163,17 +163,17 @@ export async function seedSampleData() {
   const fern = await dogRepo.create({
     call_name: 'Fern', sex: 'female', breed: BREED,
     date_of_birth: '2025-08-20', sire_id: gunnar.id, dam_id: juniper.id, litter_id: litter.id,
-    ownership_type: 'owned', status: 'puppy', kennel_id: thornfield.id
+    ownership_type: 'owned', status: 'puppy', disposition: 'available', kennel_id: thornfield.id
   });
   const birch = await dogRepo.create({
     call_name: 'Birch', sex: 'male', breed: BREED,
     date_of_birth: '2025-08-20', sire_id: gunnar.id, dam_id: juniper.id, litter_id: litter.id,
-    ownership_type: 'owned', status: 'active_breeding', kennel_id: thornfield.id
+    ownership_type: 'owned', status: 'active_breeding', disposition: 'keeping', kennel_id: thornfield.id
   });
   const hazel = await dogRepo.create({
     call_name: 'Hazel', sex: 'female', breed: BREED,
     date_of_birth: '2025-08-20', sire_id: gunnar.id, dam_id: juniper.id, litter_id: litter.id,
-    ownership_type: 'owned', status: 'pet_home', kennel_id: thornfield.id
+    ownership_type: 'owned', status: 'pet_home', disposition: 'placed', kennel_id: thornfield.id
   });
 
   const percy = await dogRepo.create({

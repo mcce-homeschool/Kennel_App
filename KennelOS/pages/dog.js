@@ -13,7 +13,7 @@ import { saleRepo } from '../data/saleRepo.js';
 import { studServiceRepo } from '../data/studServiceRepo.js';
 import { getMyContactId } from '../data/kennelSetup.js';
 import {
-  SEX, DOG_STATUS, OWNERSHIP_TYPE, PAIRING_TYPE, PAIRING_STATUS,
+  SEX, DOG_STATUS, DISPOSITION, OWNERSHIP_TYPE, PAIRING_TYPE, PAIRING_STATUS,
   PLACEMENT_TYPE, SALE_STATUS, STUD_SERVICE_DIRECTION, STUD_SERVICE_STATUS,
   EVENT_TYPES, descriptor, COI_METHOD_SUGGESTIONS
 } from '../data/vocab.js';
@@ -47,7 +47,7 @@ const blankDog = () => ({
   call_name: '', registered_name: '', sex: '', date_of_birth: '', dob_is_estimated: false,
   date_of_death: '', breed: '', color_markings: '', registry: '', registration_number: '',
   microchip_id: '', sire_id: '', dam_id: '', ownership_type: '', owner_contact_id: '',
-  co_owner_contact_ids: [], litter_id: '', kennel_id: '', status: '', status_date: '', notes: '',
+  co_owner_contact_ids: [], litter_id: '', kennel_id: '', status: '', status_date: '', disposition: '', notes: '',
   planned_tests: []
 });
 
@@ -212,6 +212,7 @@ function renderView() {
       ${row('Co-owners', coOwners)}
       ${KENNEL_FIELD_HIDDEN_FOR.includes(d.ownership_type) ? '' : row('Kennel', esc(kennelName(d.kennel_id)))}
       ${row('Status', badge(DOG_STATUS, d.status) + (d.status_date ? ` <span class="faint">since ${esc(fmtDate(d.status_date))}</span>` : ''))}
+      ${row('Disposition', d.disposition ? badge(DISPOSITION, d.disposition) : '')}
       ${row('Notes', d.notes ? esc(d.notes).replace(/\n/g, '<br>') : '')}
     </dl>`;
 }
@@ -249,6 +250,7 @@ function renderEdit() {
       ${field('Microchip', `<input id="f-microchip_id" type="text" value="${esc(d.microchip_id)}">`)}
       ${field('Ownership', `<select id="f-ownership_type">${vocabOptions(OWNERSHIP_TYPE, d.ownership_type, 'Select…')}</select>`, { required: true })}
       ${field('Status', `<select id="f-status">${vocabOptions(DOG_STATUS, d.status, 'Select…')}</select>`, { required: true })}
+      ${field('Disposition', `<select id="f-disposition">${vocabOptions(DISPOSITION, d.disposition || 'undecided')}</select>`, { hint: 'Keeping this dog or offering it? Drives the prospective-families view. Independent of Status.' })}
       ${field('Sire', `<select id="f-sire_id">${dogOptions(d.sire_id, ctx.original?.id, 'male')}</select>`)}
       ${field('Dam', `<select id="f-dam_id">${dogOptions(d.dam_id, ctx.original?.id, 'female')}</select>`)}
       ${field('Litter', `<select id="f-litter_id">${litterOptions(d.litter_id)}</select>`, { hint: 'The litter this dog was born into, if born in-house.' })}
@@ -308,6 +310,7 @@ function readForm() {
     microchip_id: val('f-microchip_id').trim(),
     ownership_type: val('f-ownership_type'),
     status: val('f-status'),
+    disposition: val('f-disposition'),
     sire_id: val('f-sire_id') || null,
     dam_id: val('f-dam_id') || null,
     litter_id: val('f-litter_id') || null,
