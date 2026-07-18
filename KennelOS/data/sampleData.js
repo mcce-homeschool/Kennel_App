@@ -168,7 +168,7 @@ export async function seedSampleData() {
   const litter = await litterRepo.create({
     pairing_id: pairingP1.id, dam_id: juniper.id, sire_id: gunnar.id,
     whelp_date: '2025-08-20', litter_registration_number: 'THORN-L-2025-01',
-    puppies_born_total: 3, puppies_born_alive: 3, puppies_born_deceased: 0,
+    puppies_born_total: 3, puppies_born_alive: 3, puppies_born_deceased: 0, puppies_born_abnormalities: 0,
     status: 'closed'
   });
 

@@ -182,7 +182,8 @@ Edges worth calling out:
 | surgery | dog | instant | | `{procedure, vet, outcome}` |
 | vet_visit | dog | instant | | `{reason, vet, findings}` |
 | injury | dog | instant | | `{description, severity}` |
-| weight_check | dog | instant | | `{weight_lbs}` — feeds future growth charts |
+| abnormalities | dog | instant | | `{type}` — enforced choice from `ABNORMALITY_TYPES` (common birth defects) |
+| weight_check | dog | instant | | `{weight_lbs, weight_oz, time_of_day}` — `weight_oz` accepts decimals; feeds future growth charts |
 | milestone | dog | instant | | `{description}` — e.g. eyes open, first steps |
 | evaluation | dog | instant | | `{evaluator, temperament_notes, structure_notes}` — structured temperament/structure assessment |
 | title_earned | dog | instant | | `{title_abbreviation, organization}` |
@@ -233,6 +234,7 @@ Edges worth calling out:
 | puppies_born_total | integer | | point-in-time fact recorded at whelping — kept even if some puppies aren't individually entered as Dog records right away |
 | puppies_born_alive | integer | | |
 | puppies_born_deceased | integer | | |
+| puppies_born_abnormalities | integer | | count of puppies born with an abnormality; overlaps alive/deceased rather than adding to them (an alive or deceased puppy may also be counted here) |
 | status | enum: expected / whelped / weaning / ready / placed / closed | ✓ | |
 | expected_price_male | decimal | | per-litter default; `sale.js` prefills a new Sale's `price` with this when the sold dog's `sex = male` and its `litter_id` points here, only if `price` is still empty |
 | expected_price_female | decimal | | same as above, for `sex = female` |
