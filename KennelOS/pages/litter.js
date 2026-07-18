@@ -61,6 +61,13 @@ function dogName(id) {
   const d = ctx.dogsById.get(id);
   return d ? (d.call_name + (d.registered_name ? ` (${d.registered_name})` : '')) : '';
 }
+// Read-only dog reference → a link to that dog's detail page. Returns '' when the
+// id doesn't resolve, so row() falls back to its faint dash. Escapes the name.
+function dogLink(id) {
+  const name = dogName(id);
+  if (!name) return '';
+  return `<a href="dog.html?id=${encodeURIComponent(id)}">${esc(name)}</a>`;
+}
 function pairingLabel(p) {
   if (!p) return '';
   return `${dogName(p.sire_id) || '—'} × ${dogName(p.dam_id) || '—'}${p.planned_date ? ` (${fmtDate(p.planned_date)})` : ''}`;
@@ -120,8 +127,8 @@ function renderView() {
     ${syncWarningHtml(l)}
     <dl class="dl-meta" style="margin-top:14px;">
       ${row('Nickname', esc(l.nickname))}
-      ${row('Dam', esc(dogName(l.dam_id)))}
-      ${row('Sire', esc(dogName(l.sire_id)))}
+      ${row('Dam', dogLink(l.dam_id))}
+      ${row('Sire', dogLink(l.sire_id))}
       ${row('Linked pairing', pairingHtml)}
       ${row('Whelp date', l.whelp_date ? esc(fmtDate(l.whelp_date)) : '')}
       ${row('Litter registration #', esc(l.litter_registration_number))}

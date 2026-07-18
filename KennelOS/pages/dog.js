@@ -170,6 +170,13 @@ function dogName(id) {
   const d = ctx.dogsById.get(id);
   return d ? (d.call_name + (d.registered_name ? ` (${d.registered_name})` : '')) : '';
 }
+// Read-only dog reference → a link to that dog's detail page. Returns '' when the
+// id doesn't resolve, so row() falls back to its faint dash. Escapes the name.
+function dogLink(id) {
+  const name = dogName(id);
+  if (!name) return '';
+  return `<a href="dog.html?id=${encodeURIComponent(id)}">${esc(name)}</a>`;
+}
 function contactName(id) {
   const c = ctx.contactsById.get(id);
   return c ? c.name : '';
@@ -265,8 +272,8 @@ function renderView() {
       ${row('Registry', esc(d.registry))}
       ${row('Registration #', esc(d.registration_number))}
       ${row('Microchip', esc(d.microchip_id))}
-      ${row('Sire', esc(dogName(d.sire_id)))}
-      ${row('Dam', esc(dogName(d.dam_id)))}
+      ${row('Sire', dogLink(d.sire_id))}
+      ${row('Dam', dogLink(d.dam_id))}
       ${row('Litter', d.litter_id ? `<a href="litter.html?id=${encodeURIComponent(d.litter_id)}">${esc(litterLabel(d.litter_id) || 'View litter')}</a>` : '')}
       ${row('Breeder kennel', esc(kennelName(d.breeder_kennel_id)))}
       ${row('Ownership', badge(OWNERSHIP_TYPE, d.ownership_type))}
