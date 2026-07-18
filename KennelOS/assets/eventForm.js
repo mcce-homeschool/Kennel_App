@@ -91,8 +91,13 @@ export async function openEventForm(opts) {
         const opts = (isTestField ? testVocabulary : (f.options || [])).map((o) => `<option value="${esc(o)}"></option>`).join('');
         return `<div class="field"><label>${esc(f.label)}</label><input data-detail="${esc(f.key)}" type="text" list="${dlId}" value="${esc(v)}"><datalist id="${dlId}">${opts}</datalist></div>`;
       }
+      if (f.type === 'select') {
+        const opts = (f.options || []).map((o) => `<option value="${esc(o)}"${o === v ? ' selected' : ''}>${esc(o)}</option>`).join('');
+        return `<div class="field"><label>${esc(f.label)}</label><select data-detail="${esc(f.key)}"><option value="">— select —</option>${opts}</select></div>`;
+      }
       const inputType = f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text';
-      return `<div class="field"><label>${esc(f.label)}</label><input data-detail="${esc(f.key)}" type="${inputType}" value="${esc(v)}"></div>`;
+      const stepAttr = f.type === 'number' && f.step ? ` step="${esc(f.step)}"` : '';
+      return `<div class="field"><label>${esc(f.label)}</label><input data-detail="${esc(f.key)}" type="${inputType}"${stepAttr} value="${esc(v)}"></div>`;
     }).join('') + `</div>`;
   }
 

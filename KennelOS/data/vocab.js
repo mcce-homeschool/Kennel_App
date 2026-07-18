@@ -225,7 +225,11 @@ export const EVENT_TYPES = [
   { value: 'injury',             label: 'Injury',             badge: 'badge-red',     subjects: ['dog'], duration: 'instant',
     fields: [{ key: 'description', label: 'Description', type: 'textarea' }, { key: 'severity', label: 'Severity', type: 'text' }] },
   { value: 'weight_check',       label: 'Weight check',       badge: 'badge-neutral', subjects: ['dog'], duration: 'instant',
-    fields: [{ key: 'weight_lbs', label: 'Weight (lbs)', type: 'number' }] },
+    fields: [
+      { key: 'weight_lbs', label: 'Weight (lbs)', type: 'number' },
+      { key: 'weight_oz', label: 'Weight (oz)', type: 'number', step: '0.1' },
+      { key: 'time_of_day', label: 'AM/PM', type: 'select', options: ['AM', 'PM'] }
+    ] },
   { value: 'milestone',          label: 'Milestone',          badge: 'badge-green',   subjects: ['dog'], duration: 'instant',
     fields: [{ key: 'description', label: 'Description', type: 'text' }] },
   { value: 'title_earned',       label: 'Title earned',       badge: 'badge-green',   subjects: ['dog'], duration: 'instant',
