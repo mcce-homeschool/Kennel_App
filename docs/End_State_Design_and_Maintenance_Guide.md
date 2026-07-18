@@ -280,6 +280,13 @@ One polymorphic table for all dated history. `subject_type ∈ {dog, pairing, li
 Test-bearing types (`genetic_test`, `breed_specific_test`, `ofa_pennhip`) feed the
 shared test vocabulary; `testTokensOf(event)` derives the test-name token(s).
 
+**Litter-wide cascade** (`litter.js`'s "Log event for whole litter" → `openEventForm`'s
+`cascadeTargets`): normally every checked puppy gets one Event with the *same*
+`details{}`. `weight_check` is the one exception — `eventForm.js`'s
+`PER_TARGET_CASCADE_FIELDS` names `weight_lbs`/`weight_oz` as per-target, so each
+checked puppy gets its own weight inputs while `time_of_day` stays a single shared
+field. Add a type to that map to give any other field the same per-puppy treatment.
+
 ### eventRepo reads (all siblings — deliberately never fused)
 
 - `getForSubject(type, id)` — the timeline, newest first (compound index).
@@ -396,7 +403,7 @@ declined (or after sample data is later cleared), offer kennel setup.
 
 App-shell cache so the app installs and works offline after first load.
 
-- `CACHE_NAME` (currently `kennelos-shell-v30`) + a `PRECACHE_URLS` list of **every**
+- `CACHE_NAME` (currently `kennelos-shell-v31`) + a `PRECACHE_URLS` list of **every**
   app file (html/js/css/icons/vendor/resources).
 - `install` precaches the list (**`cache.addAll` is atomic** — one missing/renamed
   file fails the whole install). `activate` deletes old caches. Fetch is
