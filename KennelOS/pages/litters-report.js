@@ -24,7 +24,7 @@ async function init() {
   createReportView({
     mount: document.getElementById('report-mount'),
     csvFilename: `litters-${new Date().toISOString().slice(0, 10)}.csv`,
-    search: { placeholder: 'Search dam or sire…', text: (l) => `${name(l.dam_id)} ${name(l.sire_id)}` },
+    search: { placeholder: 'Search nickname, dam, or sire…', text: (l) => `${l.nickname || ''} ${name(l.dam_id)} ${name(l.sire_id)}` },
     filters: [
       { id: 'year', label: 'Year', options: years.map((y) => ({ value: y, label: y })), match: (l, v) => year(l) === v },
       { id: 'status', label: 'Status', options: LITTER_STATUS, match: (l, v) => l.status === v }
@@ -32,6 +32,7 @@ async function init() {
     columns: [
       { header: 'Whelp date', value: (l) => (l.whelp_date ? fmtDate(l.whelp_date) : ''), csv: (l) => l.whelp_date || '' },
       { header: 'Year', value: year },
+      { header: 'Nickname', value: (l) => l.nickname || '' },
       { header: 'Dam', value: (l) => name(l.dam_id) },
       { header: 'Sire', value: (l) => name(l.sire_id) },
       { header: 'Born total', value: (l) => (l.puppies_born_total ?? '') === '' ? '' : String(l.puppies_born_total) },

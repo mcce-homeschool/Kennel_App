@@ -30,7 +30,7 @@ const els = {
 };
 
 const blankLitter = () => ({
-  pairing_id: '', dam_id: '', sire_id: '', whelp_date: '', litter_registration_number: '',
+  pairing_id: '', dam_id: '', sire_id: '', nickname: '', whelp_date: '', litter_registration_number: '',
   puppies_born_total: '', puppies_born_alive: '', puppies_born_deceased: '', status: '', notes: '',
   expected_price_male: '', expected_price_female: '', expected_deposit_amount: ''
 });
@@ -60,6 +60,13 @@ async function loadRefs() {
 function dogName(id) {
   const d = ctx.dogsById.get(id);
   return d ? (d.call_name + (d.registered_name ? ` (${d.registered_name})` : '')) : '';
+}
+// Read-only dog reference → a link to that dog's detail page. Returns '' when the
+// id doesn't resolve, so row() falls back to its faint dash. Escapes the name.
+function dogLink(id) {
+  const name = dogName(id);
+  if (!name) return '';
+  return `<a href="dog.html?id=${encodeURIComponent(id)}">${esc(name)}</a>`;
 }
 function pairingLabel(p) {
   if (!p) return '';
@@ -119,8 +126,9 @@ function renderView() {
   els.body.innerHTML = `
     ${syncWarningHtml(l)}
     <dl class="dl-meta" style="margin-top:14px;">
-      ${row('Dam', esc(dogName(l.dam_id)))}
-      ${row('Sire', esc(dogName(l.sire_id)))}
+      ${row('Nickname', esc(l.nickname))}
+      ${row('Dam', dogLink(l.dam_id))}
+      ${row('Sire', dogLink(l.sire_id))}
       ${row('Linked pairing', pairingHtml)}
       ${row('Whelp date', l.whelp_date ? esc(fmtDate(l.whelp_date)) : '')}
       ${row('Litter registration #', esc(l.litter_registration_number))}
@@ -166,6 +174,7 @@ function renderEdit() {
   const l = ctx.draft;
   els.body.innerHTML = `
     <div class="form-grid" id="litter-form" style="margin-top:14px;">
+      ${field('Nickname', `<input id="f-nickname" type="text" value="${esc(l.nickname)}" maxlength="80">`, { hint: 'Optional friendly name for this litter, e.g. “Party of Five”.', wide: true })}
       ${field('Linked pairing', `<select id="f-pairing_id">${pairingOptions(l.pairing_id)}</select>`, { hint: 'Optional. Choosing one fills in dam/sire below (still editable).', wide: true })}
       ${field('Dam', `<select id="f-dam_id">${dogOptions(l.dam_id, 'female')}</select>`, { required: true })}
       ${field('Sire', `<select id="f-sire_id">${dogOptions(l.sire_id, 'male')}</select>`, { required: true })}
@@ -211,6 +220,7 @@ function readForm() {
   const val = (id) => document.getElementById(id)?.value ?? '';
   return {
     ...ctx.draft,
+    nickname: val('f-nickname').trim(),
     pairing_id: val('f-pairing_id') || '',
     dam_id: val('f-dam_id') || '',
     sire_id: val('f-sire_id') || '',
@@ -452,9 +462,18 @@ function renderTitle() {
     return;
   }
   const l = ctx.original;
-  const label = `${dogName(l.dam_id) || '—'} × ${dogName(l.sire_id) || '—'}`;
-  els.title.innerHTML = esc(label) + (l.is_archived ? ' <span class="badge badge-gray">Archived</span>' : '');
-  els.subtitle.innerHTML = l.whelp_date ? `Whelped ${esc(fmtDate(l.whelp_date))}` : '';
+  const cross = `${dogName(l.dam_id) || '—'} × ${dogName(l.sire_id) || '—'}`;
+  const archived = l.is_archived ? ' <span class="badge badge-gray">Archived</span>' : '';
+  const whelped = l.whelp_date ? `Whelped ${esc(fmtDate(l.whelp_date))}` : '';
+  // The nickname is the friendly label; when present it leads, with dam × sire
+  // and whelp date demoted to the subtitle. Otherwise dam × sire is the title.
+  if (l.nickname) {
+    els.title.innerHTML = esc(l.nickname) + archived;
+    els.subtitle.innerHTML = esc(cross) + (whelped ? ` · ${whelped}` : '');
+  } else {
+    els.title.innerHTML = esc(cross) + archived;
+    els.subtitle.innerHTML = whelped;
+  }
 }
 
 function renderAll() {

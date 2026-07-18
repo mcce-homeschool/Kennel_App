@@ -53,6 +53,13 @@ function dogName(id) {
   const d = ctx.dogsById.get(id);
   return d ? (d.call_name + (d.registered_name ? ` (${d.registered_name})` : '')) : '';
 }
+// Read-only dog reference → a link to that dog's detail page. Returns '' when the
+// id doesn't resolve, so row() falls back to its faint dash. Escapes the name.
+function dogLink(id) {
+  const name = dogName(id);
+  if (!name) return '';
+  return `<a href="dog.html?id=${encodeURIComponent(id)}">${esc(name)}</a>`;
+}
 
 // --- Option builders -----------------------------------------------------
 function vocabOptions(vocab, current, placeholder) {
@@ -83,8 +90,8 @@ function renderView() {
   const p = ctx.original;
   els.body.innerHTML = `
     <dl class="dl-meta" style="margin-top:14px;">
-      ${row('Sire', esc(dogName(p.sire_id)))}
-      ${row('Dam', esc(dogName(p.dam_id)))}
+      ${row('Sire', dogLink(p.sire_id))}
+      ${row('Dam', dogLink(p.dam_id))}
       ${row('Type', badge(PAIRING_TYPE, p.pairing_type))}
       ${row('Method', p.method ? badge(PAIRING_METHOD, p.method) : '')}
       ${row('Status', badge(PAIRING_STATUS, p.status))}
