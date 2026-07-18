@@ -470,7 +470,7 @@ const LITTER_MAPPING = {
   entity: 'litter',
   label: 'Litters',
   templateHeaders: [
-    'dam_registered_name', 'sire_registered_name', 'whelp_date',
+    'dam_registered_name', 'sire_registered_name', 'nickname', 'whelp_date',
     'litter_registration_number', 'puppies_born_total', 'puppies_born_alive',
     'puppies_born_deceased', 'status', 'notes'
   ],
@@ -532,6 +532,9 @@ const LITTER_MAPPING = {
     const status = normEnum(LITTER_STATUS, col(row, 'status'));
     if (status === null) reasons.push(`Unrecognized status "${col(row, 'status')}".`);
     else if (status) record.status = status;
+
+    const nickname = col(row, 'nickname');
+    if (nickname) record.nickname = nickname;
 
     const notes = col(row, 'notes');
     if (notes) record.notes = notes;

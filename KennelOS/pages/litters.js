@@ -29,8 +29,8 @@ async function init() {
   createListView({
     mount,
     search: {
-      placeholder: 'Search by dam or sire name…',
-      text: (l) => `${dogName(l.dam_id)} ${dogName(l.sire_id)} ${l.litter_registration_number || ''}`
+      placeholder: 'Search by nickname, dam, or sire name…',
+      text: (l) => `${l.nickname || ''} ${dogName(l.dam_id)} ${dogName(l.sire_id)} ${l.litter_registration_number || ''}`
     },
     filters: [
       { id: 'status', label: 'Status', options: LITTER_STATUS, match: (l, v) => l.status === v },
@@ -39,6 +39,7 @@ async function init() {
       { id: 'year', label: 'Whelp year', options: years, match: (l, v) => (l.whelp_date || '').slice(0, 4) === v }
     ],
     columns: [
+      { header: 'Nickname', cell: (l) => l.nickname ? esc(l.nickname) : '<span class="faint">—</span>' },
       { header: 'Dam', cell: (l) => `<strong>${esc(dogName(l.dam_id) || '—')}</strong>` },
       { header: 'Sire', cell: (l) => `<strong>${esc(dogName(l.sire_id) || '—')}</strong>` },
       { header: 'Whelp date', cell: (l) => l.whelp_date ? esc(fmtDate(l.whelp_date)) : '<span class="faint">—</span>' },

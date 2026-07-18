@@ -227,6 +227,7 @@ Edges worth calling out:
 | pairing_id | FK → Pairing | | nullable — allows importing historical litters that predate a formal pairing record. **This is the canonical link between litter and pairing.** |
 | dam_id | FK → Dog | ✓ | **Authoritative for the litter's dam.** Denormalized so a litter imported without a pairing still records parentage. When `pairing_id` is set, validate on write that it matches the pairing's `dam_id` (warn on mismatch rather than hard-block, for import resilience). |
 | sire_id | FK → Dog | ✓ | Authoritative for the litter's sire; same sync-and-warn rule as `dam_id`. |
+| nickname | string | | optional friendly label for the litter (e.g. "Party of Five"); leads the detail-page title when set, otherwise `dam × sire` is used. Plain, unindexed. |
 | whelp_date | date (`YYYY-MM-DD`) | | |
 | litter_registration_number | string | | |
 | puppies_born_total | integer | | point-in-time fact recorded at whelping — kept even if some puppies aren't individually entered as Dog records right away |
