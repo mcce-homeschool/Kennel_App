@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your Update</title>
+  <!--
+    companion-view.html — the recipient-facing Companion shell. A single,
+    self-contained, read-only static file. It decodes a bundle from the URL hash
+    and renders it; it makes NO network calls after load and has no backend.
+
+    INFRASTRUCTURE CONTRACT (brief §6.3): this file must stay backward-compatible
+    with every bundleVersion ever sent. Bundle evolution is additive — the render
+    branches on bundleType and bundleVersion, and unknown-but-additive fields must
+    never hard-fail the render. A fix here must not break links sent last month.
+
+    lz-string is inlined (below) and version-locked to the app's vendored copy
+    (vendor/lz-string.min.mjs, v1.5.0) so decode always matches encode, offline.
+  -->
+  <style>
+    :root {
+      --bg: #f6f7f9; --card: #ffffff; --ink: #1a2233; --muted: #5b6577;
+      --border: #e2e6ec; --accent: #2f6f5f; --chip: #eef2f0;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f141c; --card: #161d28; --ink: #e7ecf3; --muted: #9aa6b6;
+        --border: #26303d; --accent: #6bbfa8; --chip: #1c2731;
+      }
+    }
+    :root[data-theme="light"] {
+      --bg: #f6f7f9; --card: #ffffff; --ink: #1a2233; --muted: #5b6577;
+      --border: #e2e6ec; --accent: #2f6f5f; --chip: #eef2f0;
+    }
+    :root[data-theme="dark"] {
+      --bg: #0f141c; --card: #161d28; --ink: #e7ecf3; --muted: #9aa6b6;
+      --border: #26303d; --accent: #6bbfa8; --chip: #1c2731;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--ink);
+      font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 24px 16px 64px;
+    }
+    .wrap { max-width: 680px; margin: 0 auto; }
+    header.kennel { text-align: center; margin-bottom: 20px; }
+    header.kennel h1 { margin: 0 0 4px; font-size: 1.7rem; }
+    header.kennel .tagline { color: var(--muted); margin: 0; }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+      padding: 18px 18px; margin-top: 16px;
+    }
+    .card h2 { margin: 0 0 10px; font-size: 1.15rem; }
+    .intro { color: var(--muted); }
+    .announcement {
+      background: var(--chip); border-left: 3px solid var(--accent);
+      border-radius: 8px; padding: 12px 14px; margin-top: 14px; white-space: pre-wrap;
+    }
+    .updated { text-align: center; color: var(--muted); font-size: 0.85rem; margin-top: 18px; }
+    .row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border); }
+    .row:first-child { border-top: 0; }
+    .row .k { color: var(--muted); }
+    .row .v { text-align: right; font-weight: 600; }
+    ul.clean { list-style: none; margin: 0; padding: 0; }
+    ul.clean li { padding: 8px 0; border-top: 1px solid var(--border); }
+    ul.clean li:first-child { border-top: 0; }
+    .chip { display: inline-block; background: var(--chip); border-radius: 999px; padding: 2px 10px; font-size: 0.85rem; margin: 2px 4px 2px 0; }
+    a.doc { color: var(--accent); font-weight: 600; }
+    .empty { color: var(--muted); font-style: italic; }
+    .theme-toggle {
+      position: fixed; top: 12px; right: 12px; background: var(--card); color: var(--ink);
+      border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; cursor: pointer; font-size: 0.85rem;
+    }
+    .fatal { text-align: center; color: var(--muted); margin-top: 40px; }
+  </style>
+</head>
+<body>
+  <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">◑ Theme</button>
+  <div class="wrap" id="root"><p class="fatal">Loading…</p></div>
+
+  <!-- lz-string 1.5.0 (github.com/pieroxy/lz-string) — MIT. Inlined, version-locked to vendor/lz-string.min.mjs. -->
+  <script>
+  var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",n="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-$",e={};function t(r,o){if(!e[r]){e[r]={};for(var n=0;n<r.length;n++)e[r][r.charAt(n)]=n}return e[r][o]}var i={compressToBase64:function(r){if(null==r)return"";var n=i._compress(r,6,function(r){return o.charAt(r)});switch(n.length%4){default:case 0:return n;case 1:return n+"===";case 2:return n+"==";case 3:return n+"="}},decompressFromBase64:function(r){return null==r?"":""==r?null:i._decompress(r.length,32,function(n){return t(o,r.charAt(n))})},compressToUTF16:function(o){return null==o?"":i._compress(o,15,function(o){return r(o+32)})+" "},decompressFromUTF16:function(r){return null==r?"":""==r?null:i._decompress(r.length,16384,function(o){return r.charCodeAt(o)-32})},compressToUint8Array:function(r){for(var o=i.compress(r),n=new Uint8Array(2*o.length),e=0,t=o.length;e<t;e++){var s=o.charCodeAt(e);n[2*e]=s>>>8,n[2*e+1]=s%256}return n},decompressFromUint8Array:function(o){if(null==o)return i.decompress(o);for(var n=new Array(o.length/2),e=0,t=n.length;e<t;e++)n[e]=256*o[2*e]+o[2*e+1];var s=[];return n.forEach(function(o){s.push(r(o))}),i.decompress(s.join(""))},compressToEncodedURIComponent:function(r){return null==r?"":i._compress(r,6,function(r){return n.charAt(r)})},decompressFromEncodedURIComponent:function(r){return null==r?"":""==r?null:(r=r.replace(/ /g,"+"),i._decompress(r.length,32,function(o){return t(n,r.charAt(o))}))},compress:function(o){return i._compress(o,16,function(o){return r(o)})},_compress:function(r,o,n){if(null==r)return"";var e,t,i,s={},u={},a="",p="",c="",l=2,f=3,h=2,d=[],m=0,v=0;for(i=0;i<r.length;i+=1)if(a=r.charAt(i),Object.prototype.hasOwnProperty.call(s,a)||(s[a]=f++,u[a]=!0),p=c+a,Object.prototype.hasOwnProperty.call(s,p))c=p;else{if(Object.prototype.hasOwnProperty.call(u,c)){if(c.charCodeAt(0)<256){for(e=0;e<h;e++)m<<=1,v==o-1?(v=0,d.push(n(m)),m=0):v++;for(t=c.charCodeAt(0),e=0;e<8;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}else{for(t=1,e=0;e<h;e++)m=m<<1|t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t=0;for(t=c.charCodeAt(0),e=0;e<16;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}0==--l&&(l=Math.pow(2,h),h++),delete u[c]}else for(t=s[c],e=0;e<h;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;0==--l&&(l=Math.pow(2,h),h++),s[p]=f++,c=String(a)}if(""!==c){if(Object.prototype.hasOwnProperty.call(u,c)){if(c.charCodeAt(0)<256){for(e=0;e<h;e++)m<<=1,v==o-1?(v=0,d.push(n(m)),m=0):v++;for(t=c.charCodeAt(0),e=0;e<8;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}else{for(t=1,e=0;e<h;e++)m=m<<1|t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t=0;for(t=c.charCodeAt(0),e=0;e<16;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}0==--l&&(l=Math.pow(2,h),h++),delete u[c]}else for(t=s[c],e=0;e<h;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;0==--l&&(l=Math.pow(2,h),h++)}for(t=2,e=0;e<h;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;for(;;){if(m<<=1,v==o-1){d.push(n(m));break}v++}return d.join("")},decompress:function(r){return null==r?"":""==r?null:i._decompress(r.length,32768,function(o){return r.charCodeAt(o)})},_decompress:function(o,n,e){var t,i,s,u,a,p,c,l=[],f=4,h=4,d=3,m="",v=[],g={val:e(0),position:n,index:1};for(t=0;t<3;t+=1)l[t]=t;for(s=0,a=Math.pow(2,2),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;switch(s){case 0:for(s=0,a=Math.pow(2,8),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;c=r(s);break;case 1:for(s=0,a=Math.pow(2,16),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;c=r(s);break;case 2:return""}for(l[3]=c,i=c,v.push(c);;){if(g.index>o)return"";for(s=0,a=Math.pow(2,d),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;switch(c=s){case 0:for(s=0,a=Math.pow(2,8),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;l[h++]=r(s),c=h-1,f--;break;case 1:for(s=0,a=Math.pow(2,16),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;l[h++]=r(s),c=h-1,f--;break;case 2:return v.join("")}if(0==f&&(f=Math.pow(2,d),d++),l[c])m=l[c];else{if(c!==h)return null;m=i+i.charAt(0)}v.push(m),l[h++]=i+m.charAt(0),i=m,0==--f&&(f=Math.pow(2,d),d++)}}};return i}();"function"==typeof define&&define.amd?define(function(){return LZString}):"undefined"!=typeof module&&null!=module?module.exports=LZString:"undefined"!=typeof angular&&null!=angular&&angular.module("LZString",[]).factory("LZString",function(){return LZString});
+  </script>
+
+  <script>
+  (function () {
+    var root = document.getElementById('root');
+
+    // --- helpers -----------------------------------------------------------
+    function esc(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function fmtDate(d) {
+      if (!d) return '';
+      // Date-only YYYY-MM-DD → localized; anything else shown as-is.
+      var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
+      if (m) { try { return new Date(d + 'T00:00:00').toLocaleDateString(); } catch (e) { return d; } }
+      try { return new Date(d).toLocaleString(); } catch (e) { return d; }
+    }
+    function money(v) {
+      if (v == null || v === '') return '';
+      var n = Number(v);
+      return isNaN(n) ? esc(v) : '$' + n.toFixed(2);
+    }
+    var FEE_LABELS = {
+      flat_fee: 'Flat fee', pick_of_litter: 'Pick of litter',
+      flat_plus_pick: 'Flat + pick', other: 'Other'
+    };
+    function sexLabel(s) { return s === 'male' ? '♂' : s === 'female' ? '♀' : ''; }
+
+    function row(k, v) {
+      if (v == null || v === '') return '';
+      return '<div class="row"><span class="k">' + esc(k) + '</span><span class="v">' + v + '</span></div>';
+    }
+    function fatal(msg) {
+      root.innerHTML = '<p class="fatal">' + esc(msg) + '</p>';
+    }
+
+    // --- header (shared) ---------------------------------------------------
+    function renderHeader(b) {
+      var h = '';
+      h += '<header class="kennel">';
+      h += '<h1>' + esc(b.kennelName || 'Your Update') + '</h1>';
+      if (b.tagline) h += '<p class="tagline">' + esc(b.tagline) + '</p>';
+      h += '</header>';
+      var intro = '';
+      if (b.introText) intro += '<p class="intro">' + esc(b.introText) + '</p>';
+      if (b.announcement) intro += '<div class="announcement">' + esc(b.announcement) + '</div>';
+      if (intro) h += '<div class="card">' + intro + '</div>';
+      return h;
+    }
+    function renderUpdated(b) {
+      return b.updatedAt ? '<p class="updated">Snapshot as of ' + esc(fmtDate(b.updatedAt)) + ' · not a live view</p>' : '';
+    }
+
+    // --- prospective -------------------------------------------------------
+    function renderProspective(b) {
+      var h = renderHeader(b);
+      var greeting = b.familyName ? 'Hi ' + esc(b.familyName) + ' — here are the puppies we have available right now.' : 'Here are the puppies we have available right now.';
+      h += '<div class="card"><p class="intro" style="margin-top:0;">' + greeting + '</p></div>';
+
+      h += '<div class="card"><h2>Available puppies</h2>';
+      var pups = Array.isArray(b.availablePups) ? b.availablePups : [];
+      if (!pups.length) h += '<p class="empty">No puppies are marked available at the moment.</p>';
+      else {
+        h += '<ul class="clean">';
+        for (var i = 0; i < pups.length; i++) {
+          var p = pups[i];
+          h += '<li><strong>' + esc(p.name) + '</strong> ' + esc(sexLabel(p.sex)) + (p.breed ? ' <span class="chip">' + esc(p.breed) + '</span>' : '') + '</li>';
+        }
+        h += '</ul>';
+      }
+      h += '</div>';
+
+      var litters = Array.isArray(b.litters) ? b.litters : [];
+      if (litters.length) {
+        h += '<div class="card"><h2>Litters</h2><ul class="clean">';
+        for (var j = 0; j < litters.length; j++) {
+          var l = litters[j];
+          var label = l.whelpDate ? 'Born ' + esc(fmtDate(l.whelpDate)) : 'Litter';
+          h += '<li>' + label + (l.availableCount != null ? ' <span class="chip">' + esc(l.availableCount) + ' available</span>' : '') + '</li>';
+        }
+        h += '</ul></div>';
+      }
+      h += renderUpdated(b);
+      return h;
+    }
+
+    // --- family ------------------------------------------------------------
+    function renderFamily(b) {
+      var h = renderHeader(b);
+      var greeting = b.familyName ? 'Hi ' + esc(b.familyName) + ' — here is your puppy’s latest info.' : 'Here is your puppy’s latest info.';
+      h += '<div class="card"><p class="intro" style="margin-top:0;">' + greeting + '</p></div>';
+
+      h += '<div class="card"><h2>Your puppies</h2>';
+      var pups = Array.isArray(b.pups) ? b.pups : [];
+      if (!pups.length) h += '<p class="empty">No puppies linked yet.</p>';
+      else {
+        h += '<ul class="clean">';
+        for (var i = 0; i < pups.length; i++) {
+          var p = pups[i];
+          h += '<li><strong>' + esc(p.name) + '</strong> ' + esc(sexLabel(p.sex)) + (p.breed ? ' <span class="chip">' + esc(p.breed) + '</span>' : '') + '</li>';
+        }
+        h += '</ul>';
+      }
+      var litters = Array.isArray(b.litters) ? b.litters : [];
+      for (var j = 0; j < litters.length; j++) {
+        if (litters[j].whelpDate) h += '<p class="intro" style="margin:8px 0 0;">Born ' + esc(fmtDate(litters[j].whelpDate)) + '</p>';
+      }
+      var pickups = Array.isArray(b.pickupDates) ? b.pickupDates : [];
+      if (pickups.length) {
+        h += '<div style="margin-top:10px;">';
+        for (var k = 0; k < pickups.length; k++) h += row('Pick-up', esc(fmtDate(pickups[k])));
+        h += '</div>';
+      }
+      h += '</div>';
+
+      var visits = Array.isArray(b.vetVisits) ? b.vetVisits : [];
+      if (visits.length) {
+        h += '<div class="card"><h2>Health record</h2><ul class="clean">';
+        for (var v = 0; v < visits.length; v++) {
+          h += '<li><span class="k">' + esc(fmtDate(visits[v].date)) + '</span> — ' + esc(visits[v].label) + '</li>';
+        }
+        h += '</ul></div>';
+      }
+
+      var urls = Array.isArray(b.contractUrls) ? b.contractUrls : [];
+      if (urls.length) {
+        h += '<div class="card"><h2>Your contract</h2>';
+        for (var u = 0; u < urls.length; u++) {
+          h += '<p><a class="doc" href="' + esc(urls[u]) + '" target="_blank" rel="noopener noreferrer">View your signed contract →</a></p>';
+        }
+        h += '</div>';
+      }
+      h += renderUpdated(b);
+      return h;
+    }
+
+    // --- partner -----------------------------------------------------------
+    function pairLabel(a, b2) {
+      var an = a && a.name ? esc(a.name) : '—';
+      var bn = b2 && b2.name ? esc(b2.name) : '—';
+      return an + ' × ' + bn;
+    }
+    function renderPartner(b) {
+      var h = renderHeader(b);
+      var greeting = b.partnerName ? 'Hi ' + esc(b.partnerName) + ' — a summary of our arrangement.' : 'A summary of our arrangement.';
+      h += '<div class="card"><p class="intro" style="margin-top:0;">' + greeting + '</p></div>';
+
+      var services = Array.isArray(b.studServices) ? b.studServices : [];
+      if (services.length) {
+        h += '<div class="card"><h2>Stud services</h2>';
+        for (var i = 0; i < services.length; i++) {
+          var s = services[i];
+          h += '<div style="padding:10px 0; border-top:1px solid var(--border);">';
+          h += '<div style="font-weight:600;">' + pairLabel(s.studDog, s.damDog) + '</div>';
+          var comp = s.compensation || {};
+          if (comp.fee_structure) h += row('Terms', esc(FEE_LABELS[comp.fee_structure] || comp.fee_structure));
+          if (comp.fee_amount != null) h += row('Fee', esc(money(comp.fee_amount)));
+          if (comp.pick_status) h += row('Pick status', esc(comp.pick_status));
+          var dates = Array.isArray(s.breedingDates) ? s.breedingDates : [];
+          if (dates.length) h += row('Breeding date' + (dates.length > 1 ? 's' : ''), dates.map(function (d) { return esc(fmtDate(d)); }).join(', '));
+          h += '</div>';
+        }
+        h += '</div>';
+      }
+
+      var pairings = Array.isArray(b.externalPairings) ? b.externalPairings : [];
+      if (pairings.length) {
+        h += '<div class="card"><h2>Pairings</h2><ul class="clean">';
+        for (var j = 0; j < pairings.length; j++) {
+          var p = pairings[j];
+          var extra = [];
+          if (p.status) extra.push(esc(p.status));
+          if (p.plannedDate) extra.push(esc(fmtDate(p.plannedDate)));
+          h += '<li>' + pairLabel(p.sire, p.dam) + (extra.length ? ' <span class="chip">' + extra.join(' · ') + '</span>' : '') + '</li>';
+        }
+        h += '</ul></div>';
+      }
+
+      var contracts = Array.isArray(b.contracts) ? b.contracts : [];
+      if (contracts.length) {
+        h += '<div class="card"><h2>Contracts</h2><ul class="clean">';
+        for (var c = 0; c < contracts.length; c++) {
+          var ct = contracts[c];
+          var title = ct.title || (ct.type ? ct.type.replace(/_/g, ' ') : 'Contract');
+          var line = '<strong>' + esc(title) + '</strong>' + (ct.status ? ' <span class="chip">' + esc(ct.status) + '</span>' : '');
+          if (ct.document_url) line += ' — <a class="doc" href="' + esc(ct.document_url) + '" target="_blank" rel="noopener noreferrer">View →</a>';
+          h += '<li>' + line + '</li>';
+        }
+        h += '</ul></div>';
+      }
+      h += renderUpdated(b);
+      return h;
+    }
+
+    // --- decode + dispatch -------------------------------------------------
+    function decode() {
+      var hash = location.hash ? location.hash.slice(1) : '';
+      if (!hash) { fatal('This link is missing its data. Please ask for a fresh link.'); return; }
+      var json;
+      try {
+        json = LZString.decompressFromEncodedURIComponent(hash);
+      } catch (e) { json = null; }
+      if (!json) { fatal('This link could not be read — it may have been truncated. Please ask for a fresh link.'); return; }
+      var b;
+      try { b = JSON.parse(json); } catch (e) { fatal('This link could not be read. Please ask for a fresh link.'); return; }
+      if (!b || typeof b !== 'object') { fatal('This link could not be read. Please ask for a fresh link.'); return; }
+
+      // Backward-compat: render whatever bundleType we recognize; additive fields
+      // are simply ignored by the per-type renderers above, never a hard fail.
+      var html;
+      if (b.bundleType === 'prospective') html = renderProspective(b);
+      else if (b.bundleType === 'family') html = renderFamily(b);
+      else if (b.bundleType === 'partner') html = renderPartner(b);
+      else { fatal('This link is from a newer version than this page can show. Please ask for a fresh link.'); return; }
+
+      root.innerHTML = html;
+      if (b.kennelName) document.title = b.kennelName;
+    }
+
+    // Theme toggle — stamps data-theme so the viewer can flip light/dark.
+    document.getElementById('theme-toggle').addEventListener('click', function () {
+      var el = document.documentElement;
+      var cur = el.getAttribute('data-theme');
+      var next = cur === 'dark' ? 'light' : cur === 'light' ? 'dark'
+        : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark');
+      el.setAttribute('data-theme', next);
+    });
+
+    window.addEventListener('hashchange', decode);
+    decode();
+  })();
+  </script>
+</body>
+</html>
