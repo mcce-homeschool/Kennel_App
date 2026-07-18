@@ -14,7 +14,6 @@ import {
   CONTRACT_TYPE, CONTRACT_STATUS, SEX, descriptor
 } from '../data/vocab.js';
 import { esc, badge, fmtDate, param, confirmAction } from '../assets/ui.js';
-import { openEventForm } from '../assets/eventForm.js';
 import { getMyContactId } from '../data/kennelSetup.js';
 import { attachNewContactButton } from '../assets/contactPicker.js';
 
@@ -333,23 +332,7 @@ async function save() {
   try {
     if (ctx.mode === 'new') {
       const saved = await studServiceRepo.create(candidate);
-      const goToDetail = () => { location.href = `stud-service.html?id=${encodeURIComponent(saved.id)}`; };
-      // Soft-suggestion prompt (Stage4.5 Addendum §C6) — offered, never forced;
-      // no stored link back to this stud service. `our_dog_id` is the subject in
-      // both directions: it's always our own tracked dog whose whereabouts this
-      // board cares about, whether it travels out or the partner comes to us.
-      if (confirmAction('Log a boarding event for this stud service arrangement?')) {
-        openEventForm({
-          subjectType: 'dog', subjectId: saved.our_dog_id,
-          prefill: {
-            event_type: 'boarding', related_contact_id: saved.partner_contact_id,
-            title: 'Stud service boarding', details: { boarding_reason: 'Stud service' }
-          },
-          onSaved: goToDetail, onCancel: goToDetail
-        });
-      } else {
-        goToDetail();
-      }
+      location.href = `stud-service.html?id=${encodeURIComponent(saved.id)}`;
       return;
     }
     const saved = await studServiceRepo.update(ctx.original.id, candidate);
