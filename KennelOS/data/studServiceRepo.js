@@ -43,6 +43,12 @@ export const studServiceRepo = {
     return db.stud_services.where('pairing_id').equals(pairingId).toArray();
   },
 
+  // Stud services with this outside partner (partner_contact_id is indexed) —
+  // the reverse of the partner link, powering the partner companion bundle.
+  getByPartnerContact(contactId) {
+    return db.stud_services.where('partner_contact_id').equals(contactId).toArray();
+  },
+
   // Stud services where this dog appears on either side — powers the Dog
   // Detail "Stud Services" panel.
   async getForDog(dogId) {

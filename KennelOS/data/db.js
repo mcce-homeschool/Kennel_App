@@ -48,6 +48,11 @@ export const db = new Dexie('KennelOSBreedingApp');
 //    to now) is indexed like every other canonical Dog FK, and guarded in
 //    `KENNEL_REFERENCES` (referenceRegistry.js) so a Kennel can't be
 //    hard-deleted out from under a dog that still names it as its breeder.
+//  - `contracts.related_contact_id` (Companion feature) is the counterparty FK
+//    for lease/co_own/other contracts — the types with no linked Sale/StudService
+//    to reach a contact through. Indexed like every other canonical Contract FK
+//    (so contractRepo.getByContact is an index probe) and guarded in
+//    CONTACT_REFERENCES. Forced null for other types (contractRepo.normalizeLinks).
 db.version(1).stores({
   dogs:          'id, sire_id, dam_id, litter_id, breeder_kennel_id, owner_contact_id, *co_owner_contact_ids, status, ownership_type, sex, breed, kennel_id, is_archived',
   events:        'id, [subject_type+subject_id], event_type, event_date, reminder_date, related_dog_id, related_contact_id, is_archived',
@@ -56,7 +61,7 @@ db.version(1).stores({
   pairings:      'id, sire_id, dam_id, status, pairing_type, is_archived',
   litters:       'id, pairing_id, sire_id, dam_id, status, whelp_date, is_archived',
   sales:         'id, dog_id, buyer_contact_id, status, placement_type, is_archived',
-  contracts:     'id, contract_type, status, related_sale_id, related_stud_service_id, related_dog_id, is_archived',
+  contracts:     'id, contract_type, status, related_sale_id, related_stud_service_id, related_dog_id, related_contact_id, is_archived',
   stud_services: 'id, our_dog_id, partner_dog_id, partner_contact_id, direction, status, pairing_id, is_archived'
 });
 

@@ -19,6 +19,7 @@ export const NAV_ITEMS = [
 // rather than costing a slot in the main bar.
 export const MORE_ITEMS = [
   { label: 'Reports',       path: 'pages/reports.html' },
+  { label: 'Companion',     path: 'pages/companion.html' },
   { label: 'Import/Export', path: 'pages/import-export.html' }
 ];
 

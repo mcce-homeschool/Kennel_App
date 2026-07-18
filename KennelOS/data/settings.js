@@ -9,7 +9,8 @@ const KEYS = {
   sampleDataCleared: 'kennelOS.sampleDataCleared',
   myKennelId: 'kennelOS.myKennelId',
   myContactId: 'kennelOS.myContactId',
-  myKennelSetupSkipped: 'kennelOS.myKennelSetupSkipped'
+  myKennelSetupSkipped: 'kennelOS.myKennelSetupSkipped',
+  companion: 'kennelOS.companion'
 };
 
 export function getLastBackupDate() {
@@ -83,6 +84,66 @@ export function wasMyKennelSetupSkipped() {
 
 export function markMyKennelSetupSkipped() {
   localStorage.setItem(KEYS.myKennelSetupSkipped, '1');
+}
+
+// --- Companion messaging (per recipient type) ------------------------------
+// The Companion feature's Layer-1 config: kennel identity + intro/announcement
+// copy, one set per bundle type, edited in the Companion Messaging console and
+// copied into every built bundle so header/landing text updates without touching
+// the shell. App-level UI config, so it lives here (localStorage), never in
+// IndexedDB — consistent with "nothing app-level goes in IndexedDB." The Layer-2
+// per-recipient override is Contact.companion_note (a real record field).
+export const COMPANION_TYPES = ['prospective', 'family', 'partner'];
+
+const COMPANION_TYPE_LABELS = {
+  prospective: 'Prospective families',
+  family: 'Current families',
+  partner: 'Partners'
+};
+
+const COMPANION_DEFAULTS = {
+  prospective: {
+    kennelName: '', tagline: '', announcement: '',
+    introText: 'A peek at the puppies we have available right now. This is a snapshot as of the last link I sent — I’ll send a fresh link when things change. There’s no live sync.'
+  },
+  family: {
+    kennelName: '', tagline: '', announcement: '',
+    introText: 'This shows your puppy’s info as of the last link I sent. I’ll send a new link whenever anything changes — there’s no live sync.'
+  },
+  partner: {
+    kennelName: '', tagline: '', announcement: '',
+    introText: 'A summary of our arrangement as of the last link I sent. I’ll send a new link when anything changes — there’s no live sync.'
+  }
+};
+
+export function companionTypeLabel(type) {
+  return COMPANION_TYPE_LABELS[type] || type;
+}
+
+function readCompanionStore() {
+  const raw = localStorage.getItem(KEYS.companion);
+  if (!raw) return {};
+  try { return JSON.parse(raw) || {}; } catch { return {}; }
+}
+
+// Merged with defaults so a caller always gets every field, even before the
+// owner has saved anything.
+export function getCompanionSettings(type) {
+  const stored = readCompanionStore()[type] || {};
+  return { ...(COMPANION_DEFAULTS[type] || {}), ...stored };
+}
+
+export function getAllCompanionSettings() {
+  const out = {};
+  for (const t of COMPANION_TYPES) out[t] = getCompanionSettings(t);
+  return out;
+}
+
+export function setCompanionSettings(type, values) {
+  const store = readCompanionStore();
+  store[type] = { ...(store[type] || {}), ...values };
+  localStorage.setItem(KEYS.companion, JSON.stringify(store));
+  return getCompanionSettings(type);
 }
 
 // Full app reset (Reset App to Start): drop every key this app owns in

@@ -30,9 +30,15 @@ const els = {
 
 const blankStudService = () => ({
   direction: '', our_dog_id: '', partner_dog_id: '', partner_contact_id: '',
-  fee_amount: '', fee_structure: '', pairing_id: '', status: '', result_notes: '', notes: '',
+  fee_amount: '', fee_structure: '', pick_status: '', pairing_id: '', status: '', result_notes: '', notes: '',
   sent_date: '', returned_date: '', type: ''
 });
+
+// pick_status is only meaningful when the fee structure includes a pick component
+// (Companion feature §1). Elsewhere it stays null so a flat_fee arrangement never
+// shows a stray "pending".
+const FEE_STRUCTURES_WITH_PICK = ['pick_of_litter', 'flat_plus_pick'];
+function feeHasPick(structure) { return FEE_STRUCTURES_WITH_PICK.includes(structure); }
 
 const ctx = {
   mode: 'view', original: null, draft: null, pickerArchived: false,
@@ -151,6 +157,7 @@ function renderView() {
       ${row('Partner dog', s.partner_dog_id ? `<a href="dog.html?id=${encodeURIComponent(s.partner_dog_id)}">${esc(dogName(s.partner_dog_id) || '—')}</a>` : '')}
       ${row('Partner contact', s.partner_contact_id ? `<a href="contact.html?id=${encodeURIComponent(s.partner_contact_id)}">${esc(contactName(s.partner_contact_id) || '—')}</a>` : '')}
       ${row('Fee', esc(money(s.fee_amount)) + (s.fee_structure ? ` <span class="faint">(${esc((FEE_STRUCTURE.find(f => f.value === s.fee_structure) || {}).label || s.fee_structure)})</span>` : ''))}
+      ${feeHasPick(s.fee_structure) ? row('Pick status', s.pick_status ? esc(s.pick_status) : '') : ''}
       ${row('Linked pairing', pairingHtml)}
       ${row('Status', badge(STUD_SERVICE_STATUS, s.status))}
       ${row('Type', s.type ? badge(STUD_SERVICE_TYPE, s.type) : '')}
@@ -180,6 +187,7 @@ function renderEdit() {
       ${field('Partner contact', `<select id="f-partner_contact_id">${contactOptions(s.partner_contact_id)}</select>`, { required: true, hint: 'Owner of the partner dog.' })}
       ${field('Fee amount', `<input id="f-fee_amount" type="number" min="0" step="0.01" value="${esc(s.fee_amount)}">`)}
       ${field('Fee structure', `<select id="f-fee_structure">${vocabOptions(FEE_STRUCTURE, s.fee_structure, '— none —')}</select>`)}
+      ${feeHasPick(s.fee_structure) ? field('Pick status', `<input id="f-pick_status" type="text" list="pick-status-suggestions" value="${esc(s.pick_status || '')}" placeholder="pending / claimed"><datalist id="pick-status-suggestions"><option value="pending"><option value="claimed"></datalist>`, { hint: 'Has the partner claimed their pick yet? Suggested: pending / claimed (free text allowed).' }) : ''}
       ${field('Linked pairing', `<select id="f-pairing_id">${pairingOptions(s.pairing_id)}</select>`, { hint: 'Optional — the actual breeding record and outcome.' })}
       ${field('Status', `<select id="f-status">${vocabOptions(STUD_SERVICE_STATUS, s.status, 'Select…')}</select>`, { required: true })}
       ${field('Type', `<select id="f-type">${vocabOptions(STUD_SERVICE_TYPE, s.type, '— unknown —')}</select>`, { hint: 'In person = the dog physically travelled — shows on the away board. AI/shipped never does.' })}
@@ -197,6 +205,11 @@ function renderEdit() {
   form.addEventListener('input', updateWarnings);
   form.addEventListener('change', updateWarnings);
   document.getElementById('f-direction').addEventListener('change', () => {
+    ctx.draft = readForm();
+    renderEdit();
+  });
+  // Toggling to/from a pick-bearing structure shows/hides the Pick status field.
+  document.getElementById('f-fee_structure').addEventListener('change', () => {
     ctx.draft = readForm();
     renderEdit();
   });
@@ -224,6 +237,10 @@ function readForm() {
     partner_contact_id: val('f-partner_contact_id') || '',
     fee_amount: val('f-fee_amount'),
     fee_structure: val('f-fee_structure') || '',
+    // Field only exists in the DOM for pick-bearing structures; keep the draft
+    // value otherwise so a brief non-pick selection mid-edit doesn't clobber it.
+    // normalizeMoney nulls it out on save when the final structure has no pick.
+    pick_status: document.getElementById('f-pick_status') ? val('f-pick_status').trim() : (ctx.draft.pick_status || ''),
     pairing_id: val('f-pairing_id') || null,
     status: val('f-status'),
     type: val('f-type') || '',
@@ -246,9 +263,12 @@ function updateWarnings() {
   if (box) box.innerHTML = warns.length ? `<div class="inline-warn">${warns.map(esc).join('<br>')}</div>` : '';
 }
 
-// Empty numeric strings become null.
+// Empty numeric strings become null; pick_status is meaningful only for a
+// pick-bearing fee structure, forced null otherwise so it never rides along on a
+// flat_fee/other arrangement (Companion feature §1).
 function normalizeMoney(candidate) {
   candidate.fee_amount = candidate.fee_amount === '' || candidate.fee_amount == null ? null : Number(candidate.fee_amount);
+  candidate.pick_status = feeHasPick(candidate.fee_structure) && candidate.pick_status ? candidate.pick_status : null;
   return candidate;
 }
 

@@ -27,7 +27,9 @@ import {
   setSampleDataManifest,
   removeSampleDataManifest,
   wasSampleDataCleared,
-  markSampleDataCleared
+  markSampleDataCleared,
+  setCompanionSettings,
+  COMPANION_TYPES
 } from './settings.js';
 
 export { getSampleDataManifest };
@@ -97,7 +99,10 @@ export async function seedSampleData() {
   // external female used in the sample stud service.
   const priya = await contactRepo.create({
     name: 'Priya Shah', contact_type: ['buyer'], waitlist_status: 'fulfilled',
-    first_contact_source: 'Instagram', phone: '555-0106', email: 'priya.shah@example.com'
+    first_contact_source: 'Instagram', phone: '555-0106', email: 'priya.shah@example.com',
+    // Companion feature (§20): a per-recipient note (Layer 2) shown on this
+    // family's share page, overriding the per-type announcement.
+    companion_note: 'So glad Hazel found her home with you! Reach out anytime with questions.'
   });
   const owen = await contactRepo.create({
     name: 'Owen Farrow', contact_type: ['buyer'], waitlist_status: 'active',
@@ -231,16 +236,22 @@ export async function seedSampleData() {
   // sample's away-board row now — an ongoing in-person stay. The parallel
   // "Boarding for stud service" event that used to duplicate this trip is
   // gone; the board reads this record directly via studServiceRepo.getBoardRows().
+  // fee_structure/pick_status (Companion feature §1/§20): a flat_plus_pick
+  // arrangement so the partner companion bundle exercises both a cash fee_amount
+  // and a pick_status. `pending` — Ellen hasn't claimed her pick yet.
   const studServiceBirch = await studServiceRepo.create({
     direction: 'outgoing', our_dog_id: birch.id, partner_dog_id: nell.id, partner_contact_id: ellen.id,
-    fee_amount: 1200, fee_structure: 'flat_fee', pairing_id: pairingP3.id, type: 'in_person',
-    sent_date: daysFromToday(-3),
+    fee_amount: 800, fee_structure: 'flat_plus_pick', pick_status: 'pending',
+    pairing_id: pairingP3.id, type: 'in_person', sent_date: daysFromToday(-3),
     status: 'completed', result_notes: 'Successful AI breeding; pregnancy confirmed by ultrasound.'
   });
   const studServiceContract = await contractRepo.create({
     contract_type: 'stud_service', status: 'signed', related_stud_service_id: studServiceBirch.id,
     title: 'Stud Service Agreement — Birch × Nell', signed_date: '2026-04-15',
-    terms_summary: 'Flat fee, one breeding attempt, health-tested sire.'
+    // document_url (Companion feature §20): a placeholder "anyone with the link"
+    // pointer the partner bundle carries.
+    document_url: 'https://drive.example.com/thornfield/birch-nell-stud-agreement',
+    terms_summary: 'Flat fee plus pick of litter, one breeding attempt, health-tested sire.'
   });
   manifest.stud_services.push(studServiceBirch.id);
   manifest.contracts.push(studServiceContract.id);
@@ -256,6 +267,9 @@ export async function seedSampleData() {
   const hazelContract = await contractRepo.create({
     contract_type: 'sale', status: 'signed', related_sale_id: hazelSale.id,
     title: 'Puppy Purchase Agreement — Hazel', signed_date: '2025-12-15',
+    // document_url (Companion feature §20): the family bundle carries this as a
+    // pointer to the signed contract via the governing-contract rule.
+    document_url: 'https://drive.example.com/thornfield/hazel-purchase-agreement',
     terms_summary: 'Pet-home placement, spay/neuter clause, health guarantee.'
   });
   manifest.sales.push(hazelSale.id);
@@ -362,8 +376,28 @@ export async function seedSampleData() {
     manifest.events.push(saved.id);
   }
 
+  // Companion messaging (§20): seed the per-type templates so the demo's share
+  // pages have Thornfield branding. These are localStorage config (not manifest
+  // records); clearSampleData resets them back to defaults alongside the records.
+  seedCompanionSettings();
+
   setSampleDataManifest(manifest);
   return manifest;
+}
+
+// Layer-1 companion config for the demo — Thornfield identity across all three
+// recipient types, keeping each type's default introText. Reset in
+// clearSampleData via resetCompanionSettings().
+function seedCompanionSettings() {
+  for (const type of COMPANION_TYPES) {
+    setCompanionSettings(type, { kennelName: 'Thornfield Kennels', tagline: 'Boston Terriers · Est. 2015' });
+  }
+}
+
+function resetCompanionSettings() {
+  for (const type of COMPANION_TYPES) {
+    setCompanionSettings(type, { kennelName: '', tagline: '', announcement: '' });
+  }
 }
 
 // --- Clearing -----------------------------------------------------------
@@ -527,6 +561,7 @@ export async function clearSampleData({ archiveConflicting = false } = {}) {
   });
 
   removeSampleDataManifest();
+  resetCompanionSettings();
   markSampleDataCleared();
 
   return { cleared: true, counts };

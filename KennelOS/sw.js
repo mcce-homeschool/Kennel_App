@@ -6,11 +6,12 @@
 // never re-fetches a stale precached file on its own; only a CACHE_NAME change
 // (which changes these bytes, so the browser detects a new service worker,
 // installs it, and purges the old cache in `activate`) rolls it over.
-const CACHE_NAME = 'kennelos-shell-v19';
+const CACHE_NAME = 'kennelos-shell-v20';
 
 const PRECACHE_URLS = [
   './',
   'index.html',
+  'companion-view.html',
   'app.js',
   'nav.js',
   'manifest.json',
@@ -33,6 +34,7 @@ const PRECACHE_URLS = [
   'assets/icons/maskable-512.png',
   'data/appReset.js',
   'data/awayBoard.js',
+  'data/companionExport.js',
   'data/contactRepo.js',
   'data/contractRepo.js',
   'data/csvImport.js',
@@ -61,6 +63,8 @@ const PRECACHE_URLS = [
   'pages/board.js',
   'pages/breeding.html',
   'pages/breeding.js',
+  'pages/companion.html',
+  'pages/companion.js',
   'pages/dashboard.html',
   'pages/dashboard.js',
   'pages/contact-import.html',
@@ -135,6 +139,7 @@ const PRECACHE_URLS = [
   'pages/upcoming.html',
   'pages/upcoming.js',
   'vendor/dexie.min.mjs',
+  'vendor/lz-string.min.mjs',
   'vendor/papaparse.min.mjs',
   'resources/common_tests_by_breed_seed.csv'
 ];

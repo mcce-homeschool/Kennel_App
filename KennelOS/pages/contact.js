@@ -20,7 +20,7 @@ const els = {
 
 const blank = () => ({
   name: '', kennel_id: '', contact_type: [], phone: '', email: '', address: '',
-  waitlist_status: '', first_contact_source: '', notes: ''
+  waitlist_status: '', first_contact_source: '', notes: '', companion_note: ''
 });
 
 const ctx = { mode: 'view', original: null, draft: null, kennels: [], firstContactSources: [] };
@@ -54,6 +54,7 @@ function renderView() {
       ${row('Email', esc(c.email))}
       ${row('Address', c.address ? esc(c.address).replace(/\n/g, '<br>') : '')}
       ${row('Notes', c.notes ? esc(c.notes).replace(/\n/g, '<br>') : '')}
+      ${row('Companion note', c.companion_note ? esc(c.companion_note).replace(/\n/g, '<br>') : '')}
     </dl>`;
 }
 
@@ -91,6 +92,7 @@ function renderEdit() {
       <div class="field field-wide"><label>Type</label><div class="pill-row" style="gap:0;">${typeChecks}</div></div>
       <div class="field field-wide"><label>Address</label><textarea id="f-address">${esc(c.address)}</textarea></div>
       <div class="field field-wide"><label>Notes</label><textarea id="f-notes">${esc(c.notes)}</textarea></div>
+      <div class="field field-wide"><label>Companion note</label><textarea id="f-companion_note" placeholder="A personal line shown to this recipient on their companion link (overrides the per-type announcement). Leave blank to use the default.">${esc(c.companion_note || '')}</textarea><span class="field-hint">Meant for the recipient’s eyes — distinct from the private Notes above. Appears on their companion share page.</span></div>
     </div>`;
 
   document.getElementById('btn-add-kennel').addEventListener('click', addKennelInline);
@@ -109,7 +111,8 @@ function readForm() {
     waitlist_status: val('f-waitlist_status') || 'none',
     first_contact_source: val('f-first_contact_source').trim(),
     address: val('f-address').trim(),
-    notes: val('f-notes')
+    notes: val('f-notes'),
+    companion_note: val('f-companion_note').trim()
   };
 }
 

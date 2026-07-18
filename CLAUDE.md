@@ -4,8 +4,9 @@ Local-first, static, multi-page records app for a dog breeding program. No backe
 no build step. Hosted on GitHub Pages; all data lives in the browser (IndexedDB via
 Dexie). The app is **built and in maintenance** — Dogs, Contacts, Kennels, Pairings,
 Litters, Sales, Contracts, Stud Services, a polymorphic event log, reminders,
-dashboard, analytics reports, and CSV/JSON import-export all ship. Work now is
-incremental enhancement and fixes, not stage builds.
+dashboard, analytics reports, CSV/JSON import-export, and a read-only Companion
+share-out (no-account buyer/partner links; see the End-State guide §20) all ship.
+Work now is incremental enhancement and fixes, not stage builds.
 
 ## Read first, every session
 
