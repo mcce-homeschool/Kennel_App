@@ -421,8 +421,9 @@ This distinction is the single easiest thing to get wrong. Learn it:
   pre-escape. `badge` columns render a controlled-vocab badge. Has CSV export.
 - **`assets/listView.js`** — columns provide `cell:(r)=>htmlString` returning **HTML**;
   the framework injects it **raw**. **The caller must `esc()` every user-controlled
-  value inside `cell`.** Supports filters, "show archived", collapsible columns,
-  grouping, optional CSV export.
+  value inside `cell`.** Columns can be marked `sortable: true` with a `sortFn:(a,b)=>number`
+  comparator to enable click-to-sort headers (ascending/descending toggle). Supports
+  filters, "show archived", collapsible columns, grouping, optional CSV export.
 
 When in doubt: `value` = text (auto-escaped), `cell` = HTML (you escape).
 

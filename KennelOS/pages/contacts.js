@@ -26,6 +26,11 @@ function isOther(c) {
   return !isClient(c) && !isNetwork(c) && !isCareTeam(c);
 }
 
+const nameAsc = (a, b) => (a.name || '').localeCompare(b.name || '');
+const phoneAsc = (a, b) => (a.phone || '').localeCompare(b.phone || '');
+const emailAsc = (a, b) => (a.email || '').localeCompare(b.email || '');
+const waitlistAsc = (a, b) => (a.waitlist_status || '').localeCompare(b.waitlist_status || '');
+
 const GROUPS = {
   clients: { predicate: isClient, title: 'Clients', subtitle: 'Contacts with a buyer role or a waitlist status.' },
   network: { predicate: isNetwork, title: 'Network', subtitle: 'Other breeders and co-owners.' },
@@ -52,6 +57,7 @@ async function init() {
   renderTabs();
   const kennels = await kennelRepo.getAll({ includeArchived: true });
   const kennelName = (id) => kennels.find((k) => k.id === id)?.kennel_name || '';
+  const kennelAsc = (a, b) => kennelName(a.kennel_id).localeCompare(kennelName(b.kennel_id));
 
   createListView({
     mount,
@@ -65,15 +71,15 @@ async function init() {
       { id: 'waitlist', label: 'Waitlist', options: WAITLIST_STATUS.filter((w) => w.value !== 'none'), match: (c, v) => c.waitlist_status === v }
     ],
     // Name + Type stay visible at every width; Waitlist/Kennel/Phone/Email
-    // collapse behind the row's "more details" toggle on phones so the table
+    // collapse behind the row's “more details” toggle on phones so the table
     // never forces horizontal scroll on a narrow screen.
     columns: [
-      { header: 'Name', cell: (c) => `<strong>${esc(c.name)}</strong>` },
+      { header: 'Name', sortable: true, sortFn: nameAsc, cell: (c) => `<strong>${esc(c.name)}</strong>` },
       { header: 'Type', cell: (c) => badges(CONTACT_TYPE, c.contact_type) },
-      { header: 'Waitlist', collapse: true, cell: (c) => c.waitlist_status && c.waitlist_status !== 'none' ? badge(WAITLIST_STATUS, c.waitlist_status) : '<span class="faint">—</span>' },
-      { header: 'Kennel', collapse: true, cell: (c) => c.kennel_id ? esc(kennelName(c.kennel_id)) : '<span class="faint">—</span>' },
-      { header: 'Phone', collapse: true, cell: (c) => c.phone ? esc(c.phone) : '<span class="faint">—</span>' },
-      { header: 'Email', collapse: true, cell: (c) => c.email ? esc(c.email) : '<span class="faint">—</span>' }
+      { header: 'Waitlist', sortable: true, sortFn: waitlistAsc, collapse: true, cell: (c) => c.waitlist_status && c.waitlist_status !== 'none' ? badge(WAITLIST_STATUS, c.waitlist_status) : '<span class=”faint”>—</span>' },
+      { header: 'Kennel', sortable: true, sortFn: kennelAsc, collapse: true, cell: (c) => c.kennel_id ? esc(kennelName(c.kennel_id)) : '<span class=”faint”>—</span>' },
+      { header: 'Phone', sortable: true, sortFn: phoneAsc, collapse: true, cell: (c) => c.phone ? esc(c.phone) : '<span class=”faint”>—</span>' },
+      { header: 'Email', sortable: true, sortFn: emailAsc, collapse: true, cell: (c) => c.email ? esc(c.email) : '<span class=”faint”>—</span>' }
     ],
     onRowClick: (c) => { location.href = `contact.html?id=${encodeURIComponent(c.id)}`; },
     load: (o) => contactRepo.getAll(o),
