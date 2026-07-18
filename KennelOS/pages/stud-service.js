@@ -78,12 +78,14 @@ function sexLetter(d) {
 
 // Owned/co-owned active breeders only — males first, then by call name. The
 // current selection always stays in the list (edit safety) even if it no
-// longer matches. "Males first," not "males only" — an incoming service has
-// our dam as our dog.
-function ourDogOptions(current) {
+// longer matches. Once direction is set, our dog is the stud (outgoing =
+// male) or the dam (incoming = female) — filter to that sex.
+function ourDogOptions(current, direction) {
   const list = ctx.allDogs
     .filter((d) => (['owned', 'co_owned'].includes(d.ownership_type) && d.status === 'active_breeding') || d.id === current)
     .filter((d) => ctx.pickerArchived || !d.is_archived || d.id === current)
+    .filter((d) => d.id === current || direction !== 'outgoing' || d.sex === 'male')
+    .filter((d) => d.id === current || direction !== 'incoming' || d.sex === 'female')
     .sort((a, b) => {
       const rank = (d) => (d.sex === 'male' ? 0 : d.sex === 'female' ? 1 : 2);
       const r = rank(a) - rank(b);
@@ -95,11 +97,16 @@ function ourDogOptions(current) {
   return `<option value="">— select —</option>` + opts;
 }
 
-// External dogs only — the outside partner.
-function partnerDogOptions(current) {
+// External dogs only — the outside partner. Once direction is set, the
+// partner is the opposite role from our dog: outgoing (our dog is the stud)
+// means the partner is the dam (female); incoming means the partner is the
+// stud (male).
+function partnerDogOptions(current, direction) {
   const opts = ctx.allDogs
     .filter((d) => d.ownership_type === 'external' || d.id === current)
     .filter((d) => ctx.pickerArchived || !d.is_archived || d.id === current)
+    .filter((d) => d.id === current || direction !== 'outgoing' || d.sex === 'female')
+    .filter((d) => d.id === current || direction !== 'incoming' || d.sex === 'male')
     .map((d) => `<option value="${esc(d.id)}"${d.id === current ? ' selected' : ''}>${esc(d.call_name)}${sexLetter(d)}${d.registered_name ? ' — ' + esc(d.registered_name) : ''}${d.is_archived ? ' (archived)' : ''}</option>`)
     .join('');
   return `<option value="">— select —</option>` + opts;
@@ -168,8 +175,8 @@ function renderEdit() {
   els.body.innerHTML = `
     <div class="form-grid" id="ss-form" style="margin-top:14px;">
       ${field('Direction', `<select id="f-direction">${vocabOptions(STUD_SERVICE_DIRECTION, s.direction, 'Select…')}</select>`, { required: true, hint: 'Outgoing = our dog is the stud. Incoming = our dog is the dam.' })}
-      ${field('Our dog', `<select id="f-our_dog_id">${ourDogOptions(s.our_dog_id)}</select>`, { required: true })}
-      ${field('Partner dog', `<select id="f-partner_dog_id">${partnerDogOptions(s.partner_dog_id)}</select>`, { required: true })}
+      ${field('Our dog', `<select id="f-our_dog_id">${ourDogOptions(s.our_dog_id, s.direction)}</select>`, { required: true })}
+      ${field('Partner dog', `<select id="f-partner_dog_id">${partnerDogOptions(s.partner_dog_id, s.direction)}</select>`, { required: true })}
       ${field('Partner contact', `<select id="f-partner_contact_id">${contactOptions(s.partner_contact_id)}</select>`, { required: true, hint: 'Owner of the partner dog.' })}
       ${field('Fee amount', `<input id="f-fee_amount" type="number" min="0" step="0.01" value="${esc(s.fee_amount)}">`)}
       ${field('Fee structure', `<select id="f-fee_structure">${vocabOptions(FEE_STRUCTURE, s.fee_structure, '— none —')}</select>`)}
@@ -189,6 +196,10 @@ function renderEdit() {
   const form = document.getElementById('ss-form');
   form.addEventListener('input', updateWarnings);
   form.addEventListener('change', updateWarnings);
+  document.getElementById('f-direction').addEventListener('change', () => {
+    ctx.draft = readForm();
+    renderEdit();
+  });
   document.getElementById('picker-archived').addEventListener('change', (e) => {
     ctx.draft = readForm();
     ctx.pickerArchived = e.target.checked;
