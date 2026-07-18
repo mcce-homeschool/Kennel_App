@@ -1,15 +1,15 @@
-﻿// csvImport.js â€” the generic CSV match-or-create engine (Build Brief A3/B2,
-// Data Model doc Â§8). Lives in the data layer: it parses a file (via the
+// csvImport.js — the generic CSV match-or-create engine (Build Brief A3/B2,
+// Data Model doc §8). Lives in the data layer: it parses a file (via the
 // vendored PapaParse), classifies every row against existing records as
 // create / update / needs-review in a DRY RUN, and only writes on an explicit
-// commit. The engine is entity-agnostic â€” each entity contributes a small
+// commit. The engine is entity-agnostic — each entity contributes a small
 // *mapping* (column names, natural key, normalizers, repo). Stage 2 wires in
 // Dog and Contact; later stages add their own mapping to this same engine
 // rather than rebuilding it.
 //
-// The rule that shapes everything (Data Model Â§8): a natural key is only valid
+// The rule that shapes everything (Data Model §8): a natural key is only valid
 // if it is NON-EMPTY. Keyless / partial-key rows are never auto-matched and
-// never silently created â€” they land in "needs review," where the user decides.
+// never silently created — they land in "needs review," where the user decides.
 import Papa from '../vendor/papaparse.min.mjs';
 import { dogRepo } from './dogRepo.js';
 import { contactRepo } from './contactRepo.js';
@@ -51,7 +51,7 @@ function col(row, ...names) {
 }
 
 // Coerce free text to a controlled-vocab value. Returns '' (blank), the value,
-// or null (present but unrecognized â€” the caller decides how loud to be).
+// or null (present but unrecognized — the caller decides how loud to be).
 function normEnum(vocab, raw, extra = {}) {
   if (!raw) return '';
   const s = raw.trim();
@@ -85,7 +85,7 @@ function splitList(raw) {
 }
 
 // Name -> existing Dog lookup shared by the Pairing/Litter mappings to resolve
-// sire/dam relationship columns (Data Model Â§8, point 2). Same precedence as
+// sire/dam relationship columns (Data Model §8, point 2). Same precedence as
 // the Dog mapping's own byName index: registered_name wins ties, call_name
 // fills gaps.
 function buildDogNameIndex(dogs) {
@@ -117,8 +117,8 @@ function nk(name, dob) {
 // Dog mapping
 // =========================================================================
 // Natural key: registered_name + date_of_birth, falling back to
-// call_name + date_of_birth (Data Model Â§8). A row with no DOB, or with no
-// name at all, cannot form a key â†’ needs review.
+// call_name + date_of_birth (Data Model §8). A row with no DOB, or with no
+// name at all, cannot form a key → needs review.
 const DOG_MAPPING = {
   entity: 'dog',
   label: 'Dogs',
@@ -180,7 +180,7 @@ const DOG_MAPPING = {
       if (v) record[key] = v;
     }
 
-    // Recorded COI (Stage 5, Build Brief Â§2.3). Gated on a numeric coi_value:
+    // Recorded COI (Stage 5, Build Brief §2.3). Gated on a numeric coi_value:
     // present+numeric stores { value, method, source, as_of_date } (the last
     // three null when their columns are blank); present+non-numeric soft-warns
     // and drops the stray value (row kept), same posture as the end-date-on-
@@ -203,7 +203,7 @@ const DOG_MAPPING = {
       }
     }
 
-    // Sire / dam: resolve names against EXISTING dogs (Data Model Â§8.2). A named
+    // Sire / dam: resolve names against EXISTING dogs (Data Model §8.2). A named
     // parent that doesn't resolve is flagged (never silently dropped).
     const unresolved = [];
     for (const [nameCol, idField, roleLabel] of [
@@ -216,15 +216,15 @@ const DOG_MAPPING = {
       else { unresolved.push(`${roleLabel} "${pName}" not found`); }
     }
 
-    // Natural key â†’ match-or-create.
+    // Natural key → match-or-create.
     const hasName = !!(reg || call);
     const validKey = hasName && !!dob;
     let status_ = 'create';
     let match = null;
     if (!validKey) {
       status_ = 'review';
-      if (!hasName) reasons.push('No registered_name or call_name â€” cannot form a natural key.');
-      if (!dob) reasons.push('No date_of_birth â€” cannot form a natural key.');
+      if (!hasName) reasons.push('No registered_name or call_name — cannot form a natural key.');
+      if (!dob) reasons.push('No date_of_birth — cannot form a natural key.');
     } else {
       match = (reg && index.byReg.get(nk(reg, dob))) || (call && index.byCall.get(nk(call, dob))) || null;
       status_ = match ? 'update' : 'create';
@@ -252,7 +252,7 @@ const DOG_MAPPING = {
   },
 
   // Human label for an existing record (used by the "match to existing" picker).
-  describe: (d) => (d.registered_name || d.call_name || '(unnamed dog)') + (d.date_of_birth ? ` â€” ${d.date_of_birth}` : '') + (d.is_archived ? ' (archived)' : ''),
+  describe: (d) => (d.registered_name || d.call_name || '(unnamed dog)') + (d.date_of_birth ? ` — ${d.date_of_birth}` : '') + (d.is_archived ? ' (archived)' : ''),
 
   repo: dogRepo
 };
@@ -266,7 +266,7 @@ function buildDogChanges(record) {
 // =========================================================================
 // Contact mapping
 // =========================================================================
-// Natural key: name (case-insensitive, trimmed). Nameless â†’ needs review.
+// Natural key: name (case-insensitive, trimmed). Nameless → needs review.
 const CONTACT_MAPPING = {
   entity: 'contact',
   label: 'Contacts',
@@ -310,7 +310,7 @@ const CONTACT_MAPPING = {
       const v = col(row, key, ...aliases);
       if (v) record[key] = v;
     }
-    // Kennel by name â†’ existing kennel only (left blank + flagged if unknown).
+    // Kennel by name → existing kennel only (left blank + flagged if unknown).
     const kName = col(row, 'kennel_name', 'kennel');
     if (kName) {
       const hit = index.kennelByName.get(kName.toLowerCase());
@@ -322,7 +322,7 @@ const CONTACT_MAPPING = {
     let match = null;
     if (!name) {
       status_ = 'review';
-      reasons.push('No name â€” cannot form a natural key.');
+      reasons.push('No name — cannot form a natural key.');
     } else {
       match = index.byName.get(name.toLowerCase()) || null;
       status_ = match ? 'update' : 'create';

@@ -62,7 +62,10 @@ export function inspectBackup(obj) {
 }
 
 // Restore a parsed backup.
-//   mode 'replace' — wipe every known table, then load the file's rows.
+//   mode 'replace' — wipe EVERY known table, then load the file's rows, so the
+//                    result is exactly the backup's contents. A table the backup
+//                    omits ends up empty (a full export always includes all
+//                    tables; this only matters for a partial/hand-edited file).
 //   mode 'merge'   — upsert the file's rows by id, leaving other records intact.
 // Unknown collections (tables not in this schema version) are skipped, not an error.
 export async function restoreBackup(obj, mode) {
@@ -71,10 +74,13 @@ export async function restoreBackup(obj, mode) {
   const entries = Object.entries(obj.collections).filter(([name]) => known.has(name));
 
   await db.transaction('rw', db.tables, async () => {
+    // Replace is a full swap: clear every known table first so tables the backup
+    // doesn't mention are emptied too, not just the ones it carries.
+    if (mode === 'replace') {
+      for (const table of db.tables) await table.clear();
+    }
     for (const [name, rows] of entries) {
-      const table = db.table(name);
-      if (mode === 'replace') await table.clear();
-      if (rows.length) await table.bulkPut(rows);
+      if (rows.length) await db.table(name).bulkPut(rows);
     }
   });
   return entries.map(([name, rows]) => ({ name, count: rows.length }));
