@@ -127,6 +127,7 @@ Edges worth calling out:
 | registry | string | | e.g. AKC, UKC, CKC |
 | registration_number | string | | |
 | microchip_id | string | | |
+| url | string | | **Built.** Nullable, unindexed — a link for this dog (e.g. a registry page, a listing, a social profile). Plain string, never validated beyond the `type="url"` input hint. Not an FK — never enters the reference registry. |
 | sire_id | FK → Dog | | nullable — self-referencing |
 | dam_id | FK → Dog | | nullable — self-referencing |
 | ownership_type | enum: owned / co_owned / external / leased_in / leased_out | ✓ | |
@@ -189,7 +190,7 @@ Edges worth calling out:
 | title_earned | dog | instant | | `{title_abbreviation, organization}` |
 | heat_cycle | dog | **span** | | `{notes}` — the cycle start is `event_date`, the end is `event_end_date` |
 | boarding | dog | **span** | ✓ | `{location, boarding_reason, dropoff_time, pickup_time, notes}` — a dog away from home; `related_contact_id` is where it's staying |
-| placement | dog | instant | ✓ | `{placement_time, location, notes}` — a puppy drop-off; `subject_id` is the puppy, `related_contact_id` is the buyer |
+| placement | dog | instant | ✓ | `{dropoff_method, placement_time, location, deferred_boarding_amount, deferred_boarding_frequency, notes}` — a puppy drop-off; `subject_id` is the puppy, `related_contact_id` is the buyer |
 | breeding_tie | pairing | instant | | `{tie_date, method}` |
 | progesterone_test | pairing | instant | | `{value, lab}` |
 | ultrasound | pairing | instant | | `{confirmed, estimated_count}` |
@@ -198,6 +199,8 @@ Edges worth calling out:
 | note | dog / pairing / litter | instant | | free text |
 
 **Boarding specifics:** `boarding_reason` is *suggest-not-enforce* (a combobox over a starter set — stud service, co-owner rotation, foster, grow-out, owner travel, whelp assist, other — never a validated enum). `location` stays a plain string in `details`; the person/kennel is the top-level `related_contact_id`. `dropoff_time` / `pickup_time` (and `placement`'s `placement_time`) are **inert display strings** — never parsed or compared.
+
+**Placement specifics:** `dropoff_method` is an **enforced choice** from `PLACEMENT_METHODS` (`vocab.js`) — Flight nanny / Ground transport / Local pickup / Other — rendered directly above `placement_time` in the event form. `deferred_boarding_amount` (decimal, same posture as every other money field in the app — Sale `price`, StudService `fee_amount`; **never cents**) pairs with `deferred_boarding_frequency` (enforced choice from `BOARDING_FREQUENCY_OPTIONS` — Day / Week / Month), rendered on one line as "amount **per** frequency." This is a plain rate the breeder is recording, not an actual cost — it never writes to the Financials ledger (that's the separate top-level Cost field on the event form, which links an `Expense`).
 
 > **Test-name strings as vocabulary — built (§5.11).** The test-name `details` fields on `genetic_test` (`panel_name`), `breed_specific_test` (`test_name`), and `ofa_pennhip` (`joint`, combined with `method`) are the "seen-in-events" half of the shared suggestion vocabulary, unioned with `Kennel.preferred_tests` (`eventRepo.getTestTokens()` / `kennelRepo.getVocabulary()`).
 

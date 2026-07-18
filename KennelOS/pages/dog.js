@@ -52,7 +52,7 @@ const els = {
 const blankDog = () => ({
   call_name: '', registered_name: '', sex: '', date_of_birth: '', dob_is_estimated: false,
   date_of_death: '', breed: '', color_markings: '', registry: '', registration_number: '',
-  microchip_id: '', sire_id: '', dam_id: '', ownership_type: '', owner_contact_id: '',
+  microchip_id: '', url: '', sire_id: '', dam_id: '', ownership_type: '', owner_contact_id: '',
   co_owner_contact_ids: [], litter_id: '', breeder_kennel_id: '', kennel_id: '', status: '', status_date: '', disposition: '', notes: '',
   planned_tests: []
 });
@@ -275,6 +275,7 @@ function renderView() {
       ${row('Registry', esc(d.registry))}
       ${row('Registration #', esc(d.registration_number))}
       ${row('Microchip', esc(d.microchip_id))}
+      ${row('URL', d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">${esc(d.url)}</a>` : '')}
       ${row('Sire', dogLink(d.sire_id))}
       ${row('Dam', dogLink(d.dam_id))}
       ${row('Litter', d.litter_id ? `<a href="litter.html?id=${encodeURIComponent(d.litter_id)}">${esc(litterLabel(d.litter_id) || 'View litter')}</a>` : '')}
@@ -320,6 +321,7 @@ function renderEdit() {
       ${field('Registry', `<input id="f-registry" type="text" value="${esc(d.registry)}">`)}
       ${field('Registration #', `<input id="f-registration_number" type="text" value="${esc(d.registration_number)}">`)}
       ${field('Microchip', `<input id="f-microchip_id" type="text" value="${esc(d.microchip_id)}">`)}
+      ${field('URL', `<input id="f-url" type="url" value="${esc(d.url || '')}" placeholder="https://…">`)}
       ${field('Ownership', `<select id="f-ownership_type">${vocabOptions(OWNERSHIP_TYPE, d.ownership_type, 'Select…')}</select>`, { required: true })}
       ${field('Status', `<select id="f-status">${vocabOptions(DOG_STATUS, d.status, 'Select…')}</select>`, { required: true })}
       ${field('Disposition', `<select id="f-disposition">${vocabOptions(DISPOSITION, d.disposition || 'undecided')}</select>`, { hint: 'Keeping this dog or offering it? Drives the prospective-families view. Independent of Status.' })}
@@ -402,6 +404,7 @@ function readForm() {
     registry: val('f-registry').trim(),
     registration_number: val('f-registration_number').trim(),
     microchip_id: val('f-microchip_id').trim(),
+    url: val('f-url').trim(),
     ownership_type: val('f-ownership_type'),
     status: val('f-status'),
     disposition: val('f-disposition'),
