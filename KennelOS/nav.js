@@ -12,7 +12,8 @@ export const NAV_ITEMS = [
   { label: 'Dogs',     path: 'pages/dogs.html' },
   { label: 'Breeding', path: 'pages/breeding.html' }, // pairings + litters + resulting puppies
   { label: 'People',   path: 'pages/contacts.html' }, // contacts + waitlist / buyers
-  { label: 'Placements & Contracts', path: 'pages/sales.html' } // sales + stud services + contracts
+  { label: 'Placements & Contracts', path: 'pages/sales.html' }, // sales + stud services + contracts
+  { label: 'Financials', path: 'pages/financials.html' } // the expense ledger — where the money lives
 ];
 
 // Back-of-house utilities — rarely opened, so they live behind a corner menu
@@ -41,7 +42,7 @@ const HUB_CHILDREN = {
   'pages/today.html': ['dashboard.html', 'reminders.html', 'upcoming.html', 'board.html', 'scheduled-placements.html'],
   'pages/dogs.html': ['dog.html', 'roster.html', 'pedigree.html'],
   'pages/breeding.html': ['pairings.html', 'pairing.html', 'litters.html', 'litter.html', 'active-breeding.html', 'live-births.html'],
-  'pages/contacts.html': ['contact.html'],
+  'pages/contacts.html': ['contact.html', 'kennels.html', 'kennel.html'],
   'pages/sales.html': ['sale.html', 'stud-services.html', 'stud-service.html', 'contracts.html', 'contract.html']
 };
 

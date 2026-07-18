@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pairing — KennelOS</title>
+  <title>Financials — KennelOS</title>
   <link rel="stylesheet" href="../assets/app.css">
   <link rel="manifest" href="../manifest.json">
   <link rel="icon" href="../assets/icons/favicon-32.png" sizes="32x32">
@@ -18,34 +18,21 @@
   <main>
     <div class="page-header">
       <div>
-        <a class="muted" href="pairings.html">← All pairings</a>
-        <h1 id="pairing-title">Pairing</h1>
-        <div id="pairing-subtitle" class="page-subtitle"></div>
+        <h1>Financials</h1>
+        <p class="page-subtitle">Every expense across the program — costs on dogs, litters, pairings, and kennel-wide overhead, all from the one ledger. Add a cost against anything, filter, and export.</p>
       </div>
-      <div id="header-actions" class="pill-row"></div>
+      <button class="btn btn-primary" id="add-expense">+ Add Expense</button>
     </div>
-
     <div id="page-error"></div>
-
-    <section class="card" id="profile-section">
-      <div class="row-between">
-        <h2 style="margin:0;">Profile</h2>
-        <div id="profile-actions" class="pill-row"></div>
-      </div>
-      <div id="profile-body"></div>
+    <section class="card" id="summary-section" style="margin-bottom:16px;">
+      <div id="summary"></div>
     </section>
-
-    <!-- Linked Litter panel -->
-    <section id="litter-section"></section>
-    <!-- Linked Stud Service panel (derived) -->
-    <section id="stud-service-section"></section>
-    <!-- Timeline (pairing-subject events) -->
-    <section id="timeline-section"></section>
-
-    <section id="expenses-section"></section>
+    <section class="card">
+      <div id="report-mount"></div>
+    </section>
   </main>
 
   <script type="module" src="../app.js"></script>
-  <script type="module" src="./pairing.js"></script>
+  <script type="module" src="./financials.js"></script>
 </body>
 </html>
