@@ -291,6 +291,10 @@ function promptOwnershipUpdate(sale) {
           <option value="co_owned">Co-owned</option>
         </select>
       </div>
+      <div class="field" id="own-owner-field" hidden>
+        <label>Owner</label>
+        <select id="own-owner">${contactOptions(sale.buyer_contact_id)}</select>
+      </div>
       <div id="own-error"></div>
       <div class="form-actions">
         <button class="btn btn-primary" id="own-confirm">Confirm</button>
@@ -301,15 +305,25 @@ function promptOwnershipUpdate(sale) {
     const close = () => { overlay.remove(); resolve(); };
     overlay.querySelector('#own-skip').addEventListener('click', close);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    const choiceSelect = overlay.querySelector('#own-choice');
+    const ownerField = overlay.querySelector('#own-owner-field');
+    // Owner is the single owner_contact_id field, which only applies to
+    // External — Co-owned adds the buyer to co_owner_contact_ids instead
+    // (handled below without needing a picker; owner_contact_id there stays
+    // whoever it already was, typically the breeder).
+    choiceSelect.addEventListener('change', () => {
+      ownerField.hidden = choiceSelect.value !== 'external';
+    });
     overlay.querySelector('#own-confirm').addEventListener('click', async () => {
-      const choice = overlay.querySelector('#own-choice').value;
+      const choice = choiceSelect.value;
       if (!choice) { close(); return; }
       try {
         // Re-fetch: the co-own convenience above may have just updated this dog.
         const dog = await dogRepo.getById(sale.dog_id);
         if (choice === 'external') {
+          const ownerId = overlay.querySelector('#own-owner').value || null;
           const updates = { ownership_type: 'external', status: 'external_reference', status_date: todayYMD() };
-          if (!dog?.owner_contact_id) updates.owner_contact_id = sale.buyer_contact_id;
+          if (ownerId) updates.owner_contact_id = ownerId;
           await dogRepo.update(sale.dog_id, updates);
         } else if (choice === 'co_owned') {
           const coOwners = dog?.co_owner_contact_ids || [];
