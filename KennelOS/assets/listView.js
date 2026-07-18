@@ -25,7 +25,7 @@ export function createListView(opts) {
     mount,                 // container element to render into
     search,                // { placeholder, text: (record) => string } — searchable text
     filters = [],          // [{ id, label, options:[{value,label}], match:(record,value)=>bool }]
-    columns,               // [{ header, cell:(record)=>htmlString, className? }]
+    columns,               // [{ header, cell:(record)=>htmlString, className?, sortable?, sortFn:(a,b)=>number }]
     rowClass = () => '',   // (record) => extra <tr> class
     onRowClick,            // (record) => void
     load,                  // async ({ includeArchived }) => records[]
@@ -44,7 +44,7 @@ export function createListView(opts) {
   } = opts;
 
   let all = [];
-  const state = { q: '', showArchived: false, filters: {} };
+  const state = { q: '', showArchived: false, filters: {}, sortColIdx: null, sortDir: 'asc' };
 
   // --- Build toolbar ---
   const toolbar = document.createElement('div');
@@ -123,7 +123,17 @@ export function createListView(opts) {
       }
       return true;
     });
-    return sort ? rows.slice().sort(sort) : rows;
+
+    let sorted = rows.slice();
+    // Use column-based sort if one is selected and has a sortFn
+    if (state.sortColIdx !== null && columns[state.sortColIdx]?.sortFn) {
+      const compareFn = columns[state.sortColIdx].sortFn;
+      sorted.sort((a, b) => state.sortDir === 'asc' ? compareFn(a, b) : compareFn(b, a));
+    } else if (sort) {
+      // Fall back to the default sort comparator
+      sorted.sort(sort);
+    }
+    return sorted;
   }
 
   // Columns marked `collapse: true` hide on narrow screens (CSS) and move into
@@ -132,7 +142,17 @@ export function createListView(opts) {
   const hasCollapse = columns.some((c) => c.collapse);
 
   function tableHtml(rows) {
-    const head = columns.map((c) => `<th class="${c.collapse ? 'col-collapse' : ''}">${esc(c.header)}</th>`).join('')
+    const head = columns.map((c, idx) => {
+      const isSorted = state.sortColIdx === idx;
+      const sortIndicator = isSorted ? (state.sortDir === 'asc' ? ' ▲' : ' ▼') : '';
+      const sortable = c.sortable && c.sortFn;
+      const className = [
+        c.collapse ? 'col-collapse' : '',
+        sortable ? 'sortable' : ''
+      ].filter(Boolean).join(' ');
+      const attrs = sortable ? ` data-col-idx="${idx}"` : '';
+      return `<th class="${className}"${attrs}>${esc(c.header)}${isSorted ? sortIndicator : ''}</th>`;
+    }).join('')
       + (hasCollapse ? `<th class="col-toggle"></th>` : '');
     const body = rows.map((r, i) => {
       const cls = [rowClass(r), r.is_archived ? 'row-archived' : '', onRowClick ? 'clickable' : '', 'list-row']
@@ -172,6 +192,21 @@ export function createListView(opts) {
         });
       });
     }
+    // Wire up sortable column headers
+    root.querySelectorAll('th.sortable').forEach((th) => {
+      th.style.cursor = 'pointer';
+      th.addEventListener('click', () => {
+        const colIdx = Number(th.dataset.colIdx);
+        // If clicking the same column, toggle direction; otherwise, set to ascending
+        if (state.sortColIdx === colIdx) {
+          state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          state.sortColIdx = colIdx;
+          state.sortDir = 'asc';
+        }
+        render();
+      });
+    });
   }
 
   function render() {

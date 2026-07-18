@@ -322,6 +322,10 @@ table.data tbody tr.clickable:hover { background: var(--accent-soft); }
 table.data tbody tr.row-review { background: var(--warn-soft); }
 table.data tbody tr.row-review td { border-bottom-color: #e6d5ad; }
 
+/* --- Sortable columns (clickable headers) -------------------------------- */
+table.data th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+table.data th.sortable:hover { background: var(--border); color: var(--text); }
+
 /* --- Responsive column collapse (listView.js `collapse` columns) -------- */
 .col-toggle { width: 32px; text-align: center; }
 .row-toggle-btn { background: none; border: none; cursor: pointer; font-size: 14px; line-height: 1; padding: 6px; color: var(--text-muted); }
