@@ -76,6 +76,10 @@ KennelOS/
     seedImport.js              Optional breed+test vocabulary seed
     kennelSetup.js             First-run "your kennel/owner" wizard logic
     settings.js                localStorage-backed UI prefs / identity keys
+    nudgeState.js              Device-local dismissal ledger for derived nudges
+    nudges.js                  Derived-nudge engine — computeNudges() (see §19)
+    awayBoard.js                "Away from home" union: boarding events +
+                                in-person stud services, one view-model (see §19)
   assets/                      Shared UI helpers + reusable components
     ui.js                      esc(), badge(), fmtDate(), param(), fillSelect()…
     listView.js                Reusable list screen (cells return HTML)
@@ -84,6 +88,7 @@ KennelOS/
     pedigree.js                Ancestor-tree renderer
     eventForm.js               Add/edit event modal
     puppyForm.js               Litter → puppy roster entry
+    contactPicker.js           Inline "＋ New contact" decorator for pickers
     importView.js              Shared CSV import dry-run/commit UI
     sampleDataUI.js            First-run sample-data prompt + banner
     kennelSetupUI.js           Kennel-setup prompt/wizard + seed prefill
@@ -104,14 +109,14 @@ and commonly blank at entry time.
 
 | Entity | Required | Notable other fields |
 |---|---|---|
-| **Dog** | `call_name`, `sex`, `breed`, `ownership_type`, `status` | `registered_name`, `date_of_birth`, `date_of_death`, `sire_id`, `dam_id`, `litter_id`, `owner_contact_id`, `co_owner_contact_ids[]`, `kennel_id`, `color_markings`, `registry`, `registration_number`, `microchip_id`, `planned_tests[]`, `recorded_coi{value,method,source,as_of_date}`, `notes`. Owner required when `ownership_type ∈ {external, leased_in}`. |
-| **Contact** | `name` | `contact_type[]` (multi), `email`, `phone`, `address`, `kennel_id`, `waitlist_status`, `first_contact_source`, `notes`. Buyers are Contacts — **there is no Buyer table**. |
-| **Kennel** | `kennel_name` | `is_own_kennel`, `preferred_tests[]`, `preferred_breeds[]`. Lightweight; added inline from Contact form. |
+| **Dog** | `call_name`, `sex`, `breed`, `ownership_type`, `status` | `registered_name`, `date_of_birth`, `date_of_death`, `sire_id`, `dam_id`, `litter_id`, `owner_contact_id`, `co_owner_contact_ids[]`, `kennel_id`, `color_markings`, `registry`, `registration_number`, `microchip_id`, `planned_tests[]`, `recorded_coi{value,method,source,as_of_date}`, `disposition` (`undecided`/`keeping`/`available`/`placed` — breeder intent, orthogonal to `status`; feeds the Today "Available puppies" feed and the promote-lifecycle nudge, §19), `notes`. Owner required when `ownership_type ∈ {external, leased_in}`. |
+| **Contact** | `name` | `contact_type[]` (multi), `email`, `phone`, `address`, `kennel_id`, `waitlist_status`, `first_contact_source`, `notes`. Buyers are Contacts — **there is no Buyer table**. `address` also resolves an in-person stud service's away-board location (§19). |
+| **Kennel** | `kennel_name` | `is_own_kennel`, `preferred_tests[]`, `preferred_breeds[]`, `promote_nudge_enabled` (bool, default off), `promote_age_male_months`/`promote_age_female_months` (numbers — the promote-lifecycle nudge's per-kennel thresholds, §19). Lightweight; added inline from Contact form. |
 | **Pairing** | `sire_id`, `dam_id`, `pairing_type`, `status` | `method`, `planned_date`, `expected_due_date`, `notes`. Sire ≠ dam (hard block). |
 | **Litter** | `dam_id`, `sire_id`, `status` | `pairing_id`, `whelp_date`, `litter_registration_number`, `puppies_born_total/alive/deceased`, `notes`. Litter's own sire/dam are authoritative. Puppy roster is **derived** (`Dog WHERE litter_id`). |
 | **Sale** | `dog_id`, `buyer_contact_id`, `placement_type`, `status` | `sale_date`, `price`, `deposit_amount`, `deposit_date`, `balance_paid_date`, `lead_source`, `notes`. Its own table (not a Dog field) so reserve/return/re-place stay distinct facts. |
 | **Contract** | `contract_type` | `status` (defaults `draft`), `related_sale_id`, `related_stud_service_id`, `signed_date`, `notes`. Generic across sale/stud/co-ownership/lease. Leaf entity. |
-| **StudService** | `direction`, `our_dog_id`, `partner_dog_id`, `partner_contact_id`, `status` | `pairing_id`, `fee_amount`, `fee_structure`, `result_notes`, plus optional logistics dates. Covers both `incoming` and `outgoing`. |
+| **StudService** | `direction`, `our_dog_id`, `partner_dog_id`, `partner_contact_id`, `status` | `pairing_id`, `fee_amount`, `fee_structure`, `result_notes`, `type` (`in_person`/`ai` — coarse physical-travel flag; `in_person` + `sent_date`/`returned_date` window feeds the away-board, §19), plus optional logistics dates. Covers both `incoming` and `outgoing`. |
 | **Event** | `subject_type`, `subject_id`, `event_type`, `event_date`, `title` | `event_end_date`, `reminder_date`, `reminder_dismissed`, `related_dog_id`, `related_contact_id`, `details{}`, `cost`, `notes`. See §8. |
 
 ### 4.2 Relationship direction — the sixth design principle
@@ -266,8 +271,11 @@ shared test vocabulary; `testTokensOf(event)` derives the test-name token(s).
 ### eventRepo reads (all siblings — deliberately never fused)
 
 - `getForSubject(type, id)` — the timeline, newest first (compound index).
-- `getBoardRows()` — dogs currently away: `event_type='boarding'`, not archived, not
-  yet ended. Whereabouts only — **not** all spans.
+- `getBoardRows()` — dogs currently away via boarding events: `event_type='boarding'`,
+  not archived, not yet ended. Whereabouts only — **not** all spans. This is ONE half
+  of the away-board; `data/awayBoard.js` `getAwayBoardRows()` unions it with
+  `studServiceRepo.getBoardRows()` (in-person stud services) into one view-model —
+  see §19. Nothing here changed; callers just moved to the union.
 - `getUpcoming()` — instant-duration events at/after today, any subject
   ("Upcoming Deliverables").
 - `getScheduledPlacements()` — future `placement` events only.
@@ -342,10 +350,15 @@ migration-requiring way.
 
 ## 11. First-run, sample data, seed, settings
 
-- **settings.js** — the only `localStorage` user. Pages never touch `localStorage`
+- **settings.js** — the primary `localStorage` user. Pages never touch `localStorage`
   directly. Keys (all under `kennelOS.*`): `lastBackupDate`, `persistRequested`,
   `sampleDataManifest`, `sampleDataCleared`, `myKennelId`, `myContactId`,
   `myKennelSetupSkipped`. `clearAllSettings()` drops them all (used by Reset App).
+- **nudgeState.js** — a second, deliberately separate `localStorage` module (one key,
+  `kennelOS.nudgeDismissals`): the derived-nudge dismissal ledger (§19). Kept out of
+  `settings.js`/`clearAllSettings()` on purpose — `appReset.js` calls its own
+  `clearAll()` directly — and never exported in JSON backups: dismissals are
+  device-local UI state, not portable domain data.
 - **sampleData.js** — the "Thornfield Kennels" demo. Seeds through the **repo layer**
   (same validation as real data) and tracks created IDs in one manifest object (not
   an `is_sample` schema flag), so clearing is a lookup, not a scan.
@@ -368,7 +381,7 @@ declined (or after sample data is later cleared), offer kennel setup.
 
 App-shell cache so the app installs and works offline after first load.
 
-- `CACHE_NAME` (currently `kennelos-shell-v11`) + a `PRECACHE_URLS` list of **every**
+- `CACHE_NAME` (currently `kennelos-shell-v12`) + a `PRECACHE_URLS` list of **every**
   app file (html/js/css/icons/vendor/resources).
 - `install` precaches the list (**`cache.addAll` is atomic** — one missing/renamed
   file fails the whole install). `activate` deletes old caches. Fetch is
@@ -418,6 +431,13 @@ one implementation lives in `data/dateUtils.js`.
   them out of the reminder index). Supports applying one payload to multiple subjects.
 - **puppyForm.js**, **importView.js**, **sampleDataUI.js**, **kennelSetupUI.js** —
   roster entry, the CSV dry-run/commit UI, and the two first-run prompt/banners.
+- **contactPicker.js** — `attachNewContactButton(selectEl, {onCreated})` decorates any
+  contact `<select>` with a "＋ New" button: minimal inline-create modal (name
+  required), creates via `contactRepo.create`, appends+selects the option, fires a
+  native `change` event. `onCreated` runs **before** that dispatch so a caller that
+  re-renders the select from its own in-memory contact list (e.g. `sale.js`) sees the
+  new contact already there. Wired into sale (buyer), stud-service (partner), and
+  `eventForm.js` (boarding/placement related contact) — one helper, built once.
 
 ### Navigation (`nav.js`)
 
@@ -546,6 +566,73 @@ features.
 
 **Add a new page** — always finish by adding it to `sw.js` `PRECACHE_URLS` and bumping
 `CACHE_NAME`, or it won't work offline.
+
+---
+
+## 19. Derived nudges & the away-board union
+
+Two small `data/` modules, added by the Data Integrity & Workflow-Streamlining brief
+(`KennelOS/docs/Data_Integrity_Workflows_Brief_v1.md`), sit on top of the repos above.
+Neither owns storage of its own beyond the one localStorage ledger below — both are
+pure composition over existing repos.
+
+**`data/nudges.js`** — `computeNudges()` reads current record state ONLY (no ledger
+awareness) and returns zero or more:
+```
+{ key, title, detail, subjectHref, actions: [{ label, run: async () => {} }] }
+```
+Four rules, each producing its own stable `key` so a dismissal survives re-computation:
+- **Stud-service status** — `sent_date` passed + `status='arranged'` → suggest
+  `in_progress`; `returned_date` passed + `status ∈ {arranged, in_progress}` → suggest
+  `completed` (never both; completed wins if both conditions hold).
+- **Promote-lifecycle** — opt-in per kennel (`Kennel.promote_nudge_enabled`): a
+  `status='puppy'`, `disposition='keeping'` dog past its kennel's
+  `promote_age_male_months`/`promote_age_female_months` (by sex) gets a "promote to
+  active breeding?" suggestion. No kennel, disabled, or non-`keeping` disposition ⇒
+  silent — this is a decide-not-auto-promote nudge, never a mutation on its own.
+- **Stud → pairing** — a stud service that's `completed` or overdue-returned with no
+  `pairing_id` yet suggests creating one, deep-linking to
+  `pairing.html?new=1&stud_service=<id>` (existing prefill/back-fill flow, unchanged).
+  **Auto-dismisses**: once `pairing_id` is set the rule produces nothing at all — the
+  link itself is the done-signal, no ledger entry needed.
+- **Heat → pairing** — a concluded `heat_cycle` event (`event_end_date < today`) with
+  no live pairing recorded for that dam since the heat started suggests creating one
+  via `pairing.html?new=1&dam=<dogId>` (`pairing.js` new-mode gained the `dam` query
+  param alongside its existing `stud_service` one).
+
+The stud→pairing and heat→pairing rules share one dedup helper
+(`pairingExistsForDam`): a pairing counts as "already handled" if it's for the same
+dam, not `cancelled`/`failed`, and opened (`planned_date`, falling back to
+`created_at`) on or after the window in question.
+
+**`data/nudgeState.js`** — the dismissal ledger (see §11 above): `isDismissed`,
+`dismiss`, `clearAll`. A computed nudge has no backing row to persist "dismissed" on,
+so dismissal is device-local UI state, deliberately kept **out of** JSON backups.
+
+**Rendering (`pages/today.js`)** owns the split the brief specifies: it calls
+`computeNudges()`, filters out `isDismissed(key)` itself, renders what's left in a
+"Nudges" section (above Reminders), wires each nudge's own action button(s), and adds
+one generic "Dismiss" button per row that isn't part of any nudge's `actions` — the
+same mechanism for every nudge, owned by the renderer, not each rule.
+
+**`data/awayBoard.js`** — `getAwayBoardRows()` unions two sources into one
+normalized view-model (`{ dogId, location, reason, contactId, outDate, returnDate,
+dropoffTime, pickupTime, sourceType, sourceId, href }`):
+`eventRepo.getBoardRows()` (boarding events — unchanged) plus the new
+`studServiceRepo.getBoardRows()` (stud services where `type='in_person'` and today
+falls in `[sent_date, returned_date]`, open-ended if `returned_date` is null; away dog
+is always `our_dog_id`; location resolves from the partner contact's `address`).
+Consumed by `pages/board.js`, `pages/today.js` (`renderBoard`), and
+`pages/dashboard.js` (the away-count tile) — all three moved off
+`eventRepo.getBoardRows()` directly onto this union. Boarding events still cover
+non-stud reasons (grow-out, foster, owner travel); only the stud-reason boarding
+*duplicate* went away — `sampleData.js` no longer authors a parallel boarding event
+for its sample in-person stud service, it just sets `type`/`sent_date` on the
+StudService record itself.
+
+No schema/index/reference-registry change: `StudService.type` and the three `Kennel`
+fields are plain unindexed additions (§5); the one new cross-entity link (stud→pairing
+via a nudge action) already existed as `StudService.pairing_id`.
 
 ---
 
