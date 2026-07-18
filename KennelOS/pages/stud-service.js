@@ -10,12 +10,13 @@ import { pairingRepo } from '../data/pairingRepo.js';
 import { dogRepo } from '../data/dogRepo.js';
 import { contactRepo } from '../data/contactRepo.js';
 import {
-  STUD_SERVICE_DIRECTION, FEE_STRUCTURE, STUD_SERVICE_STATUS,
+  STUD_SERVICE_DIRECTION, FEE_STRUCTURE, STUD_SERVICE_STATUS, STUD_SERVICE_TYPE,
   CONTRACT_TYPE, CONTRACT_STATUS, SEX, descriptor
 } from '../data/vocab.js';
 import { esc, badge, fmtDate, param, confirmAction } from '../assets/ui.js';
 import { openEventForm } from '../assets/eventForm.js';
 import { getMyContactId } from '../data/kennelSetup.js';
+import { attachNewContactButton } from '../assets/contactPicker.js';
 
 const els = {
   title: document.getElementById('ss-title'),
@@ -30,7 +31,7 @@ const els = {
 const blankStudService = () => ({
   direction: '', our_dog_id: '', partner_dog_id: '', partner_contact_id: '',
   fee_amount: '', fee_structure: '', pairing_id: '', status: '', result_notes: '', notes: '',
-  sent_date: '', returned_date: ''
+  sent_date: '', returned_date: '', type: ''
 });
 
 const ctx = {
@@ -145,6 +146,7 @@ function renderView() {
       ${row('Fee', esc(money(s.fee_amount)) + (s.fee_structure ? ` <span class="faint">(${esc((FEE_STRUCTURE.find(f => f.value === s.fee_structure) || {}).label || s.fee_structure)})</span>` : ''))}
       ${row('Linked pairing', pairingHtml)}
       ${row('Status', badge(STUD_SERVICE_STATUS, s.status))}
+      ${row('Type', s.type ? badge(STUD_SERVICE_TYPE, s.type) : '')}
       ${row('Sent', s.sent_date ? esc(fmtDate(s.sent_date)) : '')}
       ${row('Returned', s.returned_date ? esc(fmtDate(s.returned_date)) : '')}
       ${row('Result notes', s.result_notes ? esc(s.result_notes).replace(/\n/g, '<br>') : '')}
@@ -173,6 +175,7 @@ function renderEdit() {
       ${field('Fee structure', `<select id="f-fee_structure">${vocabOptions(FEE_STRUCTURE, s.fee_structure, '— none —')}</select>`)}
       ${field('Linked pairing', `<select id="f-pairing_id">${pairingOptions(s.pairing_id)}</select>`, { hint: 'Optional — the actual breeding record and outcome.' })}
       ${field('Status', `<select id="f-status">${vocabOptions(STUD_SERVICE_STATUS, s.status, 'Select…')}</select>`, { required: true })}
+      ${field('Type', `<select id="f-type">${vocabOptions(STUD_SERVICE_TYPE, s.type, '— unknown —')}</select>`, { hint: 'In person = the dog physically travelled — shows on the away board. AI/shipped never does.' })}
       ${field('Sent', `<input id="f-sent_date" type="date" value="${esc(s.sent_date)}">`, { hint: 'Date the dog/semen was sent out (optional).' })}
       ${field('Returned', `<input id="f-returned_date" type="date" value="${esc(s.returned_date)}">`)}
       <div class="field field-wide">
@@ -191,6 +194,12 @@ function renderEdit() {
     ctx.pickerArchived = e.target.checked;
     renderEdit();
   });
+  attachNewContactButton(document.getElementById('f-partner_contact_id'), {
+    onCreated: (contact) => {
+      ctx.allContacts.push(contact);
+      ctx.contactsById.set(contact.id, contact);
+    }
+  });
   updateWarnings();
 }
 
@@ -206,6 +215,7 @@ function readForm() {
     fee_structure: val('f-fee_structure') || '',
     pairing_id: val('f-pairing_id') || null,
     status: val('f-status'),
+    type: val('f-type') || '',
     sent_date: val('f-sent_date'),
     returned_date: val('f-returned_date'),
     result_notes: val('f-result_notes'),

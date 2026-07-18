@@ -103,8 +103,11 @@ export async function seedSampleData() {
     name: 'Owen Farrow', contact_type: ['buyer'], waitlist_status: 'active',
     first_contact_source: 'Referral', phone: '555-0107'
   });
+  // address (Data Integrity Brief §5): the away-board resolves an in-person
+  // stud service's location from the partner contact's address, so Ellen
+  // needs one for studServiceBirch below to show a real location, not "—".
   const ellen = await contactRepo.create({
-    name: 'Ellen Brooks', contact_type: ['breeder'], phone: '555-0108'
+    name: 'Ellen Brooks', contact_type: ['breeder'], phone: '555-0108', address: 'Burlington, VT'
   });
   manifest.contacts.push(patricia.id, dana.id, sam.id, tessa.id, marcus.id, priya.id, owen.id, ellen.id);
 
@@ -214,9 +217,14 @@ export async function seedSampleData() {
 
   // Stage 4 — Stud Service: Birch (our dog) services Nell (Ellen's outside
   // female). Links to Pairing P3 via the canonical pairing_id.
+  // type/sent_date/no returned_date (Data Integrity Brief §5): this IS the
+  // sample's away-board row now — an ongoing in-person stay. The parallel
+  // "Boarding for stud service" event that used to duplicate this trip is
+  // gone; the board reads this record directly via studServiceRepo.getBoardRows().
   const studServiceBirch = await studServiceRepo.create({
     direction: 'outgoing', our_dog_id: birch.id, partner_dog_id: nell.id, partner_contact_id: ellen.id,
-    fee_amount: 1200, fee_structure: 'flat_fee', pairing_id: pairingP3.id,
+    fee_amount: 1200, fee_structure: 'flat_fee', pairing_id: pairingP3.id, type: 'in_person',
+    sent_date: daysFromToday(-3),
     status: 'completed', result_notes: 'Successful AI breeding; pregnancy confirmed by ultrasound.'
   });
   const studServiceContract = await contractRepo.create({
@@ -287,12 +295,10 @@ export async function seedSampleData() {
       details: { vaccine: 'DHPP', lot_number: 'C1029' } },
     { subject_id: birch.id, event_type: 'genetic_test', event_date: '2026-06-20', title: 'Panel results',
       details: { panel_name: 'Embark Breeder Panel', lab: 'Embark', result: 'Clear' } },
-    // Birch's outgoing stud stay with Ellen (Stage4.5 Addendum §C6) — the sample
-    // boarding event, ongoing (no event_end_date) so it always shows on the
-    // Location/Status Board regardless of when the packet is seeded.
-    { subject_id: birch.id, event_type: 'boarding', event_date: daysFromToday(-3), title: 'Boarding for stud service',
-      related_contact_id: ellen.id,
-      details: { location: "Ellen Brooks' home", boarding_reason: 'Stud service', dropoff_time: '9:00 AM', notes: 'Staying with Ellen for the Nell breeding.' } },
+    // Birch's outgoing stud stay with Ellen no longer gets a parallel boarding
+    // event (Data Integrity Brief §5 away-board de-dup) — studServiceBirch
+    // above (type: in_person, sent_date set, no returned_date) is now the
+    // sole source for that trip on the Location/Status Board.
     // Hazel
     { subject_id: hazel.id, event_type: 'vaccination', event_date: '2026-05-01', title: 'Puppy shots (2nd round)',
       details: { vaccine: 'DHPP', lot_number: 'C1029' } },

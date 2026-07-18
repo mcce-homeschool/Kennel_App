@@ -1,8 +1,9 @@
 // board.js — Location / Status Board (Stage4.5 Addendum §C4): one row per
-// dog currently away from home. Reads HistoryEvent.getBoardRows(), which
-// filters on event_type ∈ {boarding} — never on `duration` — so active
-// medications/heat cycles (also spans) never show up here.
-import { HistoryEvent } from '../data/eventRepo.js';
+// dog currently away from home. Reads getAwayBoardRows(), the union of
+// boarding events (event_type === 'boarding' — never filtered on `duration`,
+// so active medications/heat cycles, also spans, never show up here) and
+// in-person stud services (Data Integrity Brief §5).
+import { getAwayBoardRows } from '../data/awayBoard.js';
 import { dogRepo } from '../data/dogRepo.js';
 import { contactRepo } from '../data/contactRepo.js';
 import { esc, fmtDate, todayYMD } from '../assets/ui.js';
@@ -11,7 +12,7 @@ const mount = document.getElementById('board-mount');
 
 async function init() {
   const [rows, dogs, contacts] = await Promise.all([
-    HistoryEvent.getBoardRows(),
+    getAwayBoardRows(),
     dogRepo.getAll({ includeArchived: true }),
     contactRepo.getAll({ includeArchived: true })
   ]);
@@ -24,20 +25,19 @@ async function init() {
   }
 
   const today = todayYMD();
-  const body = rows.map((ev) => {
-    const dog = dogsById.get(ev.subject_id);
-    const contact = ev.related_contact_id ? contactsById.get(ev.related_contact_id) : null;
-    const d = ev.details || {};
-    const returnCell = ev.event_end_date
-      ? `${esc(fmtDate(ev.event_end_date))}${ev.event_end_date < today ? ' <span class="badge badge-amber">Overdue?</span>' : ''}`
+  const body = rows.map((row) => {
+    const dog = dogsById.get(row.dogId);
+    const contact = row.contactId ? contactsById.get(row.contactId) : null;
+    const returnCell = row.returnDate
+      ? `${esc(fmtDate(row.returnDate))}${row.returnDate < today ? ' <span class="badge badge-amber">Overdue?</span>' : ''}`
       : '<span class="badge badge-blue">Ongoing</span>';
-    return `<tr class="clickable" data-dog="${esc(ev.subject_id)}">
+    return `<tr class="clickable" data-href="${esc(row.href)}">
       <td><strong>${esc(dog ? dog.call_name : '—')}</strong></td>
-      <td>${esc(d.location || '')}</td>
-      <td>${esc(d.boarding_reason || '')}</td>
+      <td>${esc(row.location || '')}</td>
+      <td>${esc(row.reason || '')}</td>
       <td>${contact ? esc(contact.name) : '<span class="faint">—</span>'}</td>
-      <td>${esc(fmtDate(ev.event_date))}${d.dropoff_time ? ` <span class="faint">${esc(d.dropoff_time)}</span>` : ''}</td>
-      <td>${returnCell}${d.pickup_time ? ` <span class="faint">${esc(d.pickup_time)}</span>` : ''}</td>
+      <td>${esc(fmtDate(row.outDate))}${row.dropoffTime ? ` <span class="faint">${esc(row.dropoffTime)}</span>` : ''}</td>
+      <td>${returnCell}${row.pickupTime ? ` <span class="faint">${esc(row.pickupTime)}</span>` : ''}</td>
     </tr>`;
   }).join('');
 
@@ -47,8 +47,8 @@ async function init() {
       <tbody>${body}</tbody>
     </table>`;
 
-  mount.querySelectorAll('tr[data-dog]').forEach((tr) => {
-    tr.addEventListener('click', () => { location.href = `dog.html?id=${encodeURIComponent(tr.dataset.dog)}`; });
+  mount.querySelectorAll('tr[data-href]').forEach((tr) => {
+    tr.addEventListener('click', () => { location.href = tr.dataset.href; });
   });
 }
 

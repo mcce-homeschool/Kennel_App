@@ -29,3 +29,14 @@ export function monthsFromToday(n) {
   d.setMonth(d.getMonth() + n);
   return formatYMD(d);
 }
+
+// Whole months between two YYYY-MM-DD strings (fromYMD earlier, toYMD later),
+// day-of-month aware — used by the promote-lifecycle nudge (Data Integrity
+// Brief §4.3) to turn date_of_birth into an age threshold can compare against.
+export function monthsBetween(fromYMD, toYMD) {
+  const [fy, fm, fd] = fromYMD.split('-').map(Number);
+  const [ty, tm, td] = toYMD.split('-').map(Number);
+  let months = (ty - fy) * 12 + (tm - fm);
+  if (td < fd) months -= 1;
+  return months;
+}

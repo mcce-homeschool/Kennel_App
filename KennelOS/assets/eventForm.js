@@ -11,6 +11,7 @@ import { contactRepo } from '../data/contactRepo.js';
 import { kennelRepo } from '../data/kennelRepo.js';
 import { eventTypesFor, descriptor, EVENT_TYPES } from '../data/vocab.js';
 import { esc, todayYMD } from './ui.js';
+import { attachNewContactButton } from './contactPicker.js';
 
 // Which combobox field on each test-bearing type draws from the shared test
 // vocabulary rather than a static options list (Test Planning Addendum §3).
@@ -153,6 +154,12 @@ export async function openEventForm(opts) {
       if (!draft.title) draft.title = descriptor(EVENT_TYPES, draft.event_type).label;
       render();
     });
+    const relatedContactEl = modal.querySelector('#ef-related-contact');
+    if (relatedContactEl) {
+      attachNewContactButton(relatedContactEl, {
+        onCreated: (contact) => { contacts.push(contact); draft.related_contact_id = contact.id; }
+      });
+    }
     if (isCascade) {
       modal.querySelectorAll('[data-cascade-target]').forEach((cb) => {
         cb.addEventListener('change', (e) => {

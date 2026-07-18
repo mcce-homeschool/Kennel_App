@@ -376,6 +376,10 @@ async function main() {
         ctx.draft.status = 'planned';
       }
     }
+    // Pre-fill dam from the heat-conclusion nudge deep-link (Data Integrity
+    // Brief §4.5) — a lighter-weight seed than `stud_service`, just the dam.
+    const damId = param('dam');
+    if (damId && ctx.dogsById.has(damId)) ctx.draft.dam_id = damId;
     renderTitle();
     renderEdit();
     renderProfileActions();

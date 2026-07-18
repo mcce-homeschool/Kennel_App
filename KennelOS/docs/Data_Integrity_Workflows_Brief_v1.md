@@ -1,7 +1,7 @@
 # Data Integrity & Workflow-Streamlining Brief v1
 
-**Status:** design agreed, not yet built. Hand-off spec for implementation.
-**Branch:** `claude/data-integrity-workflows-y84d4s`
+**Status:** built. All of Phase A and Phase B (§6) implemented on `claude/data-integrity-brief-sh4d8d`. Changelog entry: `docs/Data_Model_Architecture_Proposal_v3.md` §16.
+**Branch:** `claude/data-integrity-workflows-y84d4s` (design); built on `claude/data-integrity-brief-sh4d8d`
 **Goal:** reduce the number of places a user has to *remember* to keep tables aligned. Two mechanisms: (A) capture data at the point of entry the user is already on, and (B) surface derived nudges computed from record state at app launch. Nothing here auto-mutates records — every derived prompt is a user-confirmed action.
 
 ---

@@ -148,6 +148,15 @@ export const STUD_SERVICE_STATUS = [
   { value: 'cancelled', label: 'Cancelled', badge: 'badge-gray' }
 ];
 
+// Was this a physical stay or a shipment? Sibling to `direction`. The fine-
+// grained method (natural / ai_chilled / …) already lives on the linked Pairing
+// (pairing_id), so the stud record only needs the coarse in-person/AI split —
+// enough to tell the away-board whether a dog physically travelled.
+export const STUD_SERVICE_TYPE = [
+  { value: 'in_person', label: 'In person', badge: 'badge-green' },
+  { value: 'ai',        label: 'AI / shipped', badge: 'badge-neutral' }
+];
+
 // Look up the {value,label,badge} descriptor for a value in a vocab list.
 export function descriptor(vocab, value) {
   return vocab.find((v) => v.value === value) || { value, label: value ?? '—', badge: 'badge-gray' };

@@ -5,7 +5,7 @@
 // pre-filled. call_name and sex are the only per-puppy fields prompted, matching
 // Dog's "required to save" list; everything else is edited later on Dog Detail.
 import { dogRepo } from '../data/dogRepo.js';
-import { SEX } from '../data/vocab.js';
+import { SEX, DISPOSITION } from '../data/vocab.js';
 import { esc } from './ui.js';
 
 // Fields carried from the litter onto each new puppy record.
@@ -22,6 +22,10 @@ function baseFromLitter(litter, dam) {
 
 function sexOptions(current) {
   return SEX.map((s) => `<option value="${esc(s.value)}"${s.value === current ? ' selected' : ''}>${esc(s.label)}</option>`).join('');
+}
+
+function dispositionOptions(current) {
+  return DISPOSITION.map((d) => `<option value="${esc(d.value)}"${d.value === current ? ' selected' : ''}>${esc(d.label)}</option>`).join('');
 }
 
 function modalShell(titleText) {
@@ -63,6 +67,8 @@ export function openAddPuppyForm({ litter, dam, onSaved }) {
         <input id="pf-call_name" type="text" placeholder="e.g. Green collar"></div>
       <div class="field"><label>Sex <span class="req">*</span></label>
         <select id="pf-sex">${sexOptions('unknown')}</select></div>
+      <div class="field"><label>Disposition</label>
+        <select id="pf-disposition">${dispositionOptions('undecided')}</select></div>
     </div>
     <div id="pf-error"></div>
     <div class="form-actions">
@@ -76,12 +82,13 @@ export function openAddPuppyForm({ litter, dam, onSaved }) {
   async function save(openAfter) {
     const call_name = modal.querySelector('#pf-call_name').value.trim();
     const sex = modal.querySelector('#pf-sex').value;
+    const disposition = modal.querySelector('#pf-disposition').value;
     if (!call_name) {
       modal.querySelector('#pf-error').innerHTML = `<div class="inline-error">Call name is required.</div>`;
       return;
     }
     try {
-      const puppy = await dogRepo.create({ ...base, call_name, sex });
+      const puppy = await dogRepo.create({ ...base, call_name, sex, disposition });
       close();
       if (openAfter) { location.href = `dog.html?id=${encodeURIComponent(puppy.id)}`; return; }
       onSaved?.(puppy);
@@ -118,6 +125,8 @@ export function openAddPuppiesForm({ litter, dam, existingCount = 0, onSaved }) 
     <div class="form-grid">
       <div class="field"><label>How many? <span class="req">*</span></label>
         <input id="pf-count" type="number" min="1" max="20" value="4"></div>
+      <div class="field"><label>Disposition (applies to all)</label>
+        <select id="pf-disposition">${dispositionOptions('undecided')}</select></div>
     </div>
     <div id="pf-error"></div>
     <div class="form-actions">
@@ -129,6 +138,7 @@ export function openAddPuppiesForm({ litter, dam, existingCount = 0, onSaved }) 
 
   modal.querySelector('[data-act="save"]').addEventListener('click', async () => {
     const n = Number(modal.querySelector('#pf-count').value);
+    const disposition = modal.querySelector('#pf-disposition').value;
     if (!Number.isInteger(n) || n < 1 || n > 20) {
       modal.querySelector('#pf-error').innerHTML = `<div class="inline-error">Enter a whole number from 1 to 20.</div>`;
       return;
@@ -136,7 +146,7 @@ export function openAddPuppiesForm({ litter, dam, existingCount = 0, onSaved }) 
     try {
       // Number the placeholders continuing past any puppies already on the roster.
       for (let i = 0; i < n; i++) {
-        await dogRepo.create({ ...base, call_name: `Puppy ${existingCount + i + 1}`, sex: 'unknown' });
+        await dogRepo.create({ ...base, call_name: `Puppy ${existingCount + i + 1}`, sex: 'unknown', disposition });
       }
       close();
       onSaved?.();

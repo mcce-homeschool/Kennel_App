@@ -8,6 +8,7 @@ import { contactRepo } from '../data/contactRepo.js';
 import { PLACEMENT_TYPE, SALE_STATUS, CONTRACT_TYPE, CONTRACT_STATUS } from '../data/vocab.js';
 import { esc, badge, fmtDate, todayYMD, param, confirmAction } from '../assets/ui.js';
 import { openEventForm } from '../assets/eventForm.js';
+import { attachNewContactButton } from '../assets/contactPicker.js';
 
 // Statuses that warrant the "log a scheduled pickup" prompt (Stage4.5 Addendum §D4).
 const PLACEMENT_PROMPT_STATUSES = ['paid_in_full', 'delivered'];
@@ -150,6 +151,12 @@ function renderEdit() {
       ctx.draft.lead_source = c.first_contact_source;
     }
     renderEdit();
+  });
+  attachNewContactButton(document.getElementById('f-buyer_contact_id'), {
+    onCreated: (contact) => {
+      ctx.allContacts.push(contact);
+      ctx.contactsById.set(contact.id, contact);
+    }
   });
 }
 
