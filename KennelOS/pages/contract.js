@@ -3,7 +3,7 @@
 // Owns all three canonical links (related_sale_id, related_stud_service_id,
 // related_dog_id); linking is a plain field on this record, never a two-way
 // sync (Stage4 Revision v2 §5).
-import { contractRepo, DOG_LINK_TYPES, ReferenceBlockedError } from '../data/contractRepo.js';
+import { contractRepo, DOG_LINK_TYPES, CONTACT_LINK_TYPES, ReferenceBlockedError } from '../data/contractRepo.js';
 import { saleRepo } from '../data/saleRepo.js';
 import { studServiceRepo } from '../data/studServiceRepo.js';
 import { dogRepo } from '../data/dogRepo.js';
@@ -22,6 +22,7 @@ const els = {
 
 const blankContract = () => ({
   contract_type: '', status: 'draft', related_sale_id: '', related_stud_service_id: '', related_dog_id: '',
+  related_contact_id: '', document_url: '',
   title: '', signed_date: '', lease_start_date: '', lease_end_date: '', terms_summary: '', notes: ''
 });
 
@@ -88,6 +89,15 @@ function dogOptions(current) {
   return `<option value="">— none —</option>` + opts;
 }
 
+function contactOptions(current) {
+  const opts = [...ctx.contactsById.values()]
+    .filter((c) => !c.is_archived || c.id === current)
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true }))
+    .map((c) => `<option value="${esc(c.id)}"${c.id === current ? ' selected' : ''}>${esc(c.name)}${c.is_archived ? ' (archived)' : ''}</option>`)
+    .join('');
+  return `<option value="">— none —</option>` + opts;
+}
+
 // --- Read-only view --------------------------------------------------------
 function row(label, valueHtml) {
   return `<dt>${esc(label)}</dt><dd>${valueHtml || '<span class="faint">—</span>'}</dd>`;
@@ -98,6 +108,7 @@ function renderView() {
   const sale = ctx.allSales.find((s) => s.id === c.related_sale_id);
   const ss = ctx.allStudServices.find((s) => s.id === c.related_stud_service_id);
   const dog = ctx.dogsById.get(c.related_dog_id);
+  const contact = ctx.contactsById.get(c.related_contact_id);
   els.body.innerHTML = `
     <dl class="dl-meta" style="margin-top:14px;">
       ${row('Title', esc(c.title))}
@@ -107,8 +118,10 @@ function renderView() {
       ${c.contract_type === 'lease' ? row('Lease start', c.lease_start_date ? esc(fmtDate(c.lease_start_date)) : '') : ''}
       ${c.contract_type === 'lease' ? row('Lease end', c.lease_end_date ? esc(fmtDate(c.lease_end_date)) : '') : ''}
       ${DOG_LINK_TYPES.includes(c.contract_type) ? row('Related dog', dog ? `<a href="dog.html?id=${encodeURIComponent(dog.id)}">${esc(dogName(dog.id))}</a>` : '') : ''}
+      ${CONTACT_LINK_TYPES.includes(c.contract_type) ? row('Counterparty', contact ? `<a href="contact.html?id=${encodeURIComponent(contact.id)}">${esc(contactName(contact.id))}</a>` : '') : ''}
       ${c.contract_type !== 'lease' ? row('Related sale', sale ? `<a href="sale.html?id=${encodeURIComponent(sale.id)}">${esc(saleLabel(sale))}</a>` : '') : ''}
       ${c.contract_type !== 'lease' ? row('Related stud service', ss ? `<a href="stud-service.html?id=${encodeURIComponent(ss.id)}">${esc(studServiceLabel(ss))}</a>` : '') : ''}
+      ${row('Document link', c.document_url ? `<a href="${esc(c.document_url)}" target="_blank" rel="noopener noreferrer">${esc(c.document_url)}</a>` : '')}
       ${row('Terms summary', c.terms_summary ? esc(c.terms_summary).replace(/\n/g, '<br>') : '')}
       ${row('Notes', c.notes ? esc(c.notes).replace(/\n/g, '<br>') : '')}
     </dl>`;
@@ -134,8 +147,10 @@ function renderEdit() {
       ${c.contract_type === 'lease' ? field('Lease start', `<input id="f-lease_start_date" type="date" value="${esc(c.lease_start_date)}">`) : ''}
       ${c.contract_type === 'lease' ? field('Lease end', `<input id="f-lease_end_date" type="date" value="${esc(c.lease_end_date)}">`) : ''}
       ${DOG_LINK_TYPES.includes(c.contract_type) ? field('Related dog', `<select id="f-related_dog_id">${dogOptions(c.related_dog_id)}</select>`, { hint: 'The dog this contract is about.' }) : ''}
+      ${CONTACT_LINK_TYPES.includes(c.contract_type) ? field('Counterparty', `<select id="f-related_contact_id">${contactOptions(c.related_contact_id)}</select>`, { hint: 'The other party (lessee, co-owner, partner). Scopes this contract into their companion bundle.' }) : ''}
       ${c.contract_type !== 'lease' ? field('Related sale', `<select id="f-related_sale_id">${saleOptions(c.related_sale_id)}</select>`) : ''}
       ${c.contract_type !== 'lease' ? field('Related stud service', `<select id="f-related_stud_service_id">${studServiceOptions(c.related_stud_service_id)}</select>`) : ''}
+      ${field('Document link', `<input id="f-document_url" type="url" value="${esc(c.document_url || '')}" placeholder="https://…">`, { hint: 'Share link to the signed document (e.g. a Google Drive "anyone with the link" URL). Carried as a pointer into the buyer bundle.' })}
       ${field('Terms summary', `<textarea id="f-terms_summary">${esc(c.terms_summary)}</textarea>`, { wide: true })}
       ${field('Notes', `<textarea id="f-notes">${esc(c.notes)}</textarea>`, { wide: true })}
     </div>
@@ -175,9 +190,14 @@ function readForm() {
     // selection. contractRepo normalizes it to null on save if the final type
     // doesn't call for it.
     related_dog_id: document.getElementById('f-related_dog_id') ? (val('f-related_dog_id') || null) : (ctx.draft.related_dog_id || null),
+    // Same hidden-field fallback as related_dog_id: the counterparty select only
+    // exists in the DOM for CONTACT_LINK_TYPES. contractRepo normalizes it to null
+    // on save when the final type doesn't call for it.
+    related_contact_id: document.getElementById('f-related_contact_id') ? (val('f-related_contact_id') || null) : (ctx.draft.related_contact_id || null),
     // Related sale and stud service fields are hidden for lease contracts
     related_sale_id: document.getElementById('f-related_sale_id') ? (val('f-related_sale_id') || null) : (ctx.draft.related_sale_id || null),
     related_stud_service_id: document.getElementById('f-related_stud_service_id') ? (val('f-related_stud_service_id') || null) : (ctx.draft.related_stud_service_id || null),
+    document_url: val('f-document_url').trim(),
     terms_summary: val('f-terms_summary'),
     notes: val('f-notes')
   };

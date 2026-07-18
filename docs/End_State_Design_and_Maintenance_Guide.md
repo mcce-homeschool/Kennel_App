@@ -110,13 +110,13 @@ and commonly blank at entry time.
 | Entity | Required | Notable other fields |
 |---|---|---|
 | **Dog** | `call_name`, `sex`, `breed`, `ownership_type`, `status` | `registered_name`, `date_of_birth`, `date_of_death`, `sire_id`, `dam_id`, `litter_id`, `breeder_kennel_id` (the kennel that *produced* this dog — own or an outside contact's; distinct from `kennel_id` below, which of the user's own kennels it belongs to *now*; auto-prefilled from the litter's dam's own `kennel_id` when that dam is owned/co-owned), `owner_contact_id`, `co_owner_contact_ids[]`, `kennel_id`, `color_markings`, `registry`, `registration_number`, `microchip_id`, `planned_tests[]`, `recorded_coi{value,method,source,as_of_date}`, `disposition` (`undecided`/`keeping`/`available`/`placed` — breeder intent, orthogonal to `status`; feeds the Today "Available puppies" feed and the promote-lifecycle nudge, §19), `notes`. Owner required when `ownership_type ∈ {external, leased_in}`. |
-| **Contact** | `name` | `contact_type[]` (multi), `email`, `phone`, `address`, `kennel_id`, `waitlist_status`, `first_contact_source`, `notes`. Buyers are Contacts — **there is no Buyer table**. `address` also resolves an in-person stud service's away-board location (§19). |
+| **Contact** | `name` | `contact_type[]` (multi), `email`, `phone`, `address`, `kennel_id`, `waitlist_status`, `first_contact_source`, `notes`, `companion_note` (plain, unindexed — a per-recipient message **meant for the recipient's eyes**, shown on their companion share page; deliberately distinct from the private `notes`; the Companion feature's Layer-2 override of the per-type announcement, §20). Buyers are Contacts — **there is no Buyer table**. `address` also resolves an in-person stud service's away-board location (§19). |
 | **Kennel** | `kennel_name` | `is_own_kennel`, `preferred_tests[]`, `preferred_breeds[]`, `promote_nudge_enabled` (bool, default off), `promote_age_male_months`/`promote_age_female_months` (numbers — the promote-lifecycle nudge's per-kennel thresholds, §19). Lightweight; added inline from Contact form. |
 | **Pairing** | `sire_id`, `dam_id`, `pairing_type`, `status` | `method`, `planned_date`, `expected_due_date`, `notes`. Sire ≠ dam (hard block). |
 | **Litter** | `dam_id`, `sire_id`, `status` | `pairing_id`, `whelp_date`, `litter_registration_number`, `puppies_born_total/alive/deceased`, `notes`. Litter's own sire/dam are authoritative. Puppy roster is **derived** (`Dog WHERE litter_id`). |
 | **Sale** | `dog_id`, `buyer_contact_id`, `placement_type`, `status` | `sale_date`, `price`, `deposit_amount`, `deposit_date`, `balance_paid_date`, `lead_source`, `notes`. Its own table (not a Dog field) so reserve/return/re-place stay distinct facts. |
-| **Contract** | `contract_type` | `status` (defaults `draft`), `related_sale_id`, `related_stud_service_id`, `related_dog_id` (canonical Dog link, used only for `lease`/`co_own`/`other` types — where no linked Sale/StudService already reaches a dog; forced `null` for other types via `contractRepo.DOG_LINK_TYPES`/`normalizeDogLink`), `signed_date`, `lease_start_date`/`lease_end_date` (lease type; UI shows them and hides Related sale/stud fields when `contract_type='lease'`), `title`, `terms_summary`, `notes`. Generic across sale/stud/co-ownership/lease. Leaf for referential integrity (nothing points *at* a contract), but a contract itself points *at* its Dog via `related_dog_id` — that FK is guarded under `DOG_REFERENCES`, not `CONTRACT_REFERENCES`. |
-| **StudService** | `direction`, `our_dog_id`, `partner_dog_id`, `partner_contact_id`, `status` | `pairing_id`, `fee_amount`, `fee_structure`, `result_notes`, `type` (`in_person`/`ai` — coarse physical-travel flag; `in_person` + `sent_date`/`returned_date` window feeds the away-board, §19), plus optional logistics dates. Covers both `incoming` and `outgoing`. |
+| **Contract** | `contract_type` | `status` (defaults `draft`), `related_sale_id`, `related_stud_service_id`, `related_dog_id` (canonical Dog link, used only for `lease`/`co_own`/`other` types — where no linked Sale/StudService already reaches a dog; forced `null` for other types via `contractRepo.DOG_LINK_TYPES`/`normalizeLinks`), `related_contact_id` (canonical counterparty link — lessee/co-owner/partner — for the same `lease`/`co_own`/`other` types via `CONTACT_LINK_TYPES`; sale/stud contracts reach their counterparty through the linked Sale/StudService, so it stays `null` there and never double-sources; scopes a contract into the **partner** companion bundle, §20), `document_url` (plain, unindexed — a share link to the signed document, e.g. a Drive "anyone with the link" URL; carried as a *pointer* into the buyer bundle, §20), `signed_date`, `lease_start_date`/`lease_end_date` (lease type; UI shows them and hides Related sale/stud fields when `contract_type='lease'`), `title`, `terms_summary`, `notes`. Generic across sale/stud/co-ownership/lease. Leaf for its own hard-delete (nothing points *at* a contract), but a contract itself points *at* its Dog via `related_dog_id` (guarded under `DOG_REFERENCES`) and its counterparty via `related_contact_id` (guarded under `CONTACT_REFERENCES`) — neither under `CONTRACT_REFERENCES`. |
+| **StudService** | `direction`, `our_dog_id`, `partner_dog_id`, `partner_contact_id`, `status` | `pairing_id`, `fee_amount`, `fee_structure`, `pick_status` (plain, unindexed — suggested `pending`/`claimed`, free text allowed; meaningful **only** when `fee_structure ∈ {pick_of_litter, flat_plus_pick}`, forced `null` otherwise so a `flat_fee`/`other` arrangement never shows a stray pick; feeds the partner companion bundle's compensation, §20), `result_notes`, `type` (`in_person`/`ai` — coarse physical-travel flag; `in_person` + `sent_date`/`returned_date` window feeds the away-board, §19), plus optional logistics dates. Covers both `incoming` and `outgoing`. |
 | **Event** | `subject_type`, `subject_id`, `event_type`, `event_date`, `title` | `event_end_date`, `reminder_date`, `reminder_dismissed`, `related_dog_id`, `related_contact_id`, `details{}`, `cost`, `notes`. See §8. |
 
 ### 4.2 Relationship direction — the sixth design principle
@@ -129,11 +129,12 @@ derived query, never a second stored pointer.** This is why:
 - StudService→Pairing is stored as `StudService.pairing_id` (mirrors the litter
   link); `studServiceRepo.getByPairing` is the reverse. There is no
   `Pairing.stud_service_id`.
-- Contract→Sale / Contract→StudService / Contract→Dog are stored on the Contract
-  (`related_sale_id`, `related_stud_service_id`, `related_dog_id` — the last for
-  `lease`/`co_own`/`other` contracts, the types with no linked Sale/StudService to
-  reach a dog through). Sales/stud-services/dogs carry no contract pointer;
-  `contractRepo.getBySale`/`getByStudService`/`getByDog` are the reverse.
+- Contract→Sale / Contract→StudService / Contract→Dog / Contract→Contact are stored
+  on the Contract (`related_sale_id`, `related_stud_service_id`, `related_dog_id`,
+  `related_contact_id` — the last two for `lease`/`co_own`/`other` contracts, the
+  types with no linked Sale/StudService to reach a dog or counterparty through).
+  Sales/stud-services/dogs/contacts carry no contract pointer;
+  `contractRepo.getBySale`/`getByStudService`/`getByDog`/`getByContact` are the reverse.
 - A Dog's children, a Contact's dogs, a Kennel's contacts — all derived queries over
   the indexed FK, never stored back-pointers.
 
@@ -165,7 +166,7 @@ pairings:      id, sire_id, dam_id, status, pairing_type, is_archived
 litters:       id, pairing_id, sire_id, dam_id, status, whelp_date, is_archived
 sales:         id, dog_id, buyer_contact_id, status, placement_type, is_archived
 contracts:     id, contract_type, status, related_sale_id,
-               related_stud_service_id, related_dog_id, is_archived
+               related_stud_service_id, related_dog_id, related_contact_id, is_archived
 stud_services: id, our_dog_id, partner_dog_id, partner_contact_id, direction,
                status, pairing_id, is_archived
 ```
@@ -237,7 +238,11 @@ Hard delete is the rare "undo a data-entry mistake" action; **soft delete (archi
 is the normal remove and never cascades**.
 
 - Each entity has a declared array of every FK that can point at it
-  (`DOG_REFERENCES`, `CONTACT_REFERENCES`, …). `Contract` is a leaf (empty array).
+  (`DOG_REFERENCES`, `CONTACT_REFERENCES`, …). `CONTACT_REFERENCES` now includes
+  `contracts.related_contact_id` (a lease/co_own/other contract's counterparty), so
+  a contact documented on a contract can't be hard-deleted out from under it.
+  `Contract` is itself a leaf (empty `CONTRACT_REFERENCES` — nothing points *at* a
+  contract).
 - `findBlockingReferences(registry, id)` counts matching rows per entry and returns
   human-readable `{label, count}` blockers. `hardDelete` throws
   `ReferenceBlockedError` if any exist.
