@@ -113,7 +113,7 @@ and commonly blank at entry time.
 
 | Entity | Required | Notable other fields |
 |---|---|---|
-| **Dog** | `call_name`, `sex`, `breed`, `ownership_type`, `status` | `registered_name`, `date_of_birth`, `date_of_death`, `sire_id`, `dam_id`, `litter_id`, `breeder_kennel_id` (the kennel that *produced* this dog — own or an outside contact's; distinct from `kennel_id` below, which of the user's own kennels it belongs to *now*; auto-prefilled from the litter's dam's own `kennel_id` when that dam is owned/co-owned), `owner_contact_id`, `co_owner_contact_ids[]`, `kennel_id`, `color_markings`, `registry`, `registration_number`, `microchip_id`, `planned_tests[]`, `recorded_coi{value,method,source,as_of_date}`, `disposition` (`undecided`/`keeping`/`available`/`placed` — breeder intent, orthogonal to `status`; feeds the Today "Available puppies" feed and the promote-lifecycle nudge, §19), `notes`. Owner required when `ownership_type ∈ {external, leased_in}`. |
+| **Dog** | `call_name`, `sex`, `breed`, `ownership_type`, `status` | `registered_name`, `date_of_birth`, `date_of_death`, `sire_id`, `dam_id`, `litter_id`, `breeder_kennel_id` (the kennel that *produced* this dog — own or an outside contact's; distinct from `kennel_id` below, which of the user's own kennels it belongs to *now*; auto-prefilled from the litter's dam's own `kennel_id` when that dam is owned/co-owned), `owner_contact_id`, `co_owner_contact_ids[]`, `kennel_id`, `color_markings`, `registry`, `registration_number`, `microchip_id`, `url` (plain, unindexed — a link for this dog, e.g. a registry page or listing), `planned_tests[]`, `recorded_coi{value,method,source,as_of_date}`, `disposition` (`undecided`/`keeping`/`available`/`placed` — breeder intent, orthogonal to `status`; feeds the Today "Available puppies" feed and the promote-lifecycle nudge, §19), `notes`. Owner required when `ownership_type ∈ {external, leased_in}`. |
 | **Contact** | `name` | `contact_type[]` (multi), `email`, `phone`, `address`, `kennel_id`, `waitlist_status`, `first_contact_source`, `notes`, `companion_note` (plain, unindexed — a per-recipient message **meant for the recipient's eyes**, shown on their companion share page; deliberately distinct from the private `notes`; the Companion feature's Layer-2 override of the per-type announcement, §20). Buyers are Contacts — **there is no Buyer table**. `address` also resolves an in-person stud service's away-board location (§19). |
 | **Kennel** | `kennel_name` | `is_own_kennel`, `preferred_tests[]`, `preferred_breeds[]`, `promote_nudge_enabled` (bool, default off), `promote_age_male_months`/`promote_age_female_months` (numbers — the promote-lifecycle nudge's per-kennel thresholds, §19). Lightweight; added inline from Contact form. |
 | **Pairing** | `sire_id`, `dam_id`, `pairing_type`, `status` | `method`, `planned_date` (displayed as "Planned first date" — the first planned/tie date), `last_observed_date` (plain, unindexed — a subsequent observed tie/breeding date), `expected_due_date` (prefilled on the detail page as 63 days after `planned_date` when still empty, never clobbering a deliberate edit), `notes`. Sire ≠ dam (hard block). |
@@ -306,9 +306,21 @@ One polymorphic table for all dated history. `subject_type ∈ {dog, pairing, li
 - `badge` — colour class.
 - `fields[]` — the small type-specific form written into `details{}`. Field types:
   `text`, `textarea`, `number` (optional `step`, e.g. for a decimal-accepting field),
-  `date`, `combobox` (suggest-not-enforce), `select` (enforced, options[] only).
+  `date`, `combobox` (suggest-not-enforce), `select` (enforced, options[] only),
+  `currency_per_frequency` (a decimal amount input + a `select`, rendered on one
+  line as "amount **per** frequency"; needs `frequencyKey` + `frequencyOptions`
+  alongside the usual `key`/`label` — see `placement`'s `deferred_boarding_amount`/
+  `deferred_boarding_frequency` below).
 - `relatedContact: true` — surfaces the top-level `related_contact_id` FK (boarding,
   placement). Contacts on events are the canonical FK, never a `details` value.
+
+**Placement specifics:** `dropoff_method` (`select`, enforced choice from
+`PLACEMENT_METHODS` — Flight nanny / Ground transport / Local pickup / Other) sits
+first in the form, directly above `placement_time`. `deferred_boarding_amount` /
+`deferred_boarding_frequency` (`BOARDING_FREQUENCY_OPTIONS` — Day / Week / Month) is
+a plain rate the breeder is recording, same decimal-money posture as every other
+currency field in the app (**never cents** — see the Financials/money note in §21)
+— it never writes to the Expense ledger; that's the separate top-level Cost field.
 
 Test-bearing types (`genetic_test`, `breed_specific_test`, `ofa_pennhip`) feed the
 shared test vocabulary; `testTokensOf(event)` derives the test-name token(s).
@@ -802,7 +814,9 @@ overhead (facility, bulk food, registration dues, marketing) lives on
 `subject_type='kennel'`; there is deliberately **no `general` subject** — program
 overhead is logged against your own kennel, so there is never a null `subject_id`.
 Revenue is **not** here (it stays on `Sale.price`/`deposit_amount` and
-`StudService.fee_amount`); this table is costs only.
+`StudService.fee_amount`); this table is costs only. **Every money field in the app
+is a plain decimal — never cents** (`companionExport.js` states this explicitly:
+"Money is the app's native decimal, never cents — the shell formats it").
 
 ### The event↔cost link (one canonical direction)
 
