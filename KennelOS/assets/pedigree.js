@@ -116,6 +116,37 @@ export async function renderPedigree({ mount, rootId, generations = 3, onNavigat
     return `<div class="ped-pos" style="left:${cx(n)}px;top:${top}px;">${nodeHtml(n)}</div>`;
   }).join('');
 
+  // Build offspring section
+  const offspring = dogs.filter((d) => d.sire_id === rootId || d.dam_id === rootId).sort((a, b) => (b.date_of_birth || '') - (a.date_of_birth || ''));
+  const offspringByLitter = new Map();
+  for (const pup of offspring) {
+    const litterId = pup.litter_id || 'no-litter';
+    if (!offspringByLitter.has(litterId)) offspringByLitter.set(litterId, []);
+    offspringByLitter.get(litterId).push(pup);
+  }
+
+  let offspringHtml = '';
+  if (offspring.length > 0) {
+    offspringHtml = '<div style="margin-top: 24px; border-top: 1px solid var(--border); padding-top: 16px;"><h3 style="margin: 0 0 12px 0;">Offspring</h3>';
+    for (const [litterId, pups] of offspringByLitter) {
+      offspringHtml += '<div style="margin-bottom: 12px;">';
+      for (const pup of pups) {
+        const otherParentId = pup.sire_id === rootId ? pup.dam_id : pup.sire_id;
+        const otherParent = otherParentId ? byId.get(otherParentId) : null;
+        const role = pup.sire_id === rootId ? 'Sire' : 'Dam';
+        const otherParentName = otherParent ? esc(otherParent.call_name || '(unnamed)') : '[Unknown parent]';
+        const dob = pup.date_of_birth ? fmtDate(pup.date_of_birth) : '';
+        offspringHtml += `<div style="display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border-subtle);">
+          <span style="font-size: 14px; color: var(--text-muted);">× ${otherParentName} (${role})</span>
+          <a href="#" class="ped-pup-nav" data-pup-id="${esc(pup.id)}" style="font-weight: 500; color: var(--link-color); text-decoration: none; cursor: pointer;">${esc(pup.call_name || '(unnamed)')}</a>
+          ${dob ? `<span style="font-size: 14px; color: var(--text-muted); margin-left: auto;">${esc(dob)}</span>` : ''}
+        </div>`;
+      }
+      offspringHtml += '</div>';
+    }
+    offspringHtml += '</div>';
+  }
+
   mount.innerHTML = `
     <div class="ped-scroll">
       <div class="ped-canvas" style="width:${width}px;height:${height}px;">
@@ -124,12 +155,22 @@ export async function renderPedigree({ mount, rootId, generations = 3, onNavigat
         </svg>
         ${nodesHtml}
       </div>
-    </div>`;
+    </div>
+    ${offspringHtml}`;
 
   mount.querySelectorAll('[data-nav]').forEach((a) => {
     a.addEventListener('click', (e) => {
       e.preventDefault();
       const id = a.dataset.nav;
+      if (onNavigate) onNavigate(id);
+      else location.href = `pedigree.html?id=${encodeURIComponent(id)}`;
+    });
+  });
+
+  mount.querySelectorAll('[data-pup-id]').forEach((a) => {
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      const id = a.dataset.pupId;
       if (onNavigate) onNavigate(id);
       else location.href = `pedigree.html?id=${encodeURIComponent(id)}`;
     });

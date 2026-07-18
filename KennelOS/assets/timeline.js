@@ -1,4 +1,4 @@
-// timeline.js — renders a subject's Health Timeline (Event list, newest first)
+// timeline.js — renders a subject's Event History (Event list, newest first)
 // with add/edit/archive/delete. Reused for dogs now; pairings/litters later.
 import { HistoryEvent } from '../data/eventRepo.js';
 import { contactRepo } from '../data/contactRepo.js';
@@ -20,22 +20,27 @@ function detailsSummary(ev) {
 }
 
 export function renderTimeline(opts) {
-  // `title` lets non-dog subjects relabel the panel (dogs keep "Health Timeline";
+  // `title` lets non-dog subjects relabel the panel (dogs keep "Event History";
   // pairings/litters use plain "Timeline"). Everything else is subject-agnostic —
   // the add/edit form already filters event types by subject_type via the catalog.
-  const { mount, subjectType, subjectId, title = 'Health Timeline' } = opts;
+  const { mount, subjectType, subjectId, title = 'Event History' } = opts;
   let showArchived = false;
 
   mount.innerHTML = `
     <section class="card" style="margin-top:16px;">
       <div class="row-between">
-        <h2 style="margin:0;">${esc(title)}</h2>
-        <div class="pill-row">
+        <div class="collapsible-header" style="flex: 1; display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;" data-toggle="tl-toggle">
+          <span class="collapsible-arrow" style="transform: rotate(90deg); display: inline-block; transition: transform 0.2s; font-size: 12px;">▶</span>
+          <h2 style="margin:0;">${esc(title)}</h2>
+        </div>
+        <div id="tl-toggle-actions" class="pill-row">
           <label class="check-inline"><input type="checkbox" id="tl-archived"> Show archived</label>
           <button class="btn btn-primary btn-sm" id="tl-add">+ Add Event</button>
         </div>
       </div>
-      <div id="tl-body" style="margin-top:14px;"></div>
+      <div class="collapsible-content" id="tl-toggle-content" style="display: block; margin-top:12px;">
+        <div id="tl-body"></div>
+      </div>
     </section>`;
 
   const body = mount.querySelector('#tl-body');
@@ -110,6 +115,25 @@ export function renderTimeline(opts) {
     showArchived = e.target.checked;
     refresh();
   });
+
+  // Collapsible functionality
+  const header = mount.querySelector('[data-toggle="tl-toggle"]');
+  const content = mount.querySelector('#tl-toggle-content');
+  const arrow = header?.querySelector('.collapsible-arrow');
+  let isExpanded = true;
+
+  if (header) {
+    header.addEventListener('click', () => {
+      isExpanded = !isExpanded;
+      if (isExpanded) {
+        content.style.display = 'block';
+        if (arrow) arrow.style.transform = 'rotate(90deg)';
+      } else {
+        content.style.display = 'none';
+        if (arrow) arrow.style.transform = 'rotate(0deg)';
+      }
+    });
+  }
 
   refresh();
 }

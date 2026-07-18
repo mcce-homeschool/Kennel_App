@@ -538,7 +538,7 @@ function renderTitle() {
   els.subtitle.innerHTML = d.registered_name ? esc(d.registered_name) : '';
 }
 
-// Health Timeline only makes sense for a saved dog; hide it while creating/editing
+// Event History only makes sense for a saved dog; hide it while creating/editing
 // the profile so events can't be logged against an unsaved record.
 function renderTimelineSection() {
   if (!els.timeline) return;
@@ -630,7 +630,7 @@ async function renderRecordedCoiSection() {
 // interpretation, no clear/carrier/affected → offspring inference (that needs
 // structured locus data the app doesn't model — door left open in §11). This is
 // the "genetic analysis" of Stage 5: surfacing what was recorded, nothing more.
-// Editing/adding these events stays in the Health Timeline below.
+// Editing/adding these events stays in the Event History below.
 const HEALTH_TEST_TYPES = ['genetic_test', 'ofa_pennhip', 'breed_specific_test'];
 async function renderHealthTestsSection() {
   if (!els.healthTests) return;
@@ -659,7 +659,7 @@ async function renderHealthTestsSection() {
     : `<p class="muted" style="margin:14px 0 0;">No health-test events recorded yet.</p>`;
 
   const bodyHtml = `
-    <p class="field-hint">Recorded genetic, OFA/PennHIP, and breed-specific test results for this dog — a read-only view of what's been logged. Add or edit these in the Health Timeline below.</p>
+    <p class="field-hint">Recorded genetic, OFA/PennHIP, and breed-specific test results for this dog — a read-only view of what's been logged. Add or edit these in the Event History below.</p>
     ${rowsHtml}`;
 
   const hasContent = tests.length > 0;
