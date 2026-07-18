@@ -5,6 +5,7 @@
 // superset — real data included, no reference guard, since nothing survives).
 import { db, existingTableNames } from './db.js';
 import { clearAllSettings } from './settings.js';
+import { clearAll as clearNudgeDismissals } from './nudgeState.js';
 
 // Live counts for the confirmation UI, across whatever tables exist at the
 // current stage (stays correct as later stages add tables).
@@ -23,4 +24,5 @@ export async function resetApp() {
     for (const name of names) await db.table(name).clear();
   });
   clearAllSettings();
+  clearNudgeDismissals();
 }

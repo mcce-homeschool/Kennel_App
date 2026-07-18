@@ -82,6 +82,17 @@ function applyToDogsPanel(k) {
   </div>`;
 }
 
+// Lifecycle nudges (Data Integrity Brief §3.2) — opt-in, per-kennel. Only
+// meaningful for own kennels (promote-to-breeding is about our own puppies),
+// same gating as the preferred-tests panel above.
+function lifecycleNudgeFields(k) {
+  if (!k.is_own_kennel) return '';
+  return `
+    <div class="field field-wide"><label class="check-inline"><input id="e-promote-enabled" type="checkbox"${k.promote_nudge_enabled ? ' checked' : ''}> Nudge me to promote kept puppies to active breeding once they're old enough</label></div>
+    <div class="field"><label>Promote age — males (months)</label><input id="e-promote-male" type="number" min="0" step="1" value="${esc(k.promote_age_male_months ?? 6)}"></div>
+    <div class="field"><label>Promote age — females (months)</label><input id="e-promote-female" type="number" min="0" step="1" value="${esc(k.promote_age_female_months ?? 12)}"></div>`;
+}
+
 function editRow(k) {
   return `<tr>
     <td colspan="4">
@@ -90,6 +101,8 @@ function editRow(k) {
         <div class="field"><label>Prefix</label><input id="e-prefix" type="text" value="${esc(k.prefix || '')}"></div>
         <div class="field"><label>Location</label><input id="e-location" type="text" value="${esc(k.location || '')}"></div>
         <div class="field field-wide"><label class="check-inline"><input id="e-own" type="checkbox"${k.is_own_kennel ? ' checked' : ''}> This is one of my own kennels</label></div>
+        ${k.is_own_kennel ? `<div class="field field-wide"><h3 style="margin:8px 0 0;">Lifecycle nudges</h3></div>` : ''}
+        ${lifecycleNudgeFields(k)}
       </div>
       <div class="form-actions">
         <button class="btn btn-primary btn-sm" data-act="save" data-id="${esc(k.id)}">Save</button>
@@ -211,8 +224,15 @@ async function saveEdit(kennel) {
   const prefix = document.getElementById('e-prefix').value.trim();
   const location = document.getElementById('e-location').value.trim();
   const is_own_kennel = document.getElementById('e-own').checked;
+  const changes = { kennel_name, prefix, location, is_own_kennel };
+  const promoteEnabledEl = document.getElementById('e-promote-enabled');
+  if (promoteEnabledEl) {
+    changes.promote_nudge_enabled = promoteEnabledEl.checked;
+    changes.promote_age_male_months = Number(document.getElementById('e-promote-male').value) || 0;
+    changes.promote_age_female_months = Number(document.getElementById('e-promote-female').value) || 0;
+  }
   try {
-    await kennelRepo.update(kennel.id, { kennel_name, prefix, location, is_own_kennel });
+    await kennelRepo.update(kennel.id, changes);
     editingId = null;
     render();
   } catch (e) {

@@ -13,6 +13,7 @@ import { litterRepo } from '../data/litterRepo.js';
 import { dogRepo } from '../data/dogRepo.js';
 import { PAIRING_STATUS, PAIRING_TYPE, LITTER_STATUS } from '../data/vocab.js';
 import { esc, badge, fmtDate } from '../assets/ui.js';
+import { openEventForm } from '../assets/eventForm.js';
 
 const PAGE_SIZE = 5; // recent pairings shown before "Show more"
 
@@ -83,6 +84,49 @@ function pairingCard(p, dogsById, litter, puppies) {
       ${litterHtml(litter, puppies)}
     </section>`;
 }
+
+// "Log heat cycle" (Data Integrity Brief §4.4) — the hub is organized by
+// pairing, so the dam isn't always in context; a minimal picker gets one,
+// then opens the ordinary event form pre-filled to heat_cycle.
+function openDamPicker(females) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
+    <h2 style="margin-top:0;">Log heat cycle — choose the dam</h2>
+    <div class="form-grid">
+      <div class="field field-wide"><label>Dam <span class="req">*</span></label>
+        <select id="hc-dam">${females
+          .slice().sort((a, b) => (a.call_name || '').localeCompare(b.call_name || ''))
+          .map((d) => `<option value="${esc(d.id)}">${esc(d.call_name)}${d.registered_name ? ' — ' + esc(d.registered_name) : ''}</option>`).join('')}</select></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" id="hc-continue">Continue</button>
+      <button class="btn" id="hc-cancel">Cancel</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  function close() { overlay.remove(); document.removeEventListener('keydown', onKey); }
+  function onKey(e) { if (e.key === 'Escape') close(); }
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', onKey);
+  overlay.querySelector('#hc-cancel').addEventListener('click', close);
+  overlay.querySelector('#hc-continue').addEventListener('click', () => {
+    const damId = overlay.querySelector('#hc-dam').value;
+    close();
+    openEventForm({
+      subjectType: 'dog', subjectId: damId,
+      prefill: { event_type: 'heat_cycle' },
+      onSaved: () => main()
+    });
+  });
+}
+
+document.getElementById('log-heat-btn').addEventListener('click', async () => {
+  const dogs = await dogRepo.getAll();
+  const females = dogs.filter((d) => d.sex === 'female' && !d.is_archived);
+  if (!females.length) { showError('No female dogs on the roster yet.'); return; }
+  openDamPicker(females);
+});
 
 async function main() {
   const [pairings, dogs] = await Promise.all([

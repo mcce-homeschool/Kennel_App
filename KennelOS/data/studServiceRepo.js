@@ -8,6 +8,7 @@
 import { db } from './db.js';
 import { makeRepo } from './repoBase.js';
 import { STUD_SERVICE_REFERENCES } from './referenceRegistry.js';
+import { todayYMD } from './dateUtils.js';
 
 const base = makeRepo('stud_services', STUD_SERVICE_REFERENCES);
 
@@ -52,6 +53,39 @@ export const studServiceRepo = {
     const byId = new Map();
     for (const s of [...asOurs, ...asPartner]) byId.set(s.id, s);
     return [...byId.values()];
+  },
+
+  // Away-board rows (Data Integrity Brief §5) — stud services where our dog
+  // physically travelled and is still away today. Union'd with
+  // eventRepo.getBoardRows() at the call site (data/awayBoard.js), never
+  // replacing it — non-stud boarding stays (grow-out, foster, owner travel)
+  // still come from Event. `type` is a plain unindexed field (§3.1), so this
+  // filters in JS, same posture as is_archived elsewhere in the repo layer.
+  // Away dog is always `our_dog_id`: whichever direction the service runs,
+  // the dog that physically travels for an in-person service is ours.
+  async getBoardRows() {
+    const today = todayYMD();
+    const all = await db.stud_services.toArray();
+    const away = all.filter((s) =>
+      !s.is_archived && s.type === 'in_person' && s.sent_date && s.sent_date <= today &&
+      (s.returned_date == null || s.returned_date >= today)
+    );
+    const contacts = await Promise.all(
+      away.map((s) => (s.partner_contact_id ? db.contacts.get(s.partner_contact_id) : null))
+    );
+    return away.map((s, i) => ({
+      dogId: s.our_dog_id,
+      location: contacts[i]?.address || '',
+      reason: 'Stud service',
+      contactId: s.partner_contact_id || null,
+      outDate: s.sent_date,
+      returnDate: s.returned_date || null,
+      dropoffTime: '',
+      pickupTime: '',
+      sourceType: 'stud_service',
+      sourceId: s.id,
+      href: `stud-service.html?id=${encodeURIComponent(s.id)}`
+    }));
   }
 };
 

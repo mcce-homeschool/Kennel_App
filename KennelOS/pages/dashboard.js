@@ -14,6 +14,7 @@ import { pairingRepo } from '../data/pairingRepo.js';
 import { saleRepo } from '../data/saleRepo.js';
 import { contactRepo } from '../data/contactRepo.js';
 import { eventRepo } from '../data/eventRepo.js';
+import { getAwayBoardRows } from '../data/awayBoard.js';
 import { DOG_STATUS } from '../data/vocab.js';
 import { esc } from '../assets/ui.js';
 import { todayYMD, daysFromToday } from '../data/dateUtils.js';
@@ -46,7 +47,7 @@ async function main() {
     contactRepo.getAll({ includeArchived: false }),
     eventRepo.getReminders(),
     eventRepo.getUpcoming(),
-    eventRepo.getBoardRows()
+    getAwayBoardRows()
   ]);
 
   // Dogs: split archived (archive flag) from active (non-archived), then count

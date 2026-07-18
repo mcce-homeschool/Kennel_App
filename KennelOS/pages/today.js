@@ -7,6 +7,9 @@
 // Every read here is DERIVED over the existing repos, exactly as the dashboard/
 // reminders/upcoming/board pages each do — no stored aggregates, no new schema.
 import { eventRepo } from '../data/eventRepo.js';
+import { getAwayBoardRows } from '../data/awayBoard.js';
+import { computeNudges } from '../data/nudges.js';
+import { isDismissed, dismiss } from '../data/nudgeState.js';
 import { dogRepo } from '../data/dogRepo.js';
 import { litterRepo } from '../data/litterRepo.js';
 import { pairingRepo } from '../data/pairingRepo.js';
@@ -22,6 +25,8 @@ const errorBox = document.getElementById('page-error');
 const remindersEl = document.getElementById('today-reminders');
 const upcomingEl = document.getElementById('today-upcoming');
 const boardEl = document.getElementById('today-board');
+const availableEl = document.getElementById('today-available');
+const nudgesEl = document.getElementById('today-nudges');
 const overviewEl = document.getElementById('today-overview');
 
 // Subject-resolution context, loaded once. Shared by every section.
@@ -124,6 +129,44 @@ function openSnooze(id) {
   });
 }
 
+// --- 0. Nudges (derived, dismissible — Data Integrity Brief §2) -------------
+
+async function renderNudges() {
+  const all = await computeNudges();
+  const rows = all.filter((n) => !isDismissed(n.key));
+  if (!rows.length) { nudgesEl.innerHTML = ''; return; }
+  nudgesEl.innerHTML = `<section class="card">
+      <h2 style="margin:0;">Nudges <span class="muted" style="font-size:14px;">(${rows.length})</span></h2>
+      <p class="field-hint">Suggestions computed from your data — nothing here changes a record until you act on it.</p>
+      <ul class="linked-list" style="margin:6px 0 0; padding:0; list-style:none;">
+        ${rows.map((n) => `
+          <li class="row-between" style="padding:10px 0; border-top:1px solid var(--border); align-items:flex-start;">
+            <div>
+              <div><a href="${esc(n.subjectHref)}"><strong>${esc(n.title)}</strong></a></div>
+              ${n.detail ? `<div class="muted" style="font-size:13px;">${esc(n.detail)}</div>` : ''}
+            </div>
+            <div class="pill-row" data-nudge="${esc(n.key)}">
+              ${n.actions.map((a, i) => `<button class="btn btn-sm" data-nudge-action="${i}">${esc(a.label)}</button>`).join('')}
+              <button class="btn btn-sm" data-nudge-dismiss>Dismiss</button>
+            </div>
+          </li>`).join('')}
+      </ul>
+    </section>`;
+
+  nudgesEl.querySelectorAll('[data-nudge]').forEach((holder) => {
+    const key = holder.dataset.nudge;
+    const nudge = rows.find((n) => n.key === key);
+    holder.querySelectorAll('[data-nudge-action]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        try { await nudge.actions[Number(btn.dataset.nudgeAction)].run(); renderNudges(); }
+        catch (e) { showError(e.message || String(e)); }
+      });
+    });
+    const dismissBtn = holder.querySelector('[data-nudge-dismiss]');
+    dismissBtn.addEventListener('click', () => { dismiss(key); renderNudges(); });
+  });
+}
+
 // --- 2. Due outs / Upcoming -------------------------------------------------
 
 function renderUpcoming(rows) {
@@ -157,19 +200,18 @@ function renderBoard(rows) {
     return;
   }
   const today = todayYMD();
-  const body = rows.map((ev, i) => {
-    const dog = ctx.dogsById.get(ev.subject_id);
-    const contact = ev.related_contact_id ? ctx.contactsById.get(ev.related_contact_id) : null;
-    const d = ev.details || {};
-    const ret = ev.event_end_date
-      ? `${esc(fmtDate(ev.event_end_date))}${ev.event_end_date < today ? ' <span class="badge badge-amber">Overdue?</span>' : ''}`
+  const body = rows.map((row, i) => {
+    const dog = ctx.dogsById.get(row.dogId);
+    const contact = row.contactId ? ctx.contactsById.get(row.contactId) : null;
+    const ret = row.returnDate
+      ? `${esc(fmtDate(row.returnDate))}${row.returnDate < today ? ' <span class="badge badge-amber">Overdue?</span>' : ''}`
       : '<span class="badge badge-blue">Ongoing</span>';
-    const drop = `${esc(fmtDate(ev.event_date))}${d.dropoff_time ? ` <span class="faint">${esc(d.dropoff_time)}</span>` : ''}`;
+    const drop = `${esc(fmtDate(row.outDate))}${row.dropoffTime ? ` <span class="faint">${esc(row.dropoffTime)}</span>` : ''}`;
     return `<tbody class="expand-group">
       <tr class="expand-summary" data-panel="board-${i}">
         <td><strong>${esc(dog ? dog.call_name : '—')}</strong></td>
-        <td>${esc(d.boarding_reason || '—')}</td>
-        <td>${esc(d.location || '—')}</td>
+        <td>${esc(row.reason || '—')}</td>
+        <td>${esc(row.location || '—')}</td>
         <td style="text-align:right; width:1em;"><span class="expand-chevron">▸</span></td>
       </tr>
       <tr class="expand-panel" id="board-${i}" hidden>
@@ -178,7 +220,7 @@ function renderBoard(rows) {
             <div class="k">Contact</div><div class="v">${contact ? esc(contact.name) : '—'}</div>
             <div class="k">Drop-off</div><div class="v">${drop}</div>
             <div class="k">Return</div><div class="v">${ret}</div>
-            <div class="expand-actions"><a class="btn btn-sm" href="dog.html?id=${encodeURIComponent(ev.subject_id)}">Open dog →</a></div>
+            <div class="expand-actions"><a class="btn btn-sm" href="${esc(row.href)}">Open →</a></div>
           </div>
         </td>
       </tr>
@@ -186,7 +228,7 @@ function renderBoard(rows) {
   }).join('');
   boardEl.innerHTML = `<section class="card" style="margin-top:16px;">
       <h2 style="margin:0;">Away from home <span class="muted" style="font-size:14px;">(${rows.length})</span></h2>
-      <p class="field-hint">Boarding stays only — medications and heat cycles don't appear here. Tap a row for contact, drop-off, and return.</p>
+      <p class="field-hint">Boarding stays and in-person stud services — medications and heat cycles don't appear here. Tap a row for contact, drop-off, and return.</p>
       <table class="data expand-table">
         <thead><tr><th>Dog</th><th>Reason</th><th>Location</th><th></th></tr></thead>
         ${body}
@@ -200,6 +242,29 @@ function renderBoard(rows) {
       tr.classList.toggle('open', open); // CSS rotates the ▸ chevron to point down
     });
   });
+}
+
+// --- Available puppies feed (Data Integrity Brief §4.6) ---------------------
+// Non-archived dogs with disposition 'available' — the documented feed key
+// (vocab.js DISPOSITION comment). Distinct from DOG_STATUS 'for_sale', which
+// is the life-stage badge, not the breeder's placement intent.
+function renderAvailable(dogs) {
+  const rows = dogs.filter((d) => !d.is_archived && d.disposition === 'available');
+  const inner = rows.length
+    ? `<ul class="linked-list" style="margin:6px 0 0; padding:0; list-style:none;">
+        ${rows.map((d) => `
+          <li class="row-between" style="padding:9px 0; border-top:1px solid var(--border);">
+            <a href="dog.html?id=${encodeURIComponent(d.id)}"><strong>${esc(d.call_name)}</strong></a>
+            <a class="btn btn-sm" href="sale.html?new=1&dog=${encodeURIComponent(d.id)}">Add sale →</a>
+          </li>`).join('')}
+      </ul>`
+    : `<div class="empty-state">No dogs currently marked available.</div>`;
+  availableEl.innerHTML = `<section class="card" style="margin-top:16px;">
+      <div class="row-between">
+        <h2 style="margin:0;">Available puppies ${rows.length ? `<span class="muted" style="font-size:14px;">(${rows.length})</span>` : ''}</h2>
+        <a class="btn btn-sm" href="sale.html?new=1">+ Add sale</a>
+      </div>
+      ${inner}</section>`;
 }
 
 // --- 4. Kennel overview (slow-changing; sits last) --------------------------
@@ -246,16 +311,18 @@ async function main() {
     saleRepo.getAll({ includeArchived: false }),
     contactRepo.getAll({ includeArchived: true }),
     eventRepo.getUpcoming(),
-    eventRepo.getBoardRows()
+    getAwayBoardRows()
   ]);
   ctx.dogsById = new Map(allDogs.map((d) => [d.id, d]));
   ctx.pairingsById = new Map(pairings.map((p) => [p.id, p]));
   ctx.littersById = new Map(litters.map((l) => [l.id, l]));
   ctx.contactsById = new Map(contacts.map((c) => [c.id, c]));
 
+  await renderNudges();
   await renderReminders();
   renderUpcoming(upcoming);
   renderBoard(boardRows);
+  renderAvailable(allDogs);
   renderOverview({ allDogs, litters, pairings, sales });
 }
 
