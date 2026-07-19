@@ -2,7 +2,7 @@
 // Delete is blocked while any contact or dog still points at the kennel (KENNEL_REFERENCES).
 import { kennelRepo } from '../data/kennelRepo.js';
 import { dogRepo } from '../data/dogRepo.js';
-import { esc, confirmAction } from '../assets/ui.js';
+import { esc, confirmModal } from '../assets/ui.js';
 
 const listEl = document.getElementById('kennel-list');
 const errEl = document.getElementById('page-error');
@@ -209,7 +209,7 @@ async function onAction(act, kennel) {
       kennel.is_archived ? await kennelRepo.unarchive(kennel.id) : await kennelRepo.archive(kennel.id);
       render();
     } else if (act === 'delete') {
-      if (confirmAction(`Delete kennel “${kennel.kennel_name}”? This cannot be undone.`)) {
+      if (await confirmModal({ title: `Delete kennel “${kennel.kennel_name}”?`, message: 'This cannot be undone.', confirmLabel: 'Delete', danger: true })) {
         await kennelRepo.hardDelete(kennel.id);
         render();
       }

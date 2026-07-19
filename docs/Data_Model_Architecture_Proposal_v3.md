@@ -238,7 +238,7 @@ Edges worth calling out:
 | puppies_born_alive | integer | | |
 | puppies_born_deceased | integer | | |
 | puppies_born_abnormalities | integer | | count of puppies born with an abnormality; overlaps alive/deceased rather than adding to them (an alive or deceased puppy may also be counted here) |
-| status | enum: expected / whelped / weaning / ready / placed / closed | ✓ | |
+| status | enum: expected / whelped / weaning / ready / sold / closed | ✓ | |
 | expected_price_male | decimal | | per-litter default; `sale.js` prefills a new Sale's `price` with this when the sold dog's `sex = male` and its `litter_id` points here, only if `price` is still empty |
 | expected_price_female | decimal | | same as above, for `sex = female` |
 | expected_deposit_male | decimal | | per-litter default; prefills a new Sale's `deposit_amount` when the sold dog's `sex = male`, only if still empty |
@@ -271,7 +271,7 @@ The puppy roster itself is **not stored on Litter** — it's derived by querying
 | deferred_boarding_amount / deferred_boarding_frequency | decimal / enum: Day / Week / Month | | **Built.** Nullable, unindexed. A boarding rate for a buyer who delayed pickup — a plain rate the breeder is recording, same decimal-money posture as `price`/`deposit_amount` (**never cents**). `deferred_boarding_frequency` is an enforced choice from `BOARDING_FREQUENCY_OPTIONS` (`vocab.js`). Rendered on the Sale form as one line, "amount **per** frequency." Deliberately **not** a Financials cost — it never writes to the Expense ledger. |
 | placement_type | enum: pet / show / breeding_rights / co_own | ✓ | a `co_own` placement pairs naturally with adding the buyer to the dog's `co_owner_contact_ids` (a confirmed action, written through `dogRepo`) |
 | lead_source | string | | Free text with `<datalist>` autocomplete; how *this specific sale* came in. Prefills from the buyer's `first_contact_source` but may differ (same buyer, two dogs, two channels — which is why it can't live only on the person). Not indexed. |
-| status | enum: reserved / deposit_paid / paid_in_full / delivered / returned / cancelled | ✓ | a `returned` sale stays visible on the dog's record — status records what happened, archive only hides |
+| status | enum: deposit_pending / deposit_paid / paid_in_full / delivered / returned / cancelled | ✓ | a `returned` sale stays visible on the dog's record — status records what happened, archive only hides |
 | notes | text | | |
 | is_archived | boolean | ✓ | |
 

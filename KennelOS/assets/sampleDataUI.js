@@ -4,6 +4,7 @@
 import {
   shouldOfferFirstRunPrompt, hasSampleData, seedSampleData, declineSampleData, clearSampleData
 } from '../data/sampleData.js';
+import { alertModal, confirmModal } from './ui.js';
 
 // Shown once, before anything else, when the browser has never made a choice.
 // Resolves 'seeded' | 'blank' | null (null = prompt wasn't offered at all) so
@@ -67,10 +68,14 @@ export async function renderSampleBanner() {
 // or undefined if the user backed out.
 export async function promptClearSampleData() {
   if (!hasSampleData()) {
-    window.alert('There is no sample data loaded.');
+    await alertModal({ title: 'No sample data', message: 'There is no sample data loaded.' });
     return;
   }
-  if (!window.confirm('Remove all sample data (Thornfield Kennels demo dogs, pairings, litters, contacts, kennels, and events)? This cannot be undone.')) {
+  if (!(await confirmModal({
+    title: 'Clear sample data?',
+    message: 'Remove all sample data (Thornfield Kennels demo dogs, pairings, litters, contacts, kennels, and events)? This cannot be undone.',
+    confirmLabel: 'Clear', danger: true
+  }))) {
     return;
   }
 
@@ -78,11 +83,13 @@ export async function promptClearSampleData() {
 
   if (!result.cleared && result.reason === 'contaminated') {
     const list = result.conflicts.map((c) => `• ${c}`).join('\n');
-    const archive = window.confirm(
-      `Some of your own records now depend on sample dogs:\n\n${list}\n\n` +
-      `These sample dogs can't be deleted while that's true. Archive them instead ` +
-      `(hides them from active lists, keeps history intact) and clear the rest?`
-    );
+    const archive = await confirmModal({
+      title: 'Archive sample dogs instead?',
+      message: `Some of your own records now depend on sample dogs:\n\n${list}\n\n` +
+        `These sample dogs can't be deleted while that's true. Archive them instead ` +
+        `(hides them from active lists, keeps history intact) and clear the rest?`,
+      confirmLabel: 'Archive & clear', cancelLabel: 'Cancel'
+    });
     if (!archive) return result;
     result = await clearSampleData({ archiveConflicting: true });
   }
@@ -93,7 +100,7 @@ export async function promptClearSampleData() {
       `${result.counts.sales} sale(s)`, `${result.counts.contracts} contract(s)`,
       `${result.counts.events} event(s)`, `${result.counts.contacts} contact(s)`, `${result.counts.kennels} kennel(s)`];
     if (result.counts.archived) parts.push(`${result.counts.archived} archived instead of deleted`);
-    window.alert(`Sample data cleared — removed ${parts.join(', ')}.`);
+    await alertModal({ title: 'Sample data cleared', message: `Removed ${parts.join(', ')}.` });
   }
   return result;
 }

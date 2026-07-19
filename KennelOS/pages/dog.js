@@ -18,7 +18,7 @@ import {
   PLACEMENT_TYPE, SALE_STATUS, STUD_SERVICE_DIRECTION, STUD_SERVICE_STATUS,
   LITTER_STATUS, EVENT_TYPES, descriptor, COI_METHOD_SUGGESTIONS, CONTRACT_TYPE, CONTRACT_STATUS
 } from '../data/vocab.js';
-import { esc, badge, fmtDate, todayYMD, param, confirmAction } from '../assets/ui.js';
+import { esc, badge, fmtDate, todayYMD, param, confirmModal } from '../assets/ui.js';
 import { renderTimeline } from '../assets/timeline.js';
 import { renderExpensePanel } from '../assets/expensePanel.js';
 import { openEventFromQuery } from '../assets/eventForm.js';
@@ -561,14 +561,14 @@ async function save() {
 
   // Interactive rule: setting date_of_death SUGGESTS Deceased (not forced).
   if (candidate.date_of_death && candidate.status !== 'deceased') {
-    if (confirmAction('Date of death is set. Also change status to “Deceased”?')) {
+    if (await confirmModal({ title: 'Date of death is set. Also change status to “Deceased”?', confirmLabel: 'Set Deceased', cancelLabel: 'Keep status' })) {
       candidate.status = 'deceased';
       candidate.status_date = todayYMD();
     }
   }
   // Interactive rule: leaving Deceased needs confirmation.
   if (ctx.original && ctx.original.status === 'deceased' && candidate.status !== 'deceased') {
-    if (!confirmAction('This dog is marked Deceased. Are you sure you want to change that?')) return;
+    if (!(await confirmModal({ title: 'Change status from Deceased?', message: 'This dog is marked Deceased. Are you sure you want to change that?', confirmLabel: 'Change status', cancelLabel: 'Cancel' }))) return;
   }
 
   try {
@@ -597,14 +597,14 @@ async function save() {
 async function toggleArchive() {
   const d = ctx.original;
   const verb = d.is_archived ? 'Unarchive' : 'Archive';
-  if (!confirmAction(`${verb} “${d.call_name}”?`)) return;
+  if (!(await confirmModal({ title: `${verb} “${d.call_name}”?`, confirmLabel: verb }))) return;
   ctx.original = d.is_archived ? await dogRepo.unarchive(d.id) : await dogRepo.archive(d.id);
   renderAll();
 }
 
 async function doDelete() {
   const d = ctx.original;
-  if (!confirmAction(`Permanently delete “${d.call_name}”? This cannot be undone.`)) return;
+  if (!(await confirmModal({ title: `Delete “${d.call_name}”?`, message: 'This cannot be undone.', confirmLabel: 'Delete', danger: true }))) return;
   try {
     await dogRepo.hardDelete(d.id);
     location.href = 'dogs.html';

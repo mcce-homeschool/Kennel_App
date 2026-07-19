@@ -7,18 +7,15 @@ import { litterRepo, ReferenceBlockedError } from '../data/litterRepo.js';
 import { pairingRepo } from '../data/pairingRepo.js';
 import { dogRepo } from '../data/dogRepo.js';
 import { LITTER_STATUS, PAIRING_STATUS, DOG_STATUS, SEX, descriptor } from '../data/vocab.js';
-import { esc, badge, fmtDate, todayYMD, param, confirmAction } from '../assets/ui.js';
+import { esc, badge, fmtDate, todayYMD, param, confirmModal } from '../assets/ui.js';
 import { addDaysToYMD } from '../data/dateUtils.js';
 import { renderTimeline } from '../assets/timeline.js';
 import { renderExpensePanel } from '../assets/expensePanel.js';
 import { openAddPuppyForm, openAddPuppiesForm } from '../assets/puppyForm.js';
 import { openEventForm, openEventFromQuery } from '../assets/eventForm.js';
 
-// Statuses that warrant the grow-out boarding prompt (Stage4.5 Addendum §C6).
-const GROW_OUT_STATUSES = ['ready', 'placed'];
-
 // Statuses at/after whelping — used to decide whether a future whelp_date warns.
-const WHELPED_OR_LATER = ['whelped', 'weaning', 'ready', 'placed', 'closed'];
+const WHELPED_OR_LATER = ['whelped', 'weaning', 'ready', 'sold', 'closed'];
 
 // Estimated ready date defaults to 8 weeks (56 days) after whelping.
 const READY_DAYS_AFTER_WHELP = 56;
@@ -356,25 +353,6 @@ function normalizeCounts(candidate) {
   return candidate;
 }
 
-// Soft-suggestion prompt (Stage4.5 Addendum §C6): offered, never forced; no
-// stored link back to this litter. If exactly one roster puppy is still at
-// life-stage `puppy` (i.e. not yet placed with a buyer), prefill its boarding
-// event directly; otherwise point the user at the roster below to pick one.
-async function maybePromptGrowOut(litter) {
-  const label = descriptor(LITTER_STATUS, litter.status).label;
-  if (!confirmAction(`This litter is now "${label}". Log grow-out boarding for a puppy that isn't going straight to a buyer?`)) return;
-  const puppies = await dogRepo.getByLitter(litter.id);
-  const candidates = puppies.filter((p) => !p.is_archived && p.status === 'puppy');
-  if (candidates.length === 1) {
-    openEventForm({
-      subjectType: 'dog', subjectId: candidates[0].id,
-      prefill: { event_type: 'boarding', title: 'Grow-out boarding', details: { boarding_reason: 'Grow-out' } }
-    });
-  } else {
-    window.alert('Pick the puppy from the roster below, then use its own "+ Add Event" to log the boarding stay.');
-  }
-}
-
 // Soft-suggestion prompt: the first time a litter crosses into a whelped-or-
 // later status, offer to sync its linked pairing's status to match (prefilled
 // "Whelped", but editable — the pairing's real state might be something else
@@ -438,9 +416,6 @@ async function save() {
     if (enteringWhelpBand) {
       await maybePromptPairingWhelped(saved);
     }
-    if (GROW_OUT_STATUSES.includes(saved.status) && prevStatus !== saved.status) {
-      await maybePromptGrowOut(saved);
-    }
   } catch (e) {
     showError(e.message || String(e));
   }
@@ -449,14 +424,14 @@ async function save() {
 async function toggleArchive() {
   const l = ctx.original;
   const verb = l.is_archived ? 'Unarchive' : 'Archive';
-  if (!confirmAction(`${verb} this litter?`)) return;
+  if (!(await confirmModal({ title: `${verb} this litter?`, confirmLabel: verb }))) return;
   ctx.original = l.is_archived ? await litterRepo.unarchive(l.id) : await litterRepo.archive(l.id);
   renderAll();
 }
 
 async function doDelete() {
   const l = ctx.original;
-  if (!confirmAction('Permanently delete this litter? This cannot be undone.')) return;
+  if (!(await confirmModal({ title: 'Delete this litter?', message: 'Permanently delete this litter? This cannot be undone.', confirmLabel: 'Delete', danger: true }))) return;
   try {
     await litterRepo.hardDelete(l.id);
     location.href = 'litters.html';

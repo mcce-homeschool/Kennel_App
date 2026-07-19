@@ -6,7 +6,7 @@ import { kennelRepo } from '../data/kennelRepo.js';
 import { dogRepo, ReferenceBlockedError } from '../data/dogRepo.js';
 import { saleRepo } from '../data/saleRepo.js';
 import { CONTACT_TYPE, DOG_STATUS, WAITLIST_STATUS, SALE_STATUS, PLACEMENT_TYPE } from '../data/vocab.js';
-import { esc, badge, badges, param, confirmAction } from '../assets/ui.js';
+import { esc, badge, badges, param, confirmModal, promptModal } from '../assets/ui.js';
 
 const els = {
   title: document.getElementById('contact-title'),
@@ -167,11 +167,11 @@ function readForm() {
 }
 
 async function addKennelInline() {
-  const name = window.prompt('New kennel name:');
-  if (!name || !name.trim()) return;
+  const name = await promptModal({ title: 'New kennel', label: 'Kennel name', confirmLabel: 'Create' });
+  if (!name) return;
   try {
     ctx.draft = readForm();
-    const kennel = await kennelRepo.create({ kennel_name: name.trim() });
+    const kennel = await kennelRepo.create({ kennel_name: name });
     await loadKennels();
     ctx.draft.kennel_id = kennel.id;
     renderEdit();
@@ -293,14 +293,15 @@ async function save() {
 
 async function toggleArchive() {
   const c = ctx.original;
-  if (!confirmAction(`${c.is_archived ? 'Unarchive' : 'Archive'} “${c.name}”?`)) return;
+  const verb = c.is_archived ? 'Unarchive' : 'Archive';
+  if (!(await confirmModal({ title: `${verb} “${c.name}”?`, confirmLabel: verb }))) return;
   ctx.original = c.is_archived ? await contactRepo.unarchive(c.id) : await contactRepo.archive(c.id);
   renderAll();
 }
 
 async function doDelete() {
   const c = ctx.original;
-  if (!confirmAction(`Permanently delete “${c.name}”? This cannot be undone.`)) return;
+  if (!(await confirmModal({ title: `Delete “${c.name}”?`, message: 'This cannot be undone.', confirmLabel: 'Delete', danger: true }))) return;
   try {
     await contactRepo.hardDelete(c.id);
     location.href = 'contacts.html';

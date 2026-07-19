@@ -6,7 +6,7 @@ import { promptClearSampleData } from '../assets/sampleDataUI.js';
 import { hasMyKennelSetup, getMyKennelName } from '../data/kennelSetup.js';
 import { showKennelSetupModal, maybeShowKennelSetupPrompt } from '../assets/kennelSetupUI.js';
 import { getResetCounts, resetApp } from '../data/appReset.js';
-import { esc, confirmAction } from '../assets/ui.js';
+import { esc, confirmModal } from '../assets/ui.js';
 
 const msg = document.getElementById('page-msg');
 function flash(text, kind = 'ok') {
@@ -69,7 +69,12 @@ async function doRestore(mode) {
   const warning = mode === 'replace'
     ? 'Replace ALL current records with the file’s contents? This cannot be undone.'
     : 'Merge the file’s records into your current data (updating any with matching ids)?';
-  if (!confirmAction(warning)) return;
+  if (!(await confirmModal({
+    title: mode === 'replace' ? 'Replace all data?' : 'Merge data?',
+    message: warning,
+    confirmLabel: mode === 'replace' ? 'Replace' : 'Merge',
+    danger: mode === 'replace'
+  }))) return;
   try {
     const result = await restoreBackup(pendingBackup, mode);
     const total = result.reduce((n, r) => n + r.count, 0);

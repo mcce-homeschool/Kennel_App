@@ -8,7 +8,7 @@ import { litterRepo } from '../data/litterRepo.js';
 import { dogRepo } from '../data/dogRepo.js';
 import { studServiceRepo } from '../data/studServiceRepo.js';
 import { PAIRING_TYPE, PAIRING_METHOD, PAIRING_STATUS, LITTER_STATUS, STUD_SERVICE_DIRECTION, STUD_SERVICE_STATUS } from '../data/vocab.js';
-import { esc, badge, fmtDate, param, confirmAction } from '../assets/ui.js';
+import { esc, badge, fmtDate, param, confirmModal } from '../assets/ui.js';
 import { addDaysToYMD } from '../data/dateUtils.js';
 import { renderTimeline } from '../assets/timeline.js';
 import { openEventFromQuery } from '../assets/eventForm.js';
@@ -278,14 +278,14 @@ async function save() {
 async function toggleArchive() {
   const p = ctx.original;
   const verb = p.is_archived ? 'Unarchive' : 'Archive';
-  if (!confirmAction(`${verb} this pairing?`)) return;
+  if (!(await confirmModal({ title: `${verb} this pairing?`, confirmLabel: verb }))) return;
   ctx.original = p.is_archived ? await pairingRepo.unarchive(p.id) : await pairingRepo.archive(p.id);
   renderAll();
 }
 
 async function doDelete() {
   const p = ctx.original;
-  if (!confirmAction('Permanently delete this pairing? This cannot be undone.')) return;
+  if (!(await confirmModal({ title: 'Delete this pairing?', message: 'Permanently delete this pairing? This cannot be undone.', confirmLabel: 'Delete', danger: true }))) return;
   try {
     await pairingRepo.hardDelete(p.id);
     location.href = 'pairings.html';

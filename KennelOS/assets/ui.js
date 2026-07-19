@@ -71,9 +71,106 @@ export function fillSelect(selectEl, vocab, current, placeholder) {
   }
 }
 
-// Minimal confirm wrapper (kept as a seam so we can swap in a nicer modal later).
-export function confirmAction(message) {
-  return window.confirm(message);
+// --- Styled modal dialogs -------------------------------------------------
+// The app's own dialogs, replacing native window.confirm/alert/prompt. Each
+// appends a .modal-overlay to <body> and returns a promise, removing the
+// overlay when the user resolves it. Backdrop-click dismisses (as cancel/no).
+// Markup mirrors the hand-built modals on the litter/sale pages so the styling
+// stays identical everywhere.
+function mountModal(innerHtml) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true">${innerHtml}</div>`;
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+// Message paragraph: pre-wrap so embedded newlines (e.g. a bulleted list passed
+// through from a former window.confirm) render as line breaks, not one blob.
+function modalMessage(message) {
+  return message ? `<p class="muted" style="white-space:pre-wrap;">${esc(message)}</p>` : '';
+}
+
+// Yes/no confirmation. Resolves true on confirm, false on cancel/backdrop.
+export function confirmModal({ title, message = '', confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false }) {
+  return new Promise((resolve) => {
+    const overlay = mountModal(`
+      <h2 style="margin-top:0;">${esc(title)}</h2>
+      ${modalMessage(message)}
+      <div class="form-actions">
+        <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" id="cm-confirm">${esc(confirmLabel)}</button>
+        <button class="btn" id="cm-cancel">${esc(cancelLabel)}</button>
+      </div>`);
+    const done = (val) => { overlay.remove(); resolve(val); };
+    overlay.querySelector('#cm-confirm').addEventListener('click', () => done(true));
+    overlay.querySelector('#cm-cancel').addEventListener('click', () => done(false));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) done(false); });
+  });
+}
+
+// Informational alert with a single OK button. Resolves when dismissed.
+export function alertModal({ title, message = '', okLabel = 'OK' }) {
+  return new Promise((resolve) => {
+    const overlay = mountModal(`
+      <h2 style="margin-top:0;">${esc(title)}</h2>
+      ${modalMessage(message)}
+      <div class="form-actions">
+        <button class="btn btn-primary" id="am-ok">${esc(okLabel)}</button>
+      </div>`);
+    const done = () => { overlay.remove(); resolve(); };
+    overlay.querySelector('#am-ok').addEventListener('click', done);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) done(); });
+  });
+}
+
+// Single-line text prompt. Resolves the trimmed string on confirm, or null on
+// cancel/backdrop/empty.
+export function promptModal({ title, message = '', label = '', placeholder = '', defaultValue = '', confirmLabel = 'OK', cancelLabel = 'Cancel' }) {
+  return new Promise((resolve) => {
+    const overlay = mountModal(`
+      <h2 style="margin-top:0;">${esc(title)}</h2>
+      ${modalMessage(message)}
+      <div class="field">
+        ${label ? `<label>${esc(label)}</label>` : ''}
+        <input id="pm-value" type="text" value="${esc(defaultValue)}" placeholder="${esc(placeholder)}">
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" id="pm-confirm">${esc(confirmLabel)}</button>
+        <button class="btn" id="pm-cancel">${esc(cancelLabel)}</button>
+      </div>`);
+    const input = overlay.querySelector('#pm-value');
+    const done = (val) => { overlay.remove(); resolve(val); };
+    const submit = () => done(input.value.trim() || null);
+    overlay.querySelector('#pm-confirm').addEventListener('click', submit);
+    overlay.querySelector('#pm-cancel').addEventListener('click', () => done(null));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) done(null); });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+    input.focus();
+  });
+}
+
+// Single-select prompt from a vocab-style [{value,label}] list. Resolves the
+// chosen value, or null on cancel/backdrop.
+export function selectModal({ title, message = '', label = '', options, defaultValue = '', confirmLabel = 'Confirm', cancelLabel = 'Cancel' }) {
+  return new Promise((resolve) => {
+    const optsHtml = options.map((o) =>
+      `<option value="${esc(o.value)}"${o.value === defaultValue ? ' selected' : ''}>${esc(o.label)}</option>`).join('');
+    const overlay = mountModal(`
+      <h2 style="margin-top:0;">${esc(title)}</h2>
+      ${modalMessage(message)}
+      <div class="field">
+        ${label ? `<label>${esc(label)}</label>` : ''}
+        <select id="sm-value">${optsHtml}</select>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" id="sm-confirm">${esc(confirmLabel)}</button>
+        <button class="btn" id="sm-cancel">${esc(cancelLabel)}</button>
+      </div>`);
+    const done = (val) => { overlay.remove(); resolve(val); };
+    overlay.querySelector('#sm-confirm').addEventListener('click', () => done(overlay.querySelector('#sm-value').value || null));
+    overlay.querySelector('#sm-cancel').addEventListener('click', () => done(null));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) done(null); });
+  });
 }
 
 // Collapsible card chrome (Today home cards). `title` is the header HTML

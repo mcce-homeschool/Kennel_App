@@ -11,7 +11,7 @@ import { expenseRepo } from '../data/expenseRepo.js';
 import { contactRepo } from '../data/contactRepo.js';
 import { kennelRepo } from '../data/kennelRepo.js';
 import { eventTypesFor, descriptor, EVENT_TYPES, EXPENSE_CATEGORIES, defaultExpenseCategoryFor } from '../data/vocab.js';
-import { esc, todayYMD, param } from './ui.js';
+import { esc, todayYMD, param, confirmModal } from './ui.js';
 import { attachNewContactButton } from './contactPicker.js';
 
 // Which combobox field on each test-bearing type draws from the shared test
@@ -263,7 +263,7 @@ export async function openEventForm(opts) {
     }
     // Soft warning: reminder should not precede the event.
     if (draft.reminder_date && draft.event_date && draft.reminder_date < draft.event_date) {
-      if (!window.confirm('Reminder date is before the event date. Save anyway?')) return;
+      if (!(await confirmModal({ title: 'Reminder is before the event date', message: 'Reminder date is before the event date. Save anyway?', confirmLabel: 'Save anyway', cancelLabel: 'Cancel' }))) return;
     }
     const basePayload = {
       subject_type: subjectType,
