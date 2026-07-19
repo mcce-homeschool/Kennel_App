@@ -11,8 +11,10 @@
 // Nothing here mutates a record on its own; every action is a user-confirmed
 // button click.
 //
-// Five rules (§4.2, §4.3, §4.5, §4.7, plus the overdue-pairing rule below),
-// each producing zero or more nudges:
+// Eight rules (End-State guide §19), each producing zero or more nudges:
+// stud-service status (§4.2), promote-lifecycle (§4.3), heat→pairing (§4.5),
+// stud→pairing (§4.7), the overdue-pairing rule, and three litter-lifecycle
+// rules (litter→sold / reopen / close) grouped over each litter's roster below.
 //   { key, title, detail, subjectHref, actions: [{ label, run: async () => {} }] }
 import { studServiceRepo } from './studServiceRepo.js';
 import { dogRepo } from './dogRepo.js';
