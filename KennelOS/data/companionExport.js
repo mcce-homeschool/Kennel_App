@@ -131,9 +131,10 @@ function assertOnlyKeys(obj, allowed, ctx) {
   return obj;
 }
 
-// Shared header copy. Layer 1 (per-type settings) supplies kennel identity +
-// intro; Layer 2 (Contact.companion_note) overrides the per-type announcement
-// when the owner has written a personal line for this recipient.
+// Shared header/footer copy. Layer 1 (per-type settings) supplies kennel identity,
+// intro, the broadcast announcement, and the closer. Layer 2 (Contact.companion_note)
+// is the recipient's personal message — carried SEPARATELY as `personalNote` and
+// shown alongside the announcement, not overriding it.
 function headerCopy(type, contact) {
   const s = getCompanionSettings(type);
   const note = (contact.companion_note || '').trim();
@@ -141,21 +142,23 @@ function headerCopy(type, contact) {
     kennelName: s.kennelName || '',
     tagline: s.tagline || '',
     introText: s.introText || '',
-    announcement: note || s.announcement || ''
+    announcement: s.announcement || '',
+    personalNote: note || '',
+    closer: s.closer || ''
   };
 }
 
 const PROSPECTIVE_KEYS = [
   'bundleVersion', 'bundleType', 'kennelName', 'tagline', 'introText', 'announcement',
-  'familyName', 'litters', 'updatedAt'
+  'personalNote', 'closer', 'familyName', 'litters', 'updatedAt'
 ];
 const FAMILY_KEYS = [
   'bundleVersion', 'bundleType', 'kennelName', 'tagline', 'introText', 'announcement',
-  'familyName', 'pups', 'contractUrls', 'updatedAt'
+  'personalNote', 'closer', 'familyName', 'pups', 'contracts', 'updatedAt'
 ];
 const PARTNER_KEYS = [
   'bundleVersion', 'bundleType', 'kennelName', 'tagline', 'introText', 'announcement',
-  'partnerName', 'studServices', 'externalPairings', 'contracts', 'updatedAt'
+  'personalNote', 'closer', 'partnerName', 'studServices', 'externalPairings', 'contracts', 'updatedAt'
 ];
 
 // --- Prospective family: current availability, one card per litter with its
@@ -217,7 +220,7 @@ export async function buildFamilyBundle(contact) {
   const asOf = updatedAt.slice(0, 10);
 
   const pups = [];
-  const contractUrls = [];
+  const contracts = [];
 
   for (const sale of sales) {
     const dog = await dogRepo.getById(sale.dog_id);
@@ -240,8 +243,47 @@ export async function buildFamilyBundle(contact) {
 
       const price = nonEmpty(sale.price);
       const deposit = nonEmpty(sale.deposit_amount);
-      const remainingBalance = (price != null && deposit != null)
-        ? Number(price) - Number(deposit) : null;
+      const transportFee = nonEmpty(sale.transport_fee);
+
+      // Deferred pickup boarding: a rate (`amount`) charged per frequency unit
+      // (Day/Week/Month), for a count of those units (`deferred_boarding_duration_days`
+      // now holds the number of frequency units, not days — owner decision). The
+      // total is `amount × units` and feeds the remaining balance; the line only
+      // appears when an amount is present.
+      const deferredAmount = nonEmpty(sale.deferred_boarding_amount);
+      let deferredPickup = null;
+      let deferredTotal = 0;
+      if (deferredAmount != null) {
+        const units = Number(sale.deferred_boarding_duration_days);
+        const factor = Number.isFinite(units) && units > 0 ? units : 1;
+        deferredTotal = Number(deferredAmount) * factor;
+        deferredPickup = {
+          total: deferredTotal,
+          amount: Number(deferredAmount),
+          frequency: nonEmpty(sale.deferred_boarding_frequency),
+          duration: nonEmpty(sale.deferred_boarding_duration_days)
+        };
+      }
+
+      // Remaining balance is COMPUTED here, never stored: price + transport fee +
+      // deferred boarding − deposit. Absent components count as 0.
+      const remainingBalance = price != null
+        ? Number(price) + Number(transportFee || 0) + deferredTotal - Number(deposit || 0)
+        : null;
+
+      // Deferred Pickup Boarding section — pinned to the top of the event history,
+      // but only when the sale carries a COMPLETE deferred pickup (amount +
+      // frequency + duration). Lists the dog's boarding stays as scheduled date
+      // ranges. Only the two dates are copied by name — never the boarding notes.
+      const deferredComplete = deferredAmount != null
+        && nonEmpty(sale.deferred_boarding_frequency) != null
+        && nonEmpty(sale.deferred_boarding_duration_days) != null;
+      if (deferredComplete) {
+        const boarding = events
+          .filter((e) => e.event_type === 'boarding' && e.event_date)
+          .map((e) => ({ startDate: e.event_date, endDate: e.event_end_date || null }));
+        if (boarding.length) eventSections.unshift({ type: 'deferred_pickup_boarding', items: boarding });
+      }
 
       const pup = {
         callName: dog.call_name || '',
@@ -254,7 +296,10 @@ export async function buildFamilyBundle(contact) {
         saleStatus: nonEmpty(sale.status),
         price,
         deposit,
+        transportFee,
+        deferredPickup,
         remainingBalance,
+        balanceDueDate: sale.balance_due_date || null,
         eventSections
       };
       if (litter && litter.nickname) pup.litterNickname = litter.nickname;
@@ -270,8 +315,14 @@ export async function buildFamilyBundle(contact) {
       }
       pups.push(pup);
     }
-    const gov = contractRepo.governingContract(await contractRepo.getBySale(sale.id));
-    if (gov && gov.document_url) contractUrls.push(gov.document_url);
+    // Carry each governing/documented contract as {signedDate, documentUrl} so the
+    // shell can show the signed date (or "Not Signed") alongside a view/sign link.
+    const saleContracts = (await contractRepo.getBySale(sale.id)).filter((c) => !c.is_archived);
+    for (const c of saleContracts) {
+      if (c.document_url || c.signed_date) {
+        contracts.push({ signedDate: c.signed_date || null, documentUrl: c.document_url || null });
+      }
+    }
   }
 
   const bundle = {
@@ -280,7 +331,7 @@ export async function buildFamilyBundle(contact) {
     ...h,
     familyName: contact.name || '',
     pups,
-    contractUrls,
+    contracts,
     updatedAt
   };
   return assertOnlyKeys(bundle, FAMILY_KEYS, 'family');
@@ -302,26 +353,30 @@ export async function buildPartnerBundle(contact) {
     const studDog = ss.direction === 'incoming' ? partner : our;
     const damDog = ss.direction === 'incoming' ? our : partner;
 
-    let breedingDates = [];
-    if (ss.pairing_id) {
-      const evs = await eventRepo.getForSubject('pairing', ss.pairing_id);
-      breedingDates = evs
-        .filter((e) => e.event_type === 'breeding_tie' && e.event_date)
-        .map((e) => e.event_date);
-    }
-
     const hasPick = FEE_STRUCTURES_WITH_PICK.includes(ss.fee_structure);
+
+    // The stud service's own contract (governing/signed if any, else the most
+    // recent) as {signedDate, documentUrl} — powers the per-service Contract
+    // block: signed date (or "Not Signed") + a view/sign link.
+    const svcContracts = (await contractRepo.getByStudService(ss.id)).filter((c) => !c.is_archived);
+    const gov = contractRepo.governingContract(svcContracts);
+    const primary = gov || svcContracts.slice().sort((a, b) =>
+      (b.created_at || '').localeCompare(a.created_at || ''))[0] || null;
+
     studServices.push({
       studDog: await dogCard(studDog),
       damDog: await dogCard(damDog),
-      breedingDates,
+      type: ss.type || null,
       compensation: {
         fee_structure: ss.fee_structure || null,
         fee_amount: nonEmpty(ss.fee_amount),
         pick_status: hasPick ? (ss.pick_status || null) : null,
         sentDate: ss.sent_date || null,
         returnedDate: ss.returned_date || null
-      }
+      },
+      contract: primary
+        ? { signedDate: primary.signed_date || null, documentUrl: primary.document_url || null }
+        : null
     });
   }
 

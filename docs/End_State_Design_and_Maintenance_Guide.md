@@ -118,7 +118,7 @@ and commonly blank at entry time.
 | **Kennel** | `kennel_name` | `is_own_kennel`, `preferred_tests[]`, `preferred_breeds[]`, `promote_nudge_enabled` (bool, default off), `promote_age_male_months`/`promote_age_female_months` (numbers — the promote-lifecycle nudge's per-kennel thresholds, §19). Lightweight; added inline from Contact form. |
 | **Pairing** | `sire_id`, `dam_id`, `pairing_type`, `status` | `method`, `planned_date` (displayed as "Planned first date" — the first planned/tie date), `last_observed_date` (plain, unindexed — a subsequent observed tie/breeding date), `expected_due_date` (prefilled on the detail page as 63 days after `planned_date` when still empty, never clobbering a deliberate edit), `notes`. Sire ≠ dam (hard block). |
 | **Litter** | `dam_id`, `sire_id`, `status` | `nickname` (plain, unindexed — optional friendly label for the litter, e.g. “Party of Five”; when set it leads the detail-page title and shows as its own column on the Litters list and report, searchable across all three; falls back to `dam × sire` when blank), `pairing_id`, `whelp_date`, `estimated_ready_date` (plain, unindexed — prefilled on the detail page as 8 weeks/56 days after `whelp_date` when still empty, never clobbering a deliberate edit), `litter_registration_number`, `puppies_born_total/alive/deceased/abnormalities` (the last a count, not mutually exclusive with alive/deceased — an alive or deceased puppy may also count here), `expected_price_male`/`expected_price_female`/`expected_deposit_male`/`expected_deposit_female` (plain, unindexed — per-litter defaults, grouped by sex on the detail page; `sale.js` prefills a new Sale's `price` and `deposit_amount` from the matching-sex pair by the puppy's `sex`, only into fields still empty, never clobbering a value already entered), `notes`. Litter's own sire/dam are authoritative. Puppy roster is **derived** (`Dog WHERE litter_id`). |
-| **Sale** | `dog_id`, `buyer_contact_id`, `placement_type`, `status` | `sale_date`, `price`, `deposit_amount`, `deposit_date`, `balance_due_date`, `balance_paid_date`, `transport_fee` (plain, unindexed — a flat delivery/transport charge, decimal amount), `deferred_boarding_amount`/`deferred_boarding_frequency`/`deferred_boarding_duration_days` (plain, unindexed — a boarding rate for a buyer who delayed pickup, decimal amount + `BOARDING_FREQUENCY_OPTIONS` Day/Week/Month + a free-text duration in days (not a number field — allows ranges like "10-14"), rendered on one line as "amount per frequency × duration days"; never cents, and never an Expense — see §21), `lead_source`, `referred_by_contact_id` (indexed FK → the Contact who referred this buyer; `CONTACT_REFERENCES`; on save `saleRepo` auto-tags that contact with the `buyer_referrer` role via `contactRepo.ensureType`), `notes`. On the detail page (`sale.js`), all fee fields (price, deposit amount, transport fee, deferred boarding) render/edit above all date fields (sale date, deposit date, balance due date, balance paid date). Its own table (not a Dog field) so reserve/return/re-place stay distinct facts. |
+| **Sale** | `dog_id`, `buyer_contact_id`, `placement_type`, `status` | `sale_date`, `price`, `deposit_amount`, `deposit_date`, `balance_due_date`, `balance_paid_date`, `transport_fee` (plain, unindexed — a flat delivery/transport charge, decimal amount), `deferred_boarding_amount`/`deferred_boarding_frequency`/`deferred_boarding_duration_days` (plain, unindexed — a boarding rate for a buyer who delayed pickup, decimal amount + `BOARDING_FREQUENCY_OPTIONS` Day/Week/Month + a free-text **count of frequency units** (despite the `_days` field name, the value is the number of frequency units — e.g. `2` with frequency `Week` means two weeks; owner decision), rendered on one line as "amount per frequency × count"; the **family companion bundle** multiplies `amount × count` into a deferred-pickup total that feeds the computed remaining balance (§20); never cents, and never an Expense — see §21), `lead_source`, `referred_by_contact_id` (indexed FK → the Contact who referred this buyer; `CONTACT_REFERENCES`; on save `saleRepo` auto-tags that contact with the `buyer_referrer` role via `contactRepo.ensureType`), `notes`. On the detail page (`sale.js`), all fee fields (price, deposit amount, transport fee, deferred boarding) render/edit above all date fields (sale date, deposit date, balance due date, balance paid date). Its own table (not a Dog field) so reserve/return/re-place stay distinct facts. |
 | **Contract** | `contract_type` | `status` (defaults `draft`), `related_sale_id`, `related_stud_service_id`, `related_dog_id` (canonical Dog link, used only for `lease`/`co_own`/`other` types — where no linked Sale/StudService already reaches a dog; forced `null` for other types via `contractRepo.DOG_LINK_TYPES`/`normalizeLinks`), `related_contact_id` (canonical counterparty link — lessee/co-owner/partner — for the same `lease`/`co_own`/`other` types via `CONTACT_LINK_TYPES`; sale/stud contracts reach their counterparty through the linked Sale/StudService, so it stays `null` there and never double-sources; scopes a contract into the **partner** companion bundle, §20), `document_url` (plain, unindexed — a share link to the signed document, e.g. a Drive "anyone with the link" URL; carried as a *pointer* into the buyer bundle, §20), `signed_date`, `lease_start_date`/`lease_end_date` (lease type; UI shows them and hides Related sale/stud fields when `contract_type='lease'`), `title`, `terms_summary`, `notes`. Generic across sale/stud/co-ownership/lease. Leaf for its own hard-delete (nothing points *at* a contract), but a contract itself points *at* its Dog via `related_dog_id` (guarded under `DOG_REFERENCES`) and its counterparty via `related_contact_id` (guarded under `CONTACT_REFERENCES`) — neither under `CONTRACT_REFERENCES`. |
 | **StudService** | `direction`, `our_dog_id`, `partner_dog_id`, `partner_contact_id`, `status` | `pairing_id`, `fee_amount`, `fee_structure`, `pick_status` (plain, unindexed — suggested `pending`/`claimed`, free text allowed; meaningful **only** when `fee_structure ∈ {pick_of_litter, flat_plus_pick}`, forced `null` otherwise so a `flat_fee`/`other` arrangement never shows a stray pick; feeds the partner companion bundle's compensation, §20), `result_notes`, `type` (`in_person`/`ai` — coarse physical-travel flag; `in_person` + `sent_date`/`returned_date` window feeds the away-board, §19), `referred_by_contact_id` (indexed FK → the Contact who referred this arrangement; `CONTACT_REFERENCES`; on save `studServiceRepo` auto-tags that contact with the `stud_referrer` role via `contactRepo.ensureType`), plus optional logistics dates. Covers both `incoming` and `outgoing`. |
 | **Event** | `subject_type`, `subject_id`, `event_type`, `event_date`, `title` | `event_end_date`, `reminder_date`, `reminder_dismissed`, `related_dog_id`, `related_contact_id`, `details{}`, `notes`. See §8. **No `cost` field** — a cost entered on the event form is written to the Expense ledger (`expenses.event_id` = the event) and read back via `expenseRepo.getByEvent`; see the Expense row below and §21. |
@@ -747,23 +747,40 @@ view. The main app stays single-user/offline/all-local; this adds *recipients*.
     `sex`, `photosUrl` (`Dog.url`), `litterNickname` (when set), `sire`/`dam` (call +
     registered name), a **computed `age` `{ageWeeks, ageDays}`** as-of the generation
     date (**never the raw DOB**), a `placement` block or an `estimatedReadyDate`,
-    sale facts (`placementType`, `saleStatus`, `price`, `deposit`, `remainingBalance`),
-    and an `eventSections[]` **curated per-type event history**. Plus top-level
-    `contractUrls` (the governing contract's `document_url`). **⚠ Scoped relaxation
-    (brief decision 4):** event history surfaces a **title + one curated safe field
-    per type** — `vaccination`→`vaccine`, `preventative`→`product`, `weight_check`→
+    sale facts (`placementType`/`saleStatus` sent as raw values, the shell maps them
+    to their proper-cased vocab labels; `price`, `deposit`, `transportFee` (shown only
+    when present), `deferredPickup` (shown only when a `deferred_boarding_amount` is
+    present — `{total, amount, frequency, duration}`, where `total = amount × count`;
+    the shell shows the total with the rate breakdown beneath it), a **computed**
+    `remainingBalance` = `price + transportFee + deferredPickup.total − deposit`
+    (absent parts count as 0; never stored), and `balanceDueDate` (`Sale.balance_due_date`,
+    shown beneath the balance)), and an `eventSections[]` **curated per-type event
+    history**. When the sale carries a **complete** deferred pickup (amount + frequency
+    + duration) a `deferred_pickup_boarding` section is **pinned to the top** of
+    `eventSections`, listing the dog's `boarding` events as `{startDate, endDate}`
+    scheduled ranges (only the two dates copied — never boarding notes). Plus top-level
+    `contracts[]` = the sale's non-archived contracts as `{signedDate, documentUrl}`
+    (shell shows the signed date or "Not Signed" + a "View/sign contract here" link;
+    legacy links carry a flat `contractUrls` list the shell still renders). **⚠ Scoped
+    relaxation (brief decision 4):** event history surfaces a **title + one curated safe
+    field per type** — `vaccination`→`vaccine`, `preventative`→`product`, `weight_check`→
     weight, `milestone`→`description`, `note`→title only. This relaxes the earlier
     "fixed type label only" rule, but **never** the freeform top-level `notes` and
     **never** illness/injury/evaluation or any type not on that list.
   - **`partner`** — a stud/lease/co-own partner: `studServices` (labeled **Stud/Dam
-    `dogCard` blocks** carrying registered/call name + completed tests;
-    `compensation` = four-value `fee_structure` + native-decimal `fee_amount` +
-    `pick_status` + `sentDate`/`returnedDate` from `StudService`; `breedingDates`
-    from the linked pairing's `breeding_tie` events), `externalPairings` (pairings
-    involving their external/leased-in dogs), and `contracts` (lease/co_own/other
-    contracts where `related_contact_id` = them, each with `type`, `status`,
-    `signedDate` — shown "Not Signed" when null — `terms`, and `document_url`; there
-    is **no** contract `returned_date`, brief decision 2).
+    `dogCard` blocks** carrying registered/call name + completed tests, each followed
+    by an **Agreement Details** section — the service `type` (`in_person`/`ai`, shown
+    proper-cased), `sentDate`/`returnedDate` relabeled **Begins/Ends**, `fee_structure`
+    as **Terms**, plus the native-decimal `fee_amount` when the structure includes a
+    flat fee and the `pick_status` when it includes a pick of litter (both for
+    `flat_plus_pick`) — and a **Contract** section carrying the service's own
+    governing/most-recent contract as `contract` = `{signedDate, documentUrl}` (shown
+    "Not Signed" when the signed date is null, + a "View/sign contract here" link)),
+    `externalPairings` (pairings involving their external/leased-in dogs), and the
+    top-level `contracts` (lease/co_own/other contracts where `related_contact_id` =
+    them, each with `type`, `status`, `signedDate` — shown "Not Signed" when null —
+    `terms`, and `document_url`; there is **no** contract `returned_date`, brief
+    decision 2).
   - **`dogCard` / completed tests** (shared projection): prospective sire/dam and
     partner stud/dam use `dogCard(dog)` → `{registeredName, callName, photosUrl,
     tests}`, where `tests` is `completedTests(dogId)` reading
@@ -773,11 +790,17 @@ view. The main app stays single-user/offline/all-local; this adds *recipients*.
     block omitted).
 
 - **Two-layer messaging.** Layer 1 is per-type config (`kennelName`/`tagline`/
-  `introText`/`announcement`) in `settings.js` under the `companion` key, edited in
-  the **Companion Messaging console** (`pages/companion.*`, in the "More" menu).
-  Layer 2 is **`Contact.companion_note`**, a per-recipient personal line that
-  overrides the type's announcement for that one recipient. The bundle copies the
-  resolved copy inline, so header/landing text updates without a shell deploy.
+  `introText`/`announcement`/`closer`) in `settings.js` under the `companion` key,
+  edited in the **Companion Messaging console** (`pages/companion.*`, in the "More"
+  menu). Layer 2 is **`Contact.companion_note`**, a per-recipient personal line.
+  Both are carried in the bundle **separately** — `announcement` (broadcast) and
+  `personalNote` (the note) — and the shell shows them **alongside each other**, no
+  longer an override. The shell **prepends the recipient's name** to the intro text
+  ("Hi {name} — …"; there is no separate greeting card), renders the personal note in
+  the header card's accent box, the broadcast announcement as its own card beneath,
+  and the `closer` sign-off as the final card **just above the snapshot date**. The
+  bundle copies the resolved copy inline, so header/landing text updates without a
+  shell deploy.
 
 ### The load-bearing invariant: the allow-list builder
 

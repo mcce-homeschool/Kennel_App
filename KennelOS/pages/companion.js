@@ -4,8 +4,8 @@
 // Two layers (see settings.js): Layer 1 is the per-type header copy (kennel
 // identity + intro + announcement), edited in the "Message templates" cards.
 // Layer 2 is Contact.companion_note, a per-recipient personal line editable
-// inline in the Recipients table that overrides the announcement for that one
-// recipient. "Prepare link" builds a fresh point-in-time bundle through the
+// inline in the Recipients table, shown alongside the broadcast announcement
+// (not an override). "Prepare link" builds a fresh point-in-time bundle through the
 // allow-list builder, compresses it, and hands off a REAL sms:/mailto: anchor —
 // the user's tap on that anchor is the activating gesture (never a post-async
 // window.location assignment, which loses the iOS user-activation, brief §5.2).
@@ -57,7 +57,8 @@ function templateCard(type) {
         <div class="field"><label>Kennel name</label><input class="t-kennelName" type="text" value="${esc(s.kennelName)}"></div>
         <div class="field"><label>Tagline</label><input class="t-tagline" type="text" value="${esc(s.tagline)}"></div>
         <div class="field field-wide"><label>Intro text</label><textarea class="t-introText">${esc(s.introText)}</textarea><span class="field-hint">Sets the "not live" expectation on the recipient's page.</span></div>
-        <div class="field field-wide"><label>Announcement</label><textarea class="t-announcement">${esc(s.announcement)}</textarea><span class="field-hint">A broadcast line for everyone of this type (e.g. "Spring litter arrives in June!"). A recipient's personal note overrides this.</span></div>
+        <div class="field field-wide"><label>Announcement</label><textarea class="t-announcement">${esc(s.announcement)}</textarea><span class="field-hint">A broadcast line for everyone of this type (e.g. "Spring litter arrives in June!"). Shown alongside a recipient's personal note, not overridden by it.</span></div>
+        <div class="field field-wide"><label>Closer</label><textarea class="t-closer">${esc(s.closer)}</textarea><span class="field-hint">A sign-off shown at the very bottom of the page, just above the snapshot date (e.g. "Thanks for being part of our program!").</span></div>
       </div>
       <div style="margin-top:8px;"><button class="btn btn-primary btn-sm t-save">Save ${esc(companionTypeLabel(type))} template</button> <span class="t-saved muted"></span></div>
     </div>`;
@@ -72,7 +73,8 @@ function renderTemplates() {
         kennelName: card.querySelector('.t-kennelName').value.trim(),
         tagline: card.querySelector('.t-tagline').value.trim(),
         introText: card.querySelector('.t-introText').value,
-        announcement: card.querySelector('.t-announcement').value
+        announcement: card.querySelector('.t-announcement').value,
+        closer: card.querySelector('.t-closer').value
       });
       const saved = card.querySelector('.t-saved');
       saved.textContent = 'Saved.';
@@ -140,7 +142,7 @@ function recipientRow(contact) {
       </div>
       <div class="form-grid" style="margin-top:8px;">
         <div class="field"><label>Bundle type</label><select class="r-type">${typeOptions(suggested)}</select></div>
-        <div class="field field-wide"><label>Personal note (overrides the announcement)</label><textarea class="r-note">${esc(contact.companion_note || '')}</textarea></div>
+        <div class="field field-wide"><label>Personal note (shown alongside the announcement)</label><textarea class="r-note">${esc(contact.companion_note || '')}</textarea></div>
       </div>
       <div style="margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
         <button class="btn btn-sm r-save-note">Save note</button>
