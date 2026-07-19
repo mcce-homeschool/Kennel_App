@@ -1,6 +1,7 @@
 # Tutorial Sample-Data Coverage Spec (v1)
 
-**Status:** Draft for review. Planning doc only — no code changes proposed here.
+**Status:** Draft for review; the §11 open decisions are now **resolved** (see §11).
+Planning doc only — no code changes proposed here.
 **Goal:** Make the "Thornfield Kennels" sample packet comprehensive enough that a
 first-run guided tutorial can walk a brand-new user through **every hub, every
 section, every expandable surface, every required field, and every cross-app field
@@ -301,6 +302,18 @@ every new record has a reason to exist. Proposed narrative threads (each closes 
 - **Thread H — contacts & expenses polish (closes G13, G14).** Add a `groomer` and an
   `other` contact; set `email`/`address`/`companion_note` on 2–3 more; add one
   `pairing`-subject expense.
+- **Thread I — the Boxer program (D2; exercises breed vocabulary/filter).** Thornfield
+  keeps a small **Boxer** line beside the Bostons. Add ≥2 Boxer dogs (an
+  `active_breeding` female + a `retired_breeding` or `active_breeding` male), one Boxer
+  pairing, and enough that the Dogs breed-filter and reports show >1 breed. Set
+  `Kennel.preferred_breeds = ['Boston Terrier','Boxer']` on Thornfield (Thread F). Keep
+  Boxers on the **same** own kennel (no second fake kennel) so the "one program, two
+  breeds" story stays coherent. Reuse Boxers to carry some of the otherwise-thin fields
+  (e.g. a lease dog from Thread D, or the incoming stud client's dam from Thread B, can
+  be a Boxer) so the breed second-line doesn't just bolt on isolated records. The
+  pedigree/pairing sex-and-breed logic has no hard breed-match rule, so a mixed record is
+  a *warning* teaching moment, not a block — keep same-breed pairings unless a warning
+  stop is intended.
 
 **Teach-from-control fallback:** a few enum values have no believable Thornfield home
 (e.g. sale `cancelled`/`returned`, contract `void`/`declined`, pairing `failed`). The
@@ -334,6 +347,7 @@ points at; "Control" = taught from the dropdown (teach-from-control fallback).
 | `EVENT_TYPES` | ≥1 per subject-type family incl. a span (boarding/medication/heat) and a placement | rare types (surgery/injury) optional as records |
 | `EXPENSE_CATEGORIES` | food, veterinary, testing, facility, supplies, marketing, registration | remainder |
 | `EXPENSE_SUBJECT_TYPES` | dog, litter, pairing, kennel | — |
+| Breed (free vocab, D2) | Boston Terrier **and** Boxer, both on Thornfield's `preferred_breeds` | further breeds |
 
 ---
 
@@ -359,6 +373,8 @@ Each item is a new row or a previously-unset plain field — **no schema change*
 - [ ] **G12** ← Thread F: kennel `preferred_tests`/`preferred_breeds`/promote config.
 - [ ] **G13** ← Thread H: groomer/other contacts; broaden email/address/companion_note.
 - [ ] **G14** ← Thread H: one pairing-subject expense.
+- [ ] **D2** ← Thread I: ≥2 Boxer dogs + a Boxer pairing; Thornfield `preferred_breeds`
+      includes Boxer; Dogs breed-filter and reports show >1 breed.
 
 ---
 
@@ -405,24 +421,31 @@ Each item is a new row or a previously-unset plain field — **no schema change*
 
 ---
 
-## 11. Open decisions (need your call)
+## 11. Decisions (resolved)
 
-- **D1 — Seed size ceiling.** The expansion roughly doubles the packet (≈9→~16 dogs,
-  1→3 litters, 1→3 sales, 1→2 stud services, 2→5 contracts). Comfortable, or should the
-  tutorial run on a *separate, larger* "tutorial packet" distinct from the lighter
-  "sample data" a non-tutorial user loads? (Trade-off: one packet = simpler; two = the
-  casual demo stays small.)
-- **D2 — Second breed?** Everything is Boston Terrier today. Adding one dog of a second
-  breed exercises `preferred_breeds`/breed-filter but dilutes the "one program" story.
-  In or out?
-- **D3 — Teach-from-control list.** Confirm the enum values we *won't* fabricate records
-  for (§6/§7) so we don't over-build.
-- **D4 — Placeholder photos.** `Dog.url` can point at an external URL (no asset) or a
-  vendored placeholder image (asset ⇒ precache + cache bump). Which?
-- **D5 — Nudge determinism.** Nudges depend on "today". Are we comfortable tuning
-  relative dates so they're reliably live, accepting they'll drift if the user runs the
-  tutorial weeks after seeding? (Alternative: the tour seeds fresh immediately before
-  running, guaranteeing "today" alignment.)
+- **D1 — Seed size ceiling → ONE packet.** No separate tutorial packet. The single
+  "Thornfield Kennels" sample packet is expanded to serve both the casual demo and the
+  tutorial. Accept the roughly-doubled size (≈9→~16 dogs, 1→3 litters, 1→3 sales,
+  1→2 stud services, 2→5 contracts). Keep it believable per §2.5.
+- **D2 — Second breed → YES, add Boxers.** Thornfield runs a small second program in
+  **Boxers** alongside its Boston Terriers. This exercises `Kennel.preferred_breeds`,
+  the breed filter/vocabulary, and cross-breed guards. See §6 Thread I for how the Boxer
+  records are woven in without a second fake kennel.
+- **D3 — Teach-from-control list → CONFIRMED.** The enum values in §6/§7 marked
+  "teach-from-control" are **not** fabricated as records; the tour teaches them from the
+  dropdown. That list (sale `cancelled`/`returned`, contract `void`/`declined`, pairing
+  `bred`/`not_pregnant`/`failed`/`cancelled`, litter `sold`, and the second lease
+  direction) is now the agreed scope boundary — don't over-build past it.
+- **D4 — Photos → EXTERNAL URLs.** `Dog.url` (and thus companion `photosUrl`) points at
+  an **external URL**; no vendored image asset. Consequence: **no** `PRECACHE_URLS` or
+  `CACHE_NAME` change is needed for photos, and this stays consistent with `url` already
+  being a plain external-pointer field (it won't resolve offline, which is acceptable —
+  it's a link, not app shell). Editing `sampleData.js` still bumps `CACHE_NAME` per §2.7.
+- **D5 — Nudge determinism → TUNE relative dates.** Do **not** re-seed at tutorial launch.
+  Tune each nudge-dependent record's `daysFromToday`/`monthsFromToday` offsets (Threads
+  F+G) so all five nudge rules are live on seed day, accepting drift if the user seeds now
+  and takes the tutorial much later. §9 criterion 3 is evaluated against a fresh seed's
+  "today". If drift proves a problem in practice, revisit re-seed-on-launch as a v2 change.
 
 ---
 
