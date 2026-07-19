@@ -16,9 +16,15 @@ const els = {
   subtitle: document.getElementById('kennel-subtitle'),
   body: document.getElementById('profile-body'),
   error: document.getElementById('page-error'),
+  logo: document.getElementById('logo-section'),
   config: document.getElementById('kennel-config'),
   expenses: document.getElementById('expenses-section')
 };
+
+// Longest edge (px) a logo is downscaled to before it's stored as a data URL.
+// Keeps the backup-riding string small; a program logo needs no more resolution
+// than this on a printed one-page document.
+const LOGO_MAX_EDGE = 480;
 
 let kennel = null;      // the kennel being viewed
 let allDogs = [];        // loaded once, for the "Apply to dogs" picker
@@ -46,6 +52,89 @@ function renderProfile(k) {
     <p class="field-hint" style="margin-top:10px;">Edit a kennel's name, prefix, or
       location from the <a href="kennels.html">Kennels list</a>. Program settings
       and kennel-wide overhead live below.</p>`;
+}
+
+// --- Logo ------------------------------------------------------------------
+// The logo is a plain (unindexed) data-URL string on the Kennel record, so it
+// rides JSON backups and needs no schema/index change. Uploads are downscaled
+// on a canvas to LOGO_MAX_EDGE and re-encoded as PNG (preserves transparency)
+// before storing, so an oversized photo never bloats the record. The invoice /
+// receipt generator and the puppy record read this field back verbatim.
+function renderLogo() {
+  const k = kennel;
+  const preview = k.logo_data_url
+    ? `<img src="${esc(k.logo_data_url)}" alt="${esc(k.kennel_name)} logo" style="max-width:180px; max-height:180px; object-fit:contain; border:1px solid var(--border); border-radius:var(--radius); background:#fff; padding:6px;">`
+    : `<p class="faint" style="margin:4px 0;">No logo yet.</p>`;
+  els.logo.innerHTML = `
+    <section class="card">
+      <h2 style="margin-top:0;">Logo</h2>
+      <p class="field-hint">Shown on this kennel's invoices, receipts, and puppy records. Stored on this device and included in your JSON backups. A square or wide image works best; large uploads are automatically scaled down.</p>
+      <div>${preview}</div>
+      <input id="logo-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" hidden>
+      <div class="form-actions">
+        <button class="btn btn-sm" data-act="logo-choose">${k.logo_data_url ? 'Replace logo' : 'Upload logo'}</button>
+        ${k.logo_data_url ? '<button class="btn btn-danger btn-sm" data-act="logo-remove">Remove logo</button>' : ''}
+      </div>
+      <div id="logo-error"></div>
+    </section>`;
+
+  const fileInput = els.logo.querySelector('#logo-file');
+  els.logo.querySelector('[data-act="logo-choose"]').addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) onLogoFile(fileInput.files[0]); });
+  const removeBtn = els.logo.querySelector('[data-act="logo-remove"]');
+  if (removeBtn) removeBtn.addEventListener('click', onLogoRemove);
+}
+
+function logoError(msg) {
+  const box = els.logo.querySelector('#logo-error');
+  if (box) box.innerHTML = msg ? `<div class="inline-error">${esc(msg)}</div>` : '';
+}
+
+// Read a file, downscale it on a canvas, and resolve a PNG data URL. SVGs are
+// vector — kept as-is (data URL of the raw markup) rather than rasterized.
+function fileToLogoDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith('image/')) { reject(new Error('Please choose an image file.')); return; }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read that file.'));
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      if (file.type === 'image/svg+xml') { resolve(dataUrl); return; }
+      const img = new Image();
+      img.onerror = () => reject(new Error('That image could not be loaded.'));
+      img.onload = () => {
+        const scale = Math.min(1, LOGO_MAX_EDGE / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function onLogoFile(file) {
+  logoError('');
+  try {
+    const logo_data_url = await fileToLogoDataUrl(file);
+    await kennelRepo.update(kennel.id, { logo_data_url });
+    await reloadKennel();
+    renderLogo();
+  } catch (err) { logoError(err.message || String(err)); }
+}
+
+async function onLogoRemove() {
+  logoError('');
+  try {
+    await kennelRepo.update(kennel.id, { logo_data_url: null });
+    await reloadKennel();
+    renderLogo();
+  } catch (err) { logoError(err.message || String(err)); }
 }
 
 // Own-kennel program configuration: lifecycle nudges + preferred tests. Only
@@ -202,6 +291,7 @@ async function main() {
   kennel = k;
   allDogs = dogs;
   renderProfile(k);
+  renderLogo();
   renderConfig();
   renderExpensePanel({ mount: els.expenses, subjectType: 'kennel', subjectId: k.id, title: 'Kennel Expenses' });
 }

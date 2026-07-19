@@ -240,6 +240,7 @@ async function main() {
 
   root.innerHTML = `
     <div class="pr-header">
+      ${ownKennel?.logo_data_url ? `<img src="${esc(ownKennel.logo_data_url)}" alt="${esc(ownKennel.kennel_name || '')} logo" style="max-height:72px; max-width:200px; object-fit:contain; margin-bottom:6px;">` : ''}
       <h1>${esc(ownKennel?.kennel_name || 'Puppy Record')}</h1>
       <div class="pr-kennel">Puppy Record</div>
       <div class="pr-generated">Generated ${esc(fmtDateMDY(new Date().toISOString().slice(0, 10)))}</div>
