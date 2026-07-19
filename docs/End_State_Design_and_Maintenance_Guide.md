@@ -675,7 +675,7 @@ awareness) and returns zero or more:
 ```
 { key, title, detail, subjectHref, actions: [{ label, run: async () => {} }] }
 ```
-Five rules, each producing its own stable `key` so a dismissal survives re-computation:
+Eight rules, each producing its own stable `key` so a dismissal survives re-computation:
 - **Stud-service status** — `sent_date` passed + `status='arranged'` → suggest
   `in_progress`; `returned_date` passed + `status ∈ {arranged, in_progress}` → suggest
   `completed` (never both; completed wins if both conditions hold).
@@ -698,6 +698,21 @@ Five rules, each producing its own stable `key` so a dismissal survives re-compu
   against it yet (`litterRepo.getForPairing`), suggests either fix: mark the pairing
   `whelped` directly, or deep-link to `litter.html?new=1&pairing=<id>` (the same
   prefill the pairing page's own "Create Litter" button uses).
+- **Litter → sold** — a non-archived litter in `ready` status whose whole puppy roster
+  is resolved to `placed`/`keeping`, with **at least one** actually `placed` (an
+  all-`keeping` litter sold nothing, so it never fires), suggests marking the litter
+  `sold`.
+- **Litter → reopen** — a `sold` or `closed` litter with any puppy back to `available`
+  suggests reopening it to `ready`.
+- **Litter → close** — a `sold` litter with no `available` puppy where **every** `placed`
+  puppy has a `delivered` sale suggests marking it `closed`. A placed puppy with no
+  delivered sale — including one with no sale row at all — blocks the nudge.
+
+The three litter-lifecycle rules are aggregate facts over a litter's derived puppy
+roster (and, for close, its sales), so `computeNudges()` groups the already-loaded
+`dogRepo.getAll()` result by `litter_id` in one pass and adds `saleRepo.getAll()` to
+its parallel load rather than re-scanning per record on each pup/sale save. Their
+actions mutate only `Litter.status` via `litterRepo.update`; nothing auto-mutates.
 
 The stud→pairing and heat→pairing rules share one dedup helper
 (`pairingExistsForDam`): a pairing counts as "already handled" if it's for the same

@@ -19,9 +19,10 @@ import { dogRepo } from './dogRepo.js';
 import { kennelRepo } from './kennelRepo.js';
 import { pairingRepo } from './pairingRepo.js';
 import { litterRepo } from './litterRepo.js';
+import { saleRepo } from './saleRepo.js';
 import { eventRepo } from './eventRepo.js';
 import { todayYMD, monthsBetween } from './dateUtils.js';
-import { descriptor, PAIRING_STATUS } from './vocab.js';
+import { descriptor, PAIRING_STATUS, LITTER_STATUS } from './vocab.js';
 
 const TERMINAL_PAIRING_STATUSES = ['cancelled', 'failed'];
 
@@ -47,6 +48,12 @@ function studPartnerLabel(s, dogsById) {
 
 function pairingLabel(p, dogsById) {
   return `${dogsById.get(p.dam_id)?.call_name || 'Dam'} × ${dogsById.get(p.sire_id)?.call_name || 'Sire'}`;
+}
+
+// Litter display label — mirrors the litter page's title logic: the nickname
+// leads when present, otherwise dam × sire.
+function litterLabel(l, dogsById) {
+  return l.nickname || `${dogsById.get(l.dam_id)?.call_name || 'Dam'} × ${dogsById.get(l.sire_id)?.call_name || 'Sire'}`;
 }
 
 // §4.2 — stud-service status nudges. Never both at once for the same record:
@@ -78,13 +85,14 @@ function studInProgressNudge(s, dogsById) {
 
 export async function computeNudges() {
   const today = todayYMD();
-  const [studServices, dogs, kennels, pairings, events, litters] = await Promise.all([
+  const [studServices, dogs, kennels, pairings, events, litters, sales] = await Promise.all([
     studServiceRepo.getAll(),
     dogRepo.getAll(),
     kennelRepo.getAll(),
     pairingRepo.getAll(),
     eventRepo.getAll(),
-    litterRepo.getAll({ includeArchived: true })
+    litterRepo.getAll({ includeArchived: true }),
+    saleRepo.getAll()
   ]);
   const dogsById = new Map(dogs.map((d) => [d.id, d]));
   const kennelsById = new Map(kennels.map((k) => [k.id, k]));
@@ -187,6 +195,79 @@ export async function computeNudges() {
         { label: 'Create litter', run: async () => { location.href = `litter.html?new=1&pairing=${encodeURIComponent(p.id)}`; } }
       ]
     });
+  }
+
+  // Litter-lifecycle nudges — all three are aggregate facts over a litter's
+  // puppy roster (and, for the close rule, its sales), so they're grouped once
+  // here from data already loaded above rather than re-scanned per record on
+  // every pup/sale save. Non-archived, non-empty rosters only.
+  const pupsByLitter = new Map();
+  for (const d of dogs) {
+    if (!d.litter_id) continue;
+    const arr = pupsByLitter.get(d.litter_id);
+    if (arr) arr.push(d); else pupsByLitter.set(d.litter_id, [d]);
+  }
+  const salesByDog = new Map();
+  for (const s of sales) {
+    const arr = salesByDog.get(s.dog_id);
+    if (arr) arr.push(s); else salesByDog.set(s.dog_id, [s]);
+  }
+
+  for (const l of litters) {
+    if (l.is_archived) continue;
+    const pups = pupsByLitter.get(l.id);
+    if (!pups || pups.length === 0) continue;
+    const label = litterLabel(l, dogsById);
+    const href = `litter.html?id=${encodeURIComponent(l.id)}`;
+    const anyAvailable = pups.some((p) => p.disposition === 'available');
+
+    // Every pup resolved to placed/keeping, with at least one actually placed
+    // (an all-keeping litter never "sold" anything) → suggest marking it sold.
+    if (l.status === 'ready'
+      && pups.every((p) => p.disposition === 'placed' || p.disposition === 'keeping')
+      && pups.some((p) => p.disposition === 'placed')) {
+      nudges.push({
+        key: `littersold:${l.id}`,
+        title: `${label} — all puppies spoken for. Mark the litter sold?`,
+        detail: 'Every puppy is placed or being kept.',
+        subjectHref: href,
+        actions: [
+          { label: 'Mark sold', run: async () => { await litterRepo.update(l.id, { status: 'sold' }); } }
+        ]
+      });
+    }
+
+    // A puppy came back available on a sold/closed litter → suggest reopening.
+    if ((l.status === 'sold' || l.status === 'closed') && anyAvailable) {
+      nudges.push({
+        key: `litterreopen:${l.id}`,
+        title: `${label} has a puppy available again — reopen the litter?`,
+        detail: `Marked "${descriptor(LITTER_STATUS, l.status).label}" but a puppy is available.`,
+        subjectHref: href,
+        actions: [
+          { label: 'Reopen to Ready', run: async () => { await litterRepo.update(l.id, { status: 'ready' }); } }
+        ]
+      });
+    }
+
+    // Every placed puppy has a delivered sale (a placed pup with no delivered
+    // sale — including none at all — blocks this) → suggest closing the litter.
+    if (l.status === 'sold' && !anyAvailable) {
+      const placed = pups.filter((p) => p.disposition === 'placed');
+      const allDelivered = placed.length > 0 && placed.every((p) =>
+        (salesByDog.get(p.id) || []).some((s) => s.status === 'delivered'));
+      if (allDelivered) {
+        nudges.push({
+          key: `litterclose:${l.id}`,
+          title: `${label} — every placement delivered. Close the litter?`,
+          detail: 'All placed puppies have a delivered sale.',
+          subjectHref: href,
+          actions: [
+            { label: 'Close litter', run: async () => { await litterRepo.update(l.id, { status: 'closed' }); } }
+          ]
+        });
+      }
+    }
   }
 
   return nudges;
