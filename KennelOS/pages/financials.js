@@ -23,12 +23,13 @@ import { dogRepo } from '../data/dogRepo.js';
 import { litterRepo } from '../data/litterRepo.js';
 import { pairingRepo } from '../data/pairingRepo.js';
 import { kennelRepo } from '../data/kennelRepo.js';
-import { getIncomeRows, summarize } from '../data/incomeView.js';
+import { getIncomeRows, summarize, incomeLineItems } from '../data/incomeView.js';
 import { createReportView } from '../assets/reportView.js';
 import { esc, badge, fmtDate, fmtMoney, todayYMD, param } from '../assets/ui.js';
 import {
   EXPENSE_CATEGORIES, EXPENSE_SUBJECT_TYPES, INCOME_SOURCE_TYPES, INCOME_COMPONENTS,
-  INCOME_STATES, SALE_STATUS, STUD_SERVICE_STATUS, BOARDING_FREQUENCY_OPTIONS, descriptor
+  INCOME_STATES, SALE_STATUS, STUD_SERVICE_STATUS, BOARDING_FREQUENCY_OPTIONS,
+  PAYMENT_METHODS, descriptor
 } from '../data/vocab.js';
 
 const SUBJECT_PAGE = { dog: 'dog.html', litter: 'litter.html', pairing: 'pairing.html', kennel: 'kennel.html' };
@@ -559,6 +560,146 @@ async function initOverview() {
 }
 
 // ==========================================================================
+// INVOICE / RECEIPT generator (opens the print-only invoice.html, §24)
+// ==========================================================================
+
+// A source record is any income row (a Sale or an outgoing StudService that
+// carries money — exactly what getIncomeRows returns). The modal lets the owner
+// pick one, choose Invoice vs Receipt, check which of the five income types to
+// include, and set/confirm the payment method and other document fields. Those
+// fields persist on the record; doc type + item selection ride the URL.
+const PAYMENT_METHOD_LIST = PAYMENT_METHODS.map((m) => `<option value="${esc(m)}"></option>`).join('');
+
+async function openGenerateModal() {
+  const rows = await getIncomeRows({ includeArchived: false });
+  const rowByKey = new Map(rows.map((r) => [`${r.source_type}:${r.source_id}`, r]));
+
+  const optFor = (r) => {
+    const sep = r.source_type === 'sale' ? '→' : '×';
+    const when = r.date ? ` (${fmtDate(r.date)})` : '';
+    return `<option value="${esc(r.source_type)}:${esc(r.source_id)}">${esc(r.dog)} ${sep} ${esc(r.counterparty)}${esc(when)}</option>`;
+  };
+  const saleOpts = rows.filter((r) => r.source_type === 'sale').map(optFor).join('');
+  const studOpts = rows.filter((r) => r.source_type === 'stud').map(optFor).join('');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="row-between" style="margin-bottom:12px;">
+        <h2 style="margin:0;">Invoice / Receipt</h2>
+        <button class="btn btn-sm" data-act="cancel">✕</button>
+      </div>
+      ${rows.length ? `
+      <div class="form-grid">
+        <div class="field field-wide"><label>Document</label>
+          <div class="pill-row">
+            <label class="check-inline"><input type="radio" name="gen-doc" value="invoice" checked> Invoice</label>
+            <label class="check-inline"><input type="radio" name="gen-doc" value="receipt"> Receipt</label>
+          </div>
+        </div>
+        <div class="field field-wide"><label>For <span class="req">*</span></label>
+          <select id="gen-source">
+            <option value="">— select a sale or stud service —</option>
+            ${saleOpts ? `<optgroup label="Sales">${saleOpts}</optgroup>` : ''}
+            ${studOpts ? `<optgroup label="Stud services">${studOpts}</optgroup>` : ''}
+          </select>
+        </div>
+      </div>
+      <div id="gen-config"></div>
+      <div id="gen-error"></div>
+      <div class="form-actions">
+        <button class="btn btn-primary" data-act="generate" disabled>Generate →</button>
+        <button class="btn" data-act="cancel">Cancel</button>
+      </div>` : `
+      <p class="muted">No income records to invoice yet. Record a sale or an outgoing stud service with a price, deposit, or fee first.</p>
+      <div class="form-actions"><button class="btn" data-act="cancel">Close</button></div>`}
+    </div>`;
+  document.body.appendChild(overlay);
+  const modal = overlay.querySelector('.modal');
+
+  function close() { overlay.remove(); document.removeEventListener('keydown', onKey); }
+  function onKey(e) { if (e.key === 'Escape') close(); }
+  modal.querySelectorAll('[data-act="cancel"]').forEach((b) => b.addEventListener('click', close));
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', onKey);
+
+  const sourceSel = modal.querySelector('#gen-source');
+  const configEl = modal.querySelector('#gen-config');
+  const genBtn = modal.querySelector('[data-act="generate"]');
+  if (!sourceSel) return; // no rows — nothing to wire
+
+  let current = null; // { source, record }
+
+  async function loadConfig() {
+    const key = sourceSel.value;
+    const row = key ? rowByKey.get(key) : null;
+    if (!row) { current = null; configEl.innerHTML = ''; genBtn.disabled = true; return; }
+    const record = row.source_type === 'sale'
+      ? await saleRepo.getById(row.source_id)
+      : await studServiceRepo.getById(row.source_id);
+    current = { source: row.source_type, record };
+    const items = incomeLineItems(row.source_type, record);
+    const itemRows = items.map((it) => `
+      <label class="check-inline" style="display:flex; align-items:center; gap:8px; margin:5px 0;">
+        <input type="checkbox" class="gen-item" value="${esc(it.component)}" checked>
+        <span style="flex:1;">${esc(it.label)}</span>
+        <span>${badge(INCOME_STATES, it.state)}</span>
+        <strong>${esc(fmtMoney(it.amount))}</strong>
+      </label>`).join('');
+    configEl.innerHTML = `
+      <div style="margin-top:12px; border-top:1px solid var(--border); padding-top:12px;">
+        <label style="font-weight:600;">Line items to include</label>
+        <p class="field-hint" style="margin:2px 0 6px;">Covers all five income types — deposit, balance, transport, deferred boarding, and stud fee — as they apply to this record.</p>
+        ${itemRows || '<p class="faint">No billable amounts on this record.</p>'}
+      </div>
+      <div class="form-grid" style="margin-top:12px;">
+        <div class="field"><label>Payment method</label>
+          <input id="gen-pm" type="text" list="gen-pm-list" value="${esc(record.payment_method || '')}" placeholder="e.g. Check, Venmo…">
+          <datalist id="gen-pm-list">${PAYMENT_METHOD_LIST}</datalist>
+        </div>
+        <div class="field"><label>Reference</label>
+          <input id="gen-ref" type="text" value="${esc(record.payment_reference || '')}" placeholder="Check #, transaction id…">
+        </div>
+        <div class="field"><label>Document #</label>
+          <input id="gen-num" type="text" value="${esc(record.invoice_number || '')}" placeholder="Auto (INV-…)">
+        </div>
+        <div class="field field-wide"><label>Notes on document</label>
+          <textarea id="gen-notes" placeholder="Optional message shown on the invoice/receipt">${esc(record.invoice_notes || '')}</textarea>
+        </div>
+      </div>`;
+    genBtn.disabled = false;
+  }
+
+  sourceSel.addEventListener('change', () => { loadConfig().catch((e) => { modal.querySelector('#gen-error').innerHTML = `<div class="inline-error">${esc(e.message || String(e))}</div>`; }); });
+
+  genBtn.addEventListener('click', async () => {
+    const errBox = modal.querySelector('#gen-error');
+    errBox.innerHTML = '';
+    if (!current) return;
+    const items = [...modal.querySelectorAll('.gen-item:checked')].map((cb) => cb.value);
+    if (!items.length) { errBox.innerHTML = `<div class="inline-error">Select at least one line item.</div>`; return; }
+    const doc = modal.querySelector('input[name="gen-doc"]:checked').value;
+    const trimOrNull = (id) => (modal.querySelector(id).value.trim() || null);
+    try {
+      const repo = current.source === 'sale' ? saleRepo : studServiceRepo;
+      await repo.update(current.record.id, {
+        payment_method: trimOrNull('#gen-pm'),
+        payment_reference: trimOrNull('#gen-ref'),
+        invoice_number: trimOrNull('#gen-num'),
+        invoice_notes: trimOrNull('#gen-notes')
+      });
+      const url = `invoice.html?source=${encodeURIComponent(current.source)}&id=${encodeURIComponent(current.record.id)}`
+        + `&doc=${encodeURIComponent(doc)}&items=${encodeURIComponent(items.join(','))}&autoprint=1`;
+      window.open(url, '_blank');
+      close();
+    } catch (e) {
+      errBox.innerHTML = `<div class="inline-error">${esc(e.message || String(e))}</div>`;
+    }
+  });
+}
+
+// ==========================================================================
 // Boot
 // ==========================================================================
 
@@ -581,6 +722,10 @@ async function init() {
   // force it off here and initExpenses turns it back on.
   const addBtn = document.getElementById('add-expense');
   if (addBtn) addBtn.style.display = 'none';
+
+  // The Invoice / Receipt generator is available from every Financials view.
+  const genBtn = document.getElementById('gen-document');
+  if (genBtn) genBtn.addEventListener('click', () => openGenerateModal());
 
   if (view === 'income') initIncome();
   else if (view === 'overview') await initOverview();

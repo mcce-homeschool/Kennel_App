@@ -14,6 +14,7 @@ import { saleRepo } from './saleRepo.js';
 import { studServiceRepo } from './studServiceRepo.js';
 import { dogRepo } from './dogRepo.js';
 import { contactRepo } from './contactRepo.js';
+import { INCOME_COMPONENTS, descriptor } from './vocab.js';
 
 const num = (v) => (v == null || v === '' ? 0 : Number(v)) || 0;
 
@@ -85,6 +86,19 @@ function studComponents(s) {
 
 function sumBy(components, state) {
   return components.reduce((t, c) => (c.state === state ? t + c.amount : t), 0);
+}
+
+// Cash line items for an invoice/receipt on ONE income record (§24). Reuses the
+// exact earned/anticipated classification the Income view uses, so a generated
+// document can never show a component the ledger wouldn't. Drops the non-cash
+// `pick` line (never invoiceable) and tags each item with its display label.
+// `sourceType` is 'sale' | 'stud'; the invoice page and the generator modal
+// both call this so their line items can't drift.
+export function incomeLineItems(sourceType, record) {
+  const comps = sourceType === 'sale' ? saleComponents(record) : studComponents(record);
+  return comps
+    .filter((c) => c.state !== 'noncash')
+    .map((c) => ({ ...c, label: descriptor(INCOME_COMPONENTS, c.component).label }));
 }
 
 // Build the one-per-record income rows. Each carries its component breakdown plus

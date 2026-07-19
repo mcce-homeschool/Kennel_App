@@ -95,6 +95,8 @@ const PRECACHE_URLS = [
   'pages/health-tests-report.js',
   'pages/import-export.html',
   'pages/import-export.js',
+  'pages/invoice.html',
+  'pages/invoice.js',
   'pages/kennel-tests-import.html',
   'pages/kennel-tests-import.js',
   'pages/kennel.html',

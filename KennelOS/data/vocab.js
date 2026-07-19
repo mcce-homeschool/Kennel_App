@@ -181,6 +181,12 @@ export const COI_METHOD_SUGGESTIONS = ['genomic', 'pedigree', 'registry', 'other
 // how the puppy actually travelled to the buyer.
 export const PLACEMENT_METHODS = ['Flight nanny', 'Ground transport', 'Local pickup', 'Other'];
 
+// Suggested payment methods for a Sale / StudService — how the buyer or stud
+// partner paid (or will pay). Surfaced as a datalist on the invoice/receipt
+// generator (§24); free text is allowed so an unusual method is never blocked,
+// same suggest-not-enforce posture as the *_SUGGESTIONS lists above.
+export const PAYMENT_METHODS = ['Cash', 'Check', 'Credit/debit card', 'Bank transfer', 'PayPal', 'Venmo', 'Zelle', 'Money order', 'Other'];
+
 // Enforced choice list for Sale's `deferred_boarding_frequency` field — the
 // rate period the deferred pickup boarding amount is charged per.
 export const BOARDING_FREQUENCY_OPTIONS = ['Day', 'Week', 'Month'];
