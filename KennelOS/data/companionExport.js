@@ -241,7 +241,9 @@ export async function buildProspectiveBundle(contact) {
 // history. A pointer to the governing contract document rides alongside. ------
 export async function buildFamilyBundle(contact) {
   const h = headerCopy('family', contact);
-  const sales = (await saleRepo.getByBuyer(contact.id)).filter((s) => !s.is_archived);
+  // Only OPEN sales — a terminal sale (delivered/returned/cancelled) never shows,
+  // matching "current family" membership exactly (saleRepo.isOpenSale).
+  const sales = (await saleRepo.getByBuyer(contact.id)).filter(saleRepo.isOpenSale);
   const updatedAt = new Date().toISOString();
   const asOf = updatedAt.slice(0, 10);
 

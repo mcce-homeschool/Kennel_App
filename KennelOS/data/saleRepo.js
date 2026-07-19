@@ -12,6 +12,12 @@ const base = makeRepo('sales', SALE_REFERENCES);
 
 const REQUIRED_FIELDS = ['dog_id', 'buyer_contact_id', 'placement_type', 'status'];
 
+// Statuses that close a sale out. A closed sale no longer makes its buyer a
+// current "family" and never appears in that family's companion bundle — applied
+// identically to membership (companion.js) and bundle contents (companionExport.js)
+// via isOpenSale so the two can't drift.
+export const TERMINAL_SALE_STATUSES = ['delivered', 'returned', 'cancelled'];
+
 function validateSale(candidate) {
   for (const f of REQUIRED_FIELDS) {
     if (candidate[f] == null || candidate[f] === '') {
@@ -53,6 +59,14 @@ export const saleRepo = {
   // Sales where this contact is the buyer — powers the Contact Detail panel.
   getByBuyer(contactId) {
     return db.sales.where('buyer_contact_id').equals(contactId).toArray();
+  },
+
+  // Is this an open (in-flight) sale? The single predicate shared by "current
+  // family" membership (companion.js) and the family companion bundle
+  // (companionExport.js): a non-archived sale with a status that has not reached
+  // a terminal state (delivered/returned/cancelled).
+  isOpenSale(s) {
+    return !!s && !s.is_archived && !!s.status && !TERMINAL_SALE_STATUSES.includes(s.status);
   },
 
   // Distinct lead_source values already entered — feeds the free-text

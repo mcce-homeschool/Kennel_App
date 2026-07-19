@@ -744,8 +744,9 @@ view. The main app stays single-user/offline/all-local; this adds *recipients*.
     bundles **now carry price** — this reverses the earlier "prospective = shared
     availability, NO price" invariant. Still **no per-recipient private data**: the
     availability is the same for every prospect.
-  - **`family`** — a current family (a buyer with a sale): **one rich card per placed
-    pup** (`pups[]`, from `saleRepo.getByBuyer` → dog). Each pup carries `callName`,
+  - **`family`** — a current family (a buyer with an **open** sale): **one rich card per placed
+    pup** (`pups[]`, from `saleRepo.getByBuyer` filtered by `saleRepo.isOpenSale` → dog —
+    terminal sales, `delivered`/`returned`/`cancelled`, never appear, matching membership). Each pup carries `callName`,
     `sex`, `photosUrl` (`Dog.url`), `litterNickname` (when set), `sire`/`dam` (call +
     registered name), a **computed `age` `{ageWeeks, ageDays}`** as-of the generation
     date (**never the raw DOB**), a `placement` block or an `estimatedReadyDate`,
@@ -819,16 +820,17 @@ view. The main app stays single-user/offline/all-local; this adds *recipients*.
   the recipient will see, sending nothing. Both actions share `buildSendArtifacts`,
   so the preview can never drift from the send. **Membership predicates** (`companion.js`): a
   **prospective** is a Contact with `waitlist_status === 'active'`; a **family** is a
-  buyer with an **open** (non-terminal) sale — any non-archived Sale whose `status` is
-  not in `{delivered, returned, cancelled}`; a **partner** is a Contact who is the
+  buyer with an **open** sale per `saleRepo.isOpenSale(s)` (non-archived, status not in
+  `{delivered, returned, cancelled}`); a **partner** is a Contact who is the
   `partner_contact_id` on a non-archived StudService whose `returned_date` is empty or
   `>= today`, **or** the `related_contact_id` on a `lease`/`co_own`/`other` contract
   that is live per `contractRepo.isLivePartnerContract(c, today)` (non-archived,
   non-terminal status, and — for a lease — not past `lease_end_date`). A Contact can
-  appear under more than one tab — that's expected. The prospective/family filters are
-  display-only, but the **partner** predicate is now shared with the bundle builder
-  (the partner `contracts` block filters on the same `isLivePartnerContract`), so
-  membership and bundle contents stay in lockstep.
+  appear under more than one tab — that's expected. The prospective filter is
+  display-only, but the **family** and **partner** predicates are shared with the bundle
+  builder (the family bundle filters sales on the same `isOpenSale`; the partner
+  `contracts` block filters on the same `isLivePartnerContract`), so membership and
+  bundle contents stay in lockstep.
 - **Two-layer messaging.** Layer 1 is per-type config (`kennelName`/`tagline`/
   `introText`/`announcement`/`closer`) in `settings.js` under the `companion` key,
   edited in the console's template card (one per type). Layer 2 is
