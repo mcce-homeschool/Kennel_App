@@ -31,6 +31,7 @@ import { contractRepo } from './contractRepo.js';
 import { studServiceRepo } from './studServiceRepo.js';
 import { eventRepo } from './eventRepo.js';
 import { litterRepo } from './litterRepo.js';
+import { todayYMD } from './dateUtils.js';
 import { getCompanionSettings } from './settings.js';
 
 export const COMPANION_BUNDLE_VERSION = 1;
@@ -50,6 +51,38 @@ function nonEmpty(v) {
 // Parent identity for a family's parentage line — call + registered name only.
 function parentName(d) {
   return d ? { registeredName: d.registered_name || '', callName: d.call_name || '' } : null;
+}
+
+// Identity of the dog a lease / co-own agreement is about — registered + call
+// name only (no photos or tests; the recipient already knows the dog).
+function dogRef(d) {
+  return d ? { registeredName: d.registered_name || '', callName: d.call_name || '' } : null;
+}
+
+// Per-type public projection of a partner contract. Each branch copies ONLY its
+// own fields BY NAME — the allow-list invariant holds because `contracts` is an
+// allowed top-level key and everything nested here is named (spreading `base`,
+// a freshly-built object, is not a record spread — same pattern as `...h`). Lease
+// adds its window + the leased dog; co_own adds the co-owned dog; other stays the
+// generic shape.
+async function projectContract(c) {
+  const base = {
+    type: c.contract_type || null,
+    title: c.title || null,
+    status: c.status || null,
+    signedDate: c.signed_date || null,
+    terms: c.terms_summary || null,
+    document_url: c.document_url || null
+  };
+  if (c.contract_type === 'lease') {
+    const dog = c.related_dog_id ? await dogRepo.getById(c.related_dog_id) : null;
+    return { ...base, startDate: c.lease_start_date || null, endDate: c.lease_end_date || null, dog: dogRef(dog) };
+  }
+  if (c.contract_type === 'co_own') {
+    const dog = c.related_dog_id ? await dogRepo.getById(c.related_dog_id) : null;
+    return { ...base, dog: dogRef(dog) };
+  }
+  return base;
 }
 
 // Completed breed-specific / health tests for a dog, projected to {name, result}
@@ -372,16 +405,27 @@ export async function buildPartnerBundle(contact) {
     });
   }
 
-  const contracts = (await contractRepo.getByContact(contact.id))
-    .filter((c) => !c.is_archived)
-    .map((c) => ({
-      type: c.contract_type || null,
-      title: c.title || null,
-      status: c.status || null,
-      signedDate: c.signed_date || null,
-      terms: c.terms_summary || null,
-      document_url: c.document_url || null
-    }));
+  // Partner contracts, reduced to the LIVE one per distinct agreement — not the
+  // full history. getByContact spans several agreements at once (e.g. a lease +
+  // a co_own + last year's expired lease), so keep only live contracts (same
+  // isLivePartnerContract predicate as membership — non-terminal, unexpired),
+  // group them by (type + dog), and within each group keep the governing
+  // (most-recent signed) contract, falling back to the most recent by created_at.
+  const today = todayYMD();
+  const liveContracts = (await contractRepo.getByContact(contact.id))
+    .filter((c) => contractRepo.isLivePartnerContract(c, today));
+  const contractGroups = new Map();
+  for (const c of liveContracts) {
+    const key = `${c.contract_type}::${c.related_dog_id || ''}`;
+    if (!contractGroups.has(key)) contractGroups.set(key, []);
+    contractGroups.get(key).push(c);
+  }
+  const contracts = [];
+  for (const group of contractGroups.values()) {
+    const live = contractRepo.governingContract(group)
+      || group.slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0];
+    if (live) contracts.push(await projectContract(live));
+  }
 
   const bundle = {
     bundleVersion: COMPANION_BUNDLE_VERSION,

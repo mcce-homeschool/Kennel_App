@@ -141,6 +141,14 @@
       reserved: 'Reserved', deposit_paid: 'Deposit paid', paid_in_full: 'Paid in full',
       delivered: 'Delivered', returned: 'Returned', cancelled: 'Cancelled'
     };
+    // Per-contract-type labels: the entry title fallback, and the section heading
+    // when the whole Contracts card is a single type (mixed types stay "Contracts").
+    var CONTRACT_TYPE_LABELS = {
+      sale: 'Sale', stud_service: 'Stud service', co_own: 'Co-ownership', lease: 'Lease', other: 'Contract'
+    };
+    var CONTRACT_SECTION_LABELS = {
+      lease: 'Lease agreement', co_own: 'Co-ownership', other: 'Contracts'
+    };
     function labelFor(map, v) {
       if (v == null || v === '') return '';
       if (map[v]) return map[v];
@@ -148,6 +156,14 @@
       return s.charAt(0).toUpperCase() + s.slice(1);
     }
     function sexLabel(s) { return s === 'male' ? '♂' : s === 'female' ? '♀' : ''; }
+    // A lease/co-own dog's identity: registered name with the call name quoted
+    // when both are present, else whichever exists.
+    function dogLabel(d) {
+      if (!d) return '';
+      var reg = d.registeredName || '', call = d.callName || '';
+      if (reg && call) return reg + ' "' + call + '"';
+      return reg || call || '';
+    }
 
     // Hardcoded disclaimer copy (brief §3/§5 — lives in the shell, never the bundle).
     var READY_DISCLAIMER = 'This is an estimate and may be subject to change depending on veterinary status.';
@@ -519,12 +535,27 @@
 
       var contracts = Array.isArray(b.contracts) ? b.contracts : [];
       if (contracts.length) {
-        h += '<div class="card"><h2>Contracts</h2>';
+        // Section heading follows the contents: a single-type card reads as its
+        // type ("Lease agreement" / "Co-ownership"); a mixed card stays "Contracts".
+        var only = null, mixed = false;
+        for (var t = 0; t < contracts.length; t++) {
+          if (only === null) only = contracts[t].type;
+          else if (only !== contracts[t].type) { mixed = true; break; }
+        }
+        var sectionTitle = (!mixed && CONTRACT_SECTION_LABELS[only]) ? CONTRACT_SECTION_LABELS[only] : 'Contracts';
+        h += '<div class="card"><h2>' + esc(sectionTitle) + '</h2>';
         for (var c = 0; c < contracts.length; c++) {
           var ct = contracts[c];
-          var title = ct.title || (ct.type ? String(ct.type).replace(/_/g, ' ') : 'Contract');
+          var title = ct.title || labelFor(CONTRACT_TYPE_LABELS, ct.type) || 'Contract';
           h += '<div style="padding:10px 0; border-top:1px solid var(--border);">';
           h += '<div><strong>' + esc(title) + '</strong>' + (ct.status ? ' <span class="chip">' + esc(String(ct.status).replace(/_/g, ' ')) + '</span>' : '') + '</div>';
+          // Type-specific rows: the leased/co-owned dog, and a lease's window.
+          var dn = dogLabel(ct.dog);
+          if (dn) h += row('Dog', esc(dn));
+          if (ct.type === 'lease') {
+            if (ct.startDate) h += row('Begins', esc(fmtDate(ct.startDate)));
+            if (ct.endDate) h += row('Ends', esc(fmtDate(ct.endDate)));
+          }
           // signedDate is present only on new links; show "Not Signed" when null.
           if (has(ct, 'signedDate')) h += row('Signed', ct.signedDate ? esc(fmtDate(ct.signedDate)) : 'Not Signed');
           if (ct.terms) h += row('Terms', esc(ct.terms));

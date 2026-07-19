@@ -162,19 +162,16 @@ async function loadData() {
   }
 
   // Partners: a stud service whose return date hasn't passed (empty or future),
-  // a lease whose end date hasn't passed, or any co-own / other contract.
+  // or a live lease / co_own / other contract — the same isLivePartnerContract
+  // predicate the bundle builder uses, so membership and bundle contents agree
+  // (non-terminal status; unexpired for leases).
   ctx.partnerIds = new Set();
   for (const ss of studServices) {
     if (ss.is_archived || !ss.partner_contact_id) continue;
     if (!ss.returned_date || ss.returned_date >= today) ctx.partnerIds.add(ss.partner_contact_id);
   }
   for (const c of contracts) {
-    if (c.is_archived || !c.related_contact_id) continue;
-    if (c.contract_type === 'lease') {
-      if (!c.lease_end_date || c.lease_end_date >= today) ctx.partnerIds.add(c.related_contact_id);
-    } else if (c.contract_type === 'co_own' || c.contract_type === 'other') {
-      ctx.partnerIds.add(c.related_contact_id);
-    }
+    if (contractRepo.isLivePartnerContract(c, today)) ctx.partnerIds.add(c.related_contact_id);
   }
 }
 

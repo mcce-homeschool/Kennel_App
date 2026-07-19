@@ -27,6 +27,11 @@ const REQUIRED_FIELDS = ['contract_type'];
 export const DOG_LINK_TYPES = ['lease', 'co_own', 'other'];
 export const CONTACT_LINK_TYPES = ['lease', 'co_own', 'other'];
 
+// Statuses that take a contract out of play. A partner never sees a contract in
+// one of these states, and such a contract never confers partner membership —
+// applied identically in both places via isLivePartnerContract so the two agree.
+export const TERMINAL_CONTRACT_STATUSES = ['declined', 'cancelled', 'void'];
+
 function validateContract(candidate) {
   for (const f of REQUIRED_FIELDS) {
     if (candidate[f] == null || candidate[f] === '') {
@@ -99,6 +104,19 @@ export const contractRepo = {
     return signed.slice().sort((a, b) =>
       (b.signed_date || b.created_at || '').localeCompare(a.signed_date || a.created_at || '')
     )[0];
+  },
+
+  // The single predicate shared by partner *membership* (companion.js) and partner
+  // bundle *contents* (companionExport.js) so the two can never drift: a live,
+  // partner-facing contract as of `today` (YYYY-MM-DD) is a non-archived
+  // lease/co_own/other contract that has a counterparty, is not in a terminal
+  // status, and — for a lease — has not passed its end date.
+  isLivePartnerContract(c, today) {
+    if (!c || c.is_archived || !c.related_contact_id) return false;
+    if (!CONTACT_LINK_TYPES.includes(c.contract_type)) return false;
+    if (TERMINAL_CONTRACT_STATUSES.includes(c.status)) return false;
+    if (c.contract_type === 'lease' && c.lease_end_date && c.lease_end_date < today) return false;
+    return true;
   }
 };
 
