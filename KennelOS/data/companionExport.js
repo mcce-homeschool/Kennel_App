@@ -131,9 +131,10 @@ function assertOnlyKeys(obj, allowed, ctx) {
   return obj;
 }
 
-// Shared header copy. Layer 1 (per-type settings) supplies kennel identity +
-// intro; Layer 2 (Contact.companion_note) overrides the per-type announcement
-// when the owner has written a personal line for this recipient.
+// Shared header/footer copy. Layer 1 (per-type settings) supplies kennel identity,
+// intro, the broadcast announcement, and the closer. Layer 2 (Contact.companion_note)
+// is the recipient's personal message — carried SEPARATELY as `personalNote` and
+// shown alongside the announcement, not overriding it.
 function headerCopy(type, contact) {
   const s = getCompanionSettings(type);
   const note = (contact.companion_note || '').trim();
@@ -141,21 +142,23 @@ function headerCopy(type, contact) {
     kennelName: s.kennelName || '',
     tagline: s.tagline || '',
     introText: s.introText || '',
-    announcement: note || s.announcement || ''
+    announcement: s.announcement || '',
+    personalNote: note || '',
+    closer: s.closer || ''
   };
 }
 
 const PROSPECTIVE_KEYS = [
   'bundleVersion', 'bundleType', 'kennelName', 'tagline', 'introText', 'announcement',
-  'familyName', 'litters', 'updatedAt'
+  'personalNote', 'closer', 'familyName', 'litters', 'updatedAt'
 ];
 const FAMILY_KEYS = [
   'bundleVersion', 'bundleType', 'kennelName', 'tagline', 'introText', 'announcement',
-  'familyName', 'pups', 'contracts', 'updatedAt'
+  'personalNote', 'closer', 'familyName', 'pups', 'contracts', 'updatedAt'
 ];
 const PARTNER_KEYS = [
   'bundleVersion', 'bundleType', 'kennelName', 'tagline', 'introText', 'announcement',
-  'partnerName', 'studServices', 'externalPairings', 'contracts', 'updatedAt'
+  'personalNote', 'closer', 'partnerName', 'studServices', 'externalPairings', 'contracts', 'updatedAt'
 ];
 
 // --- Prospective family: current availability, one card per litter with its

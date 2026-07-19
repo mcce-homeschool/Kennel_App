@@ -199,22 +199,35 @@
       h += '<h1>' + esc(b.kennelName || 'Your Update') + '</h1>';
       if (b.tagline) h += '<p class="tagline">' + esc(b.tagline) + '</p>';
       h += '</header>';
+
+      // Intro card: the intro text with the recipient's name prepended, plus the
+      // per-recipient personal message (companion_note) in the accent box when set.
+      var name = esc(b.familyName || b.partnerName || '');
       var intro = '';
-      if (b.introText) intro += '<p class="intro">' + esc(b.introText) + '</p>';
-      if (b.announcement) intro += '<div class="announcement">' + esc(b.announcement) + '</div>';
+      if (b.introText) intro += '<p class="intro">' + (name ? 'Hi ' + name + ' — ' : '') + esc(b.introText) + '</p>';
+      else if (name) intro += '<p class="intro">Hi ' + name + '</p>';
+      if (b.personalNote) intro += '<div class="announcement">' + esc(b.personalNote) + '</div>';
       if (intro) h += '<div class="card">' + intro + '</div>';
+
+      // Announcement card: the broadcast line in its own card — shown alongside the
+      // personal note above, never overridden by it.
+      if (b.announcement) h += '<div class="card"><p class="intro" style="margin-top:0;">' + esc(b.announcement) + '</p></div>';
       return h;
     }
     function renderUpdated(b) {
       return b.updatedAt ? '<p class="updated">Snapshot as of ' + esc(fmtDate(b.updatedAt)) + ' · not a live view</p>' : '';
     }
+    // Footer: the per-type closer (sign-off) card, then the snapshot date. Every
+    // package ends with renderFooter so the closer always sits just above the date.
+    function renderFooter(b) {
+      var h = '';
+      if (b.closer) h += '<div class="card"><p class="intro" style="margin:0;">' + esc(b.closer) + '</p></div>';
+      return h + renderUpdated(b);
+    }
 
     // --- prospective -------------------------------------------------------
     function renderProspective(b) {
       var h = renderHeader(b);
-      var greeting = b.familyName ? 'Hi ' + esc(b.familyName) + ' — here are the puppies we have available right now.' : 'Here are the puppies we have available right now.';
-      h += '<div class="card"><p class="intro" style="margin-top:0;">' + greeting + '</p></div>';
-
       var litters = Array.isArray(b.litters) ? b.litters : [];
       // Legacy links carry a flat availablePups list; new links nest pups inside
       // each litter. Fall back to the old flat layout when no litter has pups.
@@ -222,7 +235,7 @@
 
       if (!litters.length) {
         h += '<div class="card"><p class="empty">No puppies are marked available at the moment.</p></div>';
-        return h + renderUpdated(b);
+        return h + renderFooter(b);
       }
 
       for (var j = 0; j < litters.length; j++) {
@@ -260,7 +273,7 @@
         }
         h += '</div>';
       }
-      h += renderUpdated(b);
+      h += renderFooter(b);
       return h;
     }
 
@@ -288,7 +301,7 @@
         }
         h += '</ul></div>';
       }
-      return h + renderUpdated(b);
+      return h + renderFooter(b);
     }
 
     // --- family ------------------------------------------------------------
@@ -323,9 +336,6 @@
 
     function renderFamily(b) {
       var h = renderHeader(b);
-      var greeting = b.familyName ? 'Hi ' + esc(b.familyName) + ' — here is your puppy’s latest info.' : 'Here is your puppy’s latest info.';
-      h += '<div class="card"><p class="intro" style="margin-top:0;">' + greeting + '</p></div>';
-
       var pups = Array.isArray(b.pups) ? b.pups : [];
       // Legacy links carry {name, breed, sex} pups + flat litters/pickup/vet
       // lists; new links carry rich per-pup cards. Fall back when none is rich.
@@ -334,7 +344,7 @@
 
       if (!pups.length) {
         h += '<div class="card"><p class="empty">No puppies linked yet.</p></div>';
-        return h + renderUpdated(b);
+        return h + renderFooter(b);
       }
 
       // Age was computed as-of the generation date (the day portion of
@@ -419,7 +429,7 @@
       }
 
       h += renderContractLinks(b);
-      h += renderUpdated(b);
+      h += renderFooter(b);
       return h;
     }
 
@@ -456,7 +466,7 @@
         h += '</ul></div>';
       }
       h += renderContractLinks(b);
-      return h + renderUpdated(b);
+      return h + renderFooter(b);
     }
 
     // --- partner -----------------------------------------------------------
@@ -467,9 +477,6 @@
     }
     function renderPartner(b) {
       var h = renderHeader(b);
-      var greeting = b.partnerName ? 'Hi ' + esc(b.partnerName) + ' — a summary of our arrangement.' : 'A summary of our arrangement.';
-      h += '<div class="card"><p class="intro" style="margin-top:0;">' + greeting + '</p></div>';
-
       var services = Array.isArray(b.studServices) ? b.studServices : [];
       if (services.length) {
         h += '<div class="card"><h2>Stud services</h2>';
@@ -539,7 +546,7 @@
         }
         h += '</div>';
       }
-      h += renderUpdated(b);
+      h += renderFooter(b);
       return h;
     }
 

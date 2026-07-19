@@ -790,11 +790,17 @@ view. The main app stays single-user/offline/all-local; this adds *recipients*.
     block omitted).
 
 - **Two-layer messaging.** Layer 1 is per-type config (`kennelName`/`tagline`/
-  `introText`/`announcement`) in `settings.js` under the `companion` key, edited in
-  the **Companion Messaging console** (`pages/companion.*`, in the "More" menu).
-  Layer 2 is **`Contact.companion_note`**, a per-recipient personal line that
-  overrides the type's announcement for that one recipient. The bundle copies the
-  resolved copy inline, so header/landing text updates without a shell deploy.
+  `introText`/`announcement`/`closer`) in `settings.js` under the `companion` key,
+  edited in the **Companion Messaging console** (`pages/companion.*`, in the "More"
+  menu). Layer 2 is **`Contact.companion_note`**, a per-recipient personal line.
+  Both are carried in the bundle **separately** — `announcement` (broadcast) and
+  `personalNote` (the note) — and the shell shows them **alongside each other**, no
+  longer an override. The shell **prepends the recipient's name** to the intro text
+  ("Hi {name} — …"; there is no separate greeting card), renders the personal note in
+  the header card's accent box, the broadcast announcement as its own card beneath,
+  and the `closer` sign-off as the final card **just above the snapshot date**. The
+  bundle copies the resolved copy inline, so header/landing text updates without a
+  shell deploy.
 
 ### The load-bearing invariant: the allow-list builder
 

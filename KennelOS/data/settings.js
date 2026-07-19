@@ -93,7 +93,8 @@ export function markMyKennelSetupSkipped() {
 // copied into every built bundle so header/landing text updates without touching
 // the shell. App-level UI config, so it lives here (localStorage), never in
 // IndexedDB — consistent with "nothing app-level goes in IndexedDB." The Layer-2
-// per-recipient override is Contact.companion_note (a real record field).
+// per-recipient personal message is Contact.companion_note (a real record field),
+// shown ALONGSIDE the broadcast announcement (not an override).
 export const COMPANION_TYPES = ['prospective', 'family', 'partner'];
 
 const COMPANION_TYPE_LABELS = {
@@ -104,15 +105,15 @@ const COMPANION_TYPE_LABELS = {
 
 const COMPANION_DEFAULTS = {
   prospective: {
-    kennelName: '', tagline: '', announcement: '',
+    kennelName: '', tagline: '', announcement: '', closer: '',
     introText: 'A peek at the puppies we have available right now. This is a snapshot as of the last link I sent — I’ll send a fresh link when things change. There’s no live sync.'
   },
   family: {
-    kennelName: '', tagline: '', announcement: '',
+    kennelName: '', tagline: '', announcement: '', closer: '',
     introText: 'This shows your puppy’s info as of the last link I sent. I’ll send a new link whenever anything changes — there’s no live sync.'
   },
   partner: {
-    kennelName: '', tagline: '', announcement: '',
+    kennelName: '', tagline: '', announcement: '', closer: '',
     introText: 'A summary of our arrangement as of the last link I sent. I’ll send a new link when anything changes — there’s no live sync.'
   }
 };
