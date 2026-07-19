@@ -548,7 +548,8 @@ for own kennels, its program configuration: the preferred-tests panel and the
 lifecycle-nudge thresholds; identity edits stay on the `kennels` list). Both map
 to the People hub in `HUB_CHILDREN`.
 Placements/contracts: `sale`/`sales`, `stud-service`/`stud-services`,
-`contract`/`contracts`.
+`contract`/`contracts`, `puppy-record` (print-only puppy record, §23 — not a nav entry,
+reached from `sale`/`sales`).
 Today cluster: `dashboard`, `reminders`, `upcoming`, `board`, `scheduled-placements`.
 Reports: `litters-report`, `stud-services-report`, `placements-report`,
 `health-tests-report`, `litter-finances-report` (Litter P&L — per-litter sale
@@ -1092,6 +1093,28 @@ one). On save the repo calls `contactRepo.ensureType` to auto-tag the referrer w
 `buyer_referrer` / `stud_referrer` role (`CONTACT_TYPE` vocab — `stud_referrer` is new).
 The tag is a convenience label; the canonical link stays the FK on the Sale/StudService,
 and a contact's referrals are the reverse query over the indexed FK.
+
+## 23. Puppy Record (print-only PDF)
+
+`pages/puppy-record.html`/`.js` (`?sale=<id>`) is a printable, one-page-style record
+for a puppy being sold: puppy info, sire/dam (with their genetic + breed-specific test
+results as a pipe-separated line), a **Health History** grid — one card per
+health-relevant event type (`vaccination`, `preventative`, `genetic_test`,
+`ofa_pennhip`, `breed_specific_test`, `illness`, `medication`, `surgery`, `vet_visit`,
+`injury`, `abnormalities`, `weight_check` — deliberately excludes admin/lifecycle types
+like `milestone`/`placement`/`note`) — and the buyer's contact info off the Sale. Every
+row is omitted (not shown as a blank/"—") when its field is empty. Reads only, through
+`saleRepo`/`dogRepo`/`contactRepo`/`litterRepo`/`eventRepo` (layering rule, §2) — no new
+repo, no new table.
+
+**"Download" is the browser's own Print → Save as PDF** (`window.print()`, gated by an
+`@media print` block that hides nav/back/print-button), not a vendored PDF library —
+avoids a new `vendor/` dependency for something the browser already does. Entry points:
+a "Puppy Record (PDF)" button on `sale.js`'s header actions, and a "Print Puppy Record"
+button on `sales.js` (next to "+ Add Sale") that opens a modal — a dropdown of every
+**non-delivered** sale (`status !== 'delivered'`), ordered by dog name, buyer name shown
+alongside for disambiguation — whose Print button opens the record in a new tab with
+`?autoprint=1`, which triggers `window.print()` itself once rendered.
 
 ---
 
