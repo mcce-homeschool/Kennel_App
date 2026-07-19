@@ -321,10 +321,12 @@ a.stat:hover { border-color: var(--accent); transform: translateY(-2px); }
 /* Keep the checkbox/radio a fixed little box — flex layouts (esp. multi-line
    labels) otherwise stretch the native control to different sizes. */
 .check-inline input[type="checkbox"], .check-inline input[type="radio"] { flex: 0 0 auto; }
-/* A wrapping group of check-inline options with even spacing; each option stays
-   on one line so multi-word labels don't break mid-phrase (Contact "Type"). */
-.check-group { display: flex; flex-wrap: wrap; gap: 8px 18px; }
-.check-group .check-inline { white-space: nowrap; }
+/* A three-column grid of check-inline options (Contact "Type"). Equal-width
+   columns keep every checkbox on a shared row and column line instead of the
+   ragged staircase a flex-wrap produces; the checkbox top-aligns so a label
+   that wraps on a narrow screen still lines up with its box. */
+.check-group { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 16px; }
+.check-group .check-inline { align-items: start; }
 
 table.data { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 table.data th, table.data td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); }

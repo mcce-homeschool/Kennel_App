@@ -69,12 +69,10 @@ function reminderRow(ev, bucketBadge) {
   // event_type on the subject's page, prefilled like the app's other
   // soft-suggestion prompts (eventForm.js `prefill`).
   const logHref = subjectHref(ev, `&logEvent=${encodeURIComponent(ev.event_type)}`);
-  return `<li class="row-between" style="padding:10px 0; border-top:1px solid var(--border); align-items:flex-start;">
-      <div>
-        <div>${bucketBadge}<a href="${subjectHref(ev)}"><strong>${esc(subjectLabel(ev))}</strong></a> — ${badge(EVENT_TYPES, ev.event_type)} ${esc(ev.title)}</div>
-        <div class="muted" style="font-size:13px;">⏰ ${esc(fmtDate(ev.reminder_date))}${contact ? ` · ${esc(contact)}` : ''}</div>
-      </div>
-      <div class="pill-row" data-row="${esc(ev.id)}">
+  return `<li style="padding:10px 0; border-top:1px solid var(--border);">
+      <div>${bucketBadge}<a href="${subjectHref(ev)}"><strong>${esc(subjectLabel(ev))}</strong></a> — ${badge(EVENT_TYPES, ev.event_type)} ${esc(ev.title)}</div>
+      <div class="muted" style="font-size:13px;">⏰ ${esc(fmtDate(ev.reminder_date))}${contact ? ` · ${esc(contact)}` : ''}</div>
+      <div class="pill-row" data-row="${esc(ev.id)}" style="margin-top:8px;">
         <a class="btn btn-sm" href="${esc(logHref)}">Log new →</a>
         <button class="btn btn-sm" data-act="snooze" data-id="${esc(ev.id)}">Snooze</button>
         <button class="btn btn-sm" data-act="dismiss" data-id="${esc(ev.id)}">Dismiss</button>
