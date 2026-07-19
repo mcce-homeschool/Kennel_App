@@ -271,6 +271,13 @@ a.stat:hover { border-color: var(--accent); transform: translateY(-2px); }
   cursor: pointer;
   text-decoration: none;
   line-height: 1.2;
+  /* Never wrap a button label. In flex rows (e.g. the breeding / placement hub
+     cards' "Open pairing" / "Open litter" / "Open sale" actions) a wrappable
+     label lets the button shrink and re-flow, so its size shifts row to row;
+     nowrap keeps each action a fixed width, anchored right by the row's
+     space-between. */
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 .btn:hover { background: var(--surface-2); }
 .btn-primary { background: var(--accent); border-color: var(--accent-dark); color: #fff; }
