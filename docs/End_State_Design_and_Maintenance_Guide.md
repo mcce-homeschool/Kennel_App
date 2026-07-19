@@ -1150,12 +1150,16 @@ no vendored PDF library.
   with the entered `collected` as its amount; **Full** prints the record's full base
   amount, and `collected` is treated as *already collected* — on an **invoice** it is
   subtracted in the totals (Subtotal → "Less amount already collected" → **Balance**), on
-  a **receipt** the line shows the remaining `base − collected` and the collected figure
-  is not printed. There is no payment ledger, so `collected` defaults to 0 for manual
-  entry (not pulled from prior receipts).
+  a **receipt** the line shows the remaining `base − collected`, the collected figure
+  is not printed, and the label reads "<Name> **(balance)**" (a Full line that carried a
+  prior partial payment is by definition the remaining balance). There is no payment
+  ledger, so `collected` defaults to 0 for manual entry (not pulled from prior receipts).
 - **Invoice specifics:** no Paid/Due status column; a per-line **Due by** date (the modal
   prefills the *soonest* of the sale's `balance_due_date` and any scheduled `placement`
-  event date for the puppy, still editable per line); footnote markers on **sale**
+  event date for the puppy, still editable per line) — **except Deposit, whose Due by is
+  always "Immediately"** (the calculated due date applies only to the other four line
+  types), so the modal shows a static "Due immediately" note for that line instead of a
+  date picker; footnote markers on **sale**
   invoices (`*` on Deposit, `**` on Remaining Purchase Price / Transport / Boarding —
   stud fees carry neither) render the two standing disclaimers (deposit non-refundability;
   balance-due-date basis) in the footer; the payment block reads **"Payment may be made
@@ -1179,7 +1183,8 @@ no vendored PDF library.
 
 The generator modal lives on the Financials hub (`financials.js`, the "Invoice /
 Receipt" button on every view), lists every income record (from `getIncomeRows`), and
-opens the print page with `?autoprint=1`.
+opens the print page in a new tab. The document **never prints itself** — the owner
+triggers the browser's Print → Save as PDF with the page's "Print / Save as PDF" button.
 
 ---
 
