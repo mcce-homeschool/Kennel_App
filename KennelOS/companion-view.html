@@ -61,6 +61,8 @@
     .row:first-child { border-top: 0; }
     .row .k { color: var(--muted); }
     .row .v { text-align: right; font-weight: 600; }
+    .row .v .subnote { display: block; font-weight: 400; font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+    .section-label { color: var(--muted); font-size: 0.9rem; font-weight: 600; margin: 14px 0 6px; }
     ul.clean { list-style: none; margin: 0; padding: 0; }
     ul.clean li { padding: 8px 0; border-top: 1px solid var(--border); }
     ul.clean li:first-child { border-top: 0; }
@@ -122,6 +124,29 @@
       flat_fee: 'Flat fee', pick_of_litter: 'Pick of litter',
       flat_plus_pick: 'Flat + pick', other: 'Other'
     };
+    // Which fee structures "include" a flat fee vs. a pick of litter — drives
+    // whether the partner Agreement Details shows the fee amount, the pick status,
+    // or both.
+    var FEE_HAS_FLAT = { flat_fee: true, flat_plus_pick: true };
+    var FEE_HAS_PICK = { pick_of_litter: true, flat_plus_pick: true };
+    // Value→label maps mirroring vocab.js, so raw record values render with proper
+    // capitalization. Kept in the shell (not the bundle) so backward-compat links
+    // that carry raw values still read correctly; labelFor() falls back to a
+    // prettified value for anything unmapped.
+    var STUD_TYPE_LABELS = { in_person: 'In person', ai: 'AI / shipped' };
+    var PLACEMENT_LABELS = {
+      pet: 'Pet', show: 'Show', breeding_rights: 'Breeding rights', co_own: 'Co-own'
+    };
+    var SALE_STATUS_LABELS = {
+      reserved: 'Reserved', deposit_paid: 'Deposit paid', paid_in_full: 'Paid in full',
+      delivered: 'Delivered', returned: 'Returned', cancelled: 'Cancelled'
+    };
+    function labelFor(map, v) {
+      if (v == null || v === '') return '';
+      if (map[v]) return map[v];
+      var s = String(v).replace(/_/g, ' ');
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    }
     function sexLabel(s) { return s === 'male' ? '♂' : s === 'female' ? '♀' : ''; }
 
     // Hardcoded disclaimer copy (brief §3/§5 — lives in the shell, never the bundle).
@@ -273,13 +298,27 @@
     };
 
     function renderContractLinks(b) {
+      // New links carry rich contract objects ({signedDate, documentUrl}); legacy
+      // links carry a flat contractUrls list. Prefer the rich form when present.
+      if (Array.isArray(b.contracts)) {
+        if (!b.contracts.length) return '';
+        var h = '<div class="card"><h2>Your contract</h2>';
+        for (var i = 0; i < b.contracts.length; i++) {
+          var c = b.contracts[i];
+          h += '<div style="padding:10px 0; border-top:1px solid var(--border);">';
+          h += row('Signed', c.signedDate ? esc(fmtDate(c.signedDate)) : 'Not Signed');
+          if (c.documentUrl) h += '<p style="margin:6px 0 0;"><a class="doc" href="' + esc(c.documentUrl) + '" target="_blank" rel="noopener noreferrer">View/sign contract here →</a></p>';
+          h += '</div>';
+        }
+        return h + '</div>';
+      }
       var urls = Array.isArray(b.contractUrls) ? b.contractUrls : [];
       if (!urls.length) return '';
-      var h = '<div class="card"><h2>Your contract</h2>';
+      var h2 = '<div class="card"><h2>Your contract</h2>';
       for (var u = 0; u < urls.length; u++) {
-        h += '<p><a class="doc" href="' + esc(urls[u]) + '" target="_blank" rel="noopener noreferrer">View your signed contract →</a></p>';
+        h2 += '<p><a class="doc" href="' + esc(urls[u]) + '" target="_blank" rel="noopener noreferrer">View your signed contract →</a></p>';
       }
-      return h + '</div>';
+      return h2 + '</div>';
     }
 
     function renderFamily(b) {
@@ -332,11 +371,22 @@
         }
 
         var facts = '';
-        facts += row('Placement type', p.placementType ? esc(String(p.placementType).replace(/_/g, ' ')) : '');
-        facts += row('Status', p.saleStatus ? esc(String(p.saleStatus).replace(/_/g, ' ')) : '');
+        facts += row('Placement type', p.placementType ? esc(labelFor(PLACEMENT_LABELS, p.placementType)) : '');
+        facts += row('Status', p.saleStatus ? esc(labelFor(SALE_STATUS_LABELS, p.saleStatus)) : '');
         facts += row('Price', money(p.price) ? esc(money(p.price)) : '');
         facts += row('Deposit', money(p.deposit) ? esc(money(p.deposit)) : '');
+        if (p.transportFee != null && p.transportFee !== '') facts += row('Transport fee', esc(money(p.transportFee)));
+        if (p.deferredPickup) {
+          // Big value = computed total; small sub-line = the rate breakdown
+          // ("$20.00 per Week × 2") straight from the sale.
+          var dp = p.deferredPickup;
+          var sub = esc(money(dp.amount));
+          if (dp.frequency) sub += ' per ' + esc(dp.frequency);
+          if (dp.duration) sub += ' × ' + esc(dp.duration);
+          facts += '<div class="row"><span class="k">Deferred pickup</span><span class="v">' + esc(money(dp.total)) + '<span class="subnote">' + sub + '</span></span></div>';
+        }
         facts += row('Remaining balance', money(p.remainingBalance) ? esc(money(p.remainingBalance)) : '');
+        if (p.balanceDueDate) facts += row('Balance due', esc(fmtDate(p.balanceDueDate)));
         if (facts) h += '<div style="margin-top:10px;">' + facts + '</div>';
 
         var sections = Array.isArray(p.eventSections) ? p.eventSections : [];
@@ -344,6 +394,18 @@
           var sec = sections[s];
           var items = Array.isArray(sec.items) ? sec.items : [];
           if (!items.length) continue;
+          // Deferred Pickup Boarding — scheduled date ranges, not dated log entries.
+          if (sec.type === 'deferred_pickup_boarding') {
+            h += '<div class="evt-group"><h3>Deferred Pickup Boarding</h3><ul class="clean">';
+            for (var bi = 0; bi < items.length; bi++) {
+              var bev = items[bi];
+              var range = esc(fmtDate(bev.startDate));
+              if (bev.endDate) range += '–' + esc(fmtDate(bev.endDate));
+              h += '<li><span class="k">Scheduled Dates</span> ' + range + '</li>';
+            }
+            h += '</ul></div>';
+            continue;
+          }
           h += '<div class="evt-group"><h3>' + esc(FAMILY_EVENT_LABELS[sec.type] || String(sec.type).replace(/_/g, ' ')) + '</h3><ul class="clean">';
           for (var it = 0; it < items.length; it++) {
             var e = items[it];
@@ -424,16 +486,25 @@
           } else {
             h += '<div style="font-weight:600;">' + pairLabel(s.studDog, s.damDog) + '</div>';
           }
+          // Agreement Details — directly under the dog info. Type, the Begins/Ends
+          // window, the fee terms, and (conditionally) the fee amount and/or pick
+          // status depending on which the fee structure includes.
           var comp = s.compensation || {};
-          var rows = '';
-          if (comp.fee_structure) rows += row('Terms', esc(FEE_LABELS[comp.fee_structure] || comp.fee_structure));
-          if (comp.fee_amount != null) rows += row('Fee', esc(money(comp.fee_amount)));
-          if (comp.pick_status) rows += row('Pick status', esc(comp.pick_status));
-          if (comp.sentDate) rows += row('Sent', esc(fmtDate(comp.sentDate)));
-          if (comp.returnedDate) rows += row('Returned', esc(fmtDate(comp.returnedDate)));
-          var dates = Array.isArray(s.breedingDates) ? s.breedingDates : [];
-          if (dates.length) rows += row('Breeding date' + (dates.length > 1 ? 's' : ''), dates.map(function (d) { return esc(fmtDate(d)); }).join(', '));
-          if (rows) h += '<div style="margin-top:8px;">' + rows + '</div>';
+          var ad = '';
+          if (s.type) ad += row('Type', esc(labelFor(STUD_TYPE_LABELS, s.type)));
+          if (comp.sentDate) ad += row('Begins', esc(fmtDate(comp.sentDate)));
+          if (comp.returnedDate) ad += row('Ends', esc(fmtDate(comp.returnedDate)));
+          if (comp.fee_structure) ad += row('Terms', esc(FEE_LABELS[comp.fee_structure] || comp.fee_structure));
+          if (FEE_HAS_FLAT[comp.fee_structure] && comp.fee_amount != null) ad += row('Fee amount', esc(money(comp.fee_amount)));
+          if (FEE_HAS_PICK[comp.fee_structure] && comp.pick_status) ad += row('Pick status', esc(comp.pick_status));
+          if (ad) h += '<div class="section-label">Agreement Details</div>' + ad;
+
+          // Contract — signed date (or "Not Signed") + a view/sign link.
+          if (s.contract) {
+            h += '<div class="section-label">Contract</div>';
+            h += row('Signed', s.contract.signedDate ? esc(fmtDate(s.contract.signedDate)) : 'Not Signed');
+            if (s.contract.documentUrl) h += '<p style="margin:6px 0 0;"><a class="doc" href="' + esc(s.contract.documentUrl) + '" target="_blank" rel="noopener noreferrer">View/sign contract here →</a></p>';
+          }
           h += '</div>';
         }
         h += '</div>';

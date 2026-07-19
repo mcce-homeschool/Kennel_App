@@ -132,7 +132,7 @@ function renderView() {
       ${row('Price', esc(money(s.price)))}
       ${row('Deposit amount', esc(money(s.deposit_amount)))}
       ${row('Transport fee', esc(money(s.transport_fee)))}
-      ${row('Deferred pickup boarding', s.deferred_boarding_amount != null && s.deferred_boarding_amount !== '' ? `${esc(money(s.deferred_boarding_amount))}${s.deferred_boarding_frequency ? ` per ${esc(s.deferred_boarding_frequency)}` : ''}${s.deferred_boarding_duration_days ? ` × ${esc(s.deferred_boarding_duration_days)} days` : ''}` : '')}
+      ${row('Deferred pickup boarding', s.deferred_boarding_amount != null && s.deferred_boarding_amount !== '' ? `${esc(money(s.deferred_boarding_amount))}${s.deferred_boarding_frequency ? ` per ${esc(s.deferred_boarding_frequency)}` : ''}${s.deferred_boarding_duration_days ? ` × ${esc(s.deferred_boarding_duration_days)}` : ''}` : '')}
       ${row('Sale date', s.sale_date ? esc(fmtDate(s.sale_date)) : '')}
       ${row('Deposit date', s.deposit_date ? esc(fmtDate(s.deposit_date)) : '')}
       ${row('Balance due date', s.balance_due_date ? esc(fmtDate(s.balance_due_date)) : '')}
@@ -169,9 +169,8 @@ function renderEdit() {
           <span class="faint">per</span>
           <select id="f-deferred_boarding_frequency" style="flex:1; min-width:90px;">${frequencyOptions(s.deferred_boarding_frequency)}</select>
           <span class="faint">×</span>
-          <input id="f-deferred_boarding_duration_days" type="text" placeholder="days" value="${esc(s.deferred_boarding_duration_days)}" style="flex:1; min-width:70px;">
-          <span class="faint">days</span>
-        </div>`, { hint: 'A boarding rate for a buyer who delayed pickup — a plain rate, not a Financials cost.' })}
+          <input id="f-deferred_boarding_duration_days" type="text" placeholder="count" value="${esc(s.deferred_boarding_duration_days)}" style="flex:1; min-width:70px;">
+        </div>`, { hint: 'A boarding rate for a buyer who delayed pickup — the count is the number of frequency units (e.g. 2 = 2 weeks). A plain rate, not a Financials cost.' })}
       ${field('Sale date', `<input id="f-sale_date" type="date" value="${esc(s.sale_date)}">`)}
       ${field('Deposit date', `<input id="f-deposit_date" type="date" value="${esc(s.deposit_date)}">`)}
       ${field('Balance due date', `<input id="f-balance_due_date" type="date" value="${esc(s.balance_due_date)}">`)}
