@@ -102,7 +102,7 @@ export const PLACEMENT_TYPE = [
 ];
 
 export const SALE_STATUS = [
-  { value: 'reserved',      label: 'Reserved',      badge: 'badge-blue' },
+  { value: 'deposit_pending', label: 'Deposit Pending', badge: 'badge-blue' },
   { value: 'deposit_paid',  label: 'Deposit paid',  badge: 'badge-amber' },
   { value: 'paid_in_full',  label: 'Paid in full',  badge: 'badge-green' },
   { value: 'delivered',     label: 'Delivered',     badge: 'badge-green' },

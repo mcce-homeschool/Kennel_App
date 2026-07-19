@@ -54,8 +54,8 @@ const els = {
 const activeType = COMPANION_TYPES.includes(param('type')) ? param('type') : COMPANION_TYPES[0];
 
 // A sale is "open" until it reaches one of these terminal states — a current
-// family is one with a sale that is still in flight (reserved / deposit paid /
-// paid in full).
+// family is one with a sale that is still in flight (deposit pending / deposit
+// paid / paid in full).
 const CLOSED_SALE_STATUSES = new Set(['delivered', 'returned', 'cancelled']);
 
 const ctx = {
@@ -81,7 +81,7 @@ function inActiveType(contact) {
 function filterBlurb() {
   switch (activeType) {
     case 'prospective': return 'Contacts with an active waiting-list status.';
-    case 'family': return 'Contacts with an open sale — reserved, deposit paid, or paid in full (not delivered, returned, or cancelled).';
+    case 'family': return 'Contacts with an open sale — deposit pending, deposit paid, or paid in full (not delivered, returned, or cancelled).';
     case 'partner': return 'Contacts on a current stud service (whose return date hasn’t passed), an active lease (whose end date hasn’t passed), or any co-own / other contract.';
     default: return '';
   }

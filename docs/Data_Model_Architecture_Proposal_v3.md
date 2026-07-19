@@ -271,7 +271,7 @@ The puppy roster itself is **not stored on Litter** — it's derived by querying
 | deferred_boarding_amount / deferred_boarding_frequency | decimal / enum: Day / Week / Month | | **Built.** Nullable, unindexed. A boarding rate for a buyer who delayed pickup — a plain rate the breeder is recording, same decimal-money posture as `price`/`deposit_amount` (**never cents**). `deferred_boarding_frequency` is an enforced choice from `BOARDING_FREQUENCY_OPTIONS` (`vocab.js`). Rendered on the Sale form as one line, "amount **per** frequency." Deliberately **not** a Financials cost — it never writes to the Expense ledger. |
 | placement_type | enum: pet / show / breeding_rights / co_own | ✓ | a `co_own` placement pairs naturally with adding the buyer to the dog's `co_owner_contact_ids` (a confirmed action, written through `dogRepo`) |
 | lead_source | string | | Free text with `<datalist>` autocomplete; how *this specific sale* came in. Prefills from the buyer's `first_contact_source` but may differ (same buyer, two dogs, two channels — which is why it can't live only on the person). Not indexed. |
-| status | enum: reserved / deposit_paid / paid_in_full / delivered / returned / cancelled | ✓ | a `returned` sale stays visible on the dog's record — status records what happened, archive only hides |
+| status | enum: deposit_pending / deposit_paid / paid_in_full / delivered / returned / cancelled | ✓ | a `returned` sale stays visible on the dog's record — status records what happened, archive only hides |
 | notes | text | | |
 | is_archived | boolean | ✓ | |
 
