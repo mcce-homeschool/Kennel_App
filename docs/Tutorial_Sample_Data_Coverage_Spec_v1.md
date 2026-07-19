@@ -30,7 +30,7 @@ Auditing `sampleData.js` against the page catalog (End-State guide §13) and the
 
 | # | Gap | Tour stop that breaks today |
 |---|-----|------------------------------|
-| G1 | **Nudges section renders empty.** With today = seed's relative dates, none of the five nudge rules (§19) fire: the stud service is already `completed` and has a `pairing_id`; no kennel has `promote_nudge_enabled`; the heat-cycle event sets `details.cycle_start` but no `event_end_date`, so heat→pairing can't fire; no pairing is overdue. | Today → "Nudges" — the marquee feature has nothing to show. |
+| G1 | **Nudges section renders empty.** With today = seed's relative dates, none of the eight nudge rules (§19) fire: the stud service is already `completed` and has a `pairing_id`; no kennel has `promote_nudge_enabled`; the heat-cycle event sets `details.cycle_start` but no `event_end_date`, so heat→pairing can't fire; no pairing is overdue; and the sole litter is `closed` with every pup resolved, so none of the three litter-lifecycle rules (sold / reopen / close) fire either. | Today → "Nudges" — the marquee feature has nothing to show. |
 | G2 | **No open/in-progress Sale.** The only sale (Hazel→Priya) is `delivered` — a terminal status. So the Companion **"Current families"** tab is **empty** (family membership excludes `delivered`/`returned`/`cancelled`), and the deposit→balance sale lifecycle is never visible. | Placements → Sales lifecycle; Companion → Current families. |
 | G3 | **Only one litter, and it's `closed`.** The Breeding hub's `active-breeding`, `live-births`, and litter-status views are sparse/empty; an "expected" and a "ready" litter don't exist. | Breeding → Litters / Active breeding / Live births. |
 | G4 | **Litter pricing fields unset** (`expected_price_*` / `expected_deposit_*`). So Sale's price/deposit prefill-from-litter can't be shown, and the **prospective** companion bundle (now carries price — brief policy reversal) shows blank money. | Breeding → Litter detail; Placements → new Sale prefill; Companion → Prospective. |
@@ -39,7 +39,7 @@ Auditing `sampleData.js` against the page catalog (End-State guide §13) and the
 | G7 | **Contract types `co_own` / `lease` / `other` and every non-`signed` status unshown.** Lease dates + `related_dog_id`/`related_contact_id` + a lease-based **partner** never demonstrated. | Placements → Contracts; Companion → Partners (lease path). |
 | G8 | **Stud service `incoming` direction and `ai` type never shown** (only one outgoing, in-person service exists). | Placements → Stud services. |
 | G9 | **Sale `transport_fee` and `deferred_boarding_*` unset**, so the family bundle's computed remaining-balance math is never exercised. | Companion → Current families (balance math). |
-| G10 | **"Show more" never triggers** (Sales=1, Stud=1, Pairings=3; the `PAGE_SIZE=5` pagination needs >5 rows). The user explicitly wants "expanding windows" demonstrated. | Breeding / Placements list "Show more". |
+| G10 | **"Show more" never triggers.** The only paginated list left is Breeding's pairing chain (`breeding.js`, `PAGE_SIZE=5`); with 3 seeded pairings it never crosses the threshold. Sales and Stud-services are now **grouped** (by litter / by our dog), not paginated, so they carry no "Show more" at all. The user explicitly wants the "expanding window" demonstrated. | Breeding → pairing chain "Show more". |
 | G11 | **Several event types have no timeline example**: `boarding` (removed in the away-board de-dup), `medication` (a span), `surgery`, `injury`, `illness`, `abnormalities`, `breed_specific_test`. | Dogs → timeline "here's what a boarding/medication span looks like". |
 | G12 | **Own-kennel config unset**: `preferred_tests` / `preferred_breeds` (test-vocab suggestions), `promote_nudge_enabled` + `promote_age_*`. | People → Kennel detail; Dogs → planned-tests combobox suggestions. |
 | G13 | **Contact roster thin on teachable fields**: `groomer`/`other` types absent; `companion_note`, `email`, `address` set on only one or two contacts. | People → Contact detail fields. |
@@ -161,7 +161,8 @@ and the anchor record. "GAP→Gn" marks a stop that needs a §8 fix before it ca
   Fern/Birch/Hazel down). Teaches: reverse is derived, depth-capped.
 
 ### 4.3 Breeding (hub: `breeding` → `pairings`/`pairing`, `litters`/`litter`, `active-breeding`, `live-births`)
-- **Pairings list + Show more** — **GAP→G10** (need >5). Teaches pairing_type/status.
+- **Pairing chain + Show more** — the only paginated list left (`breeding.js`,
+  `PAGE_SIZE=5`). **GAP→G10** (need >5 pairings). Teaches pairing_type/status.
 - **Pairing detail** — sire≠dam **hard block**, sex-mismatch **warning**, `planned_date`
   → `expected_due_date` +63d prefill (dependency), timeline of pairing-subject events.
 - **Litters list / Active breeding / Live births** — **GAP→G3** (need expected +
@@ -186,26 +187,40 @@ and the anchor record. "GAP→Gn" marks a stop that needs a §8 fix before it ca
   `preferred_breeds` + promote-nudge config. **GAP→G12**.
 
 ### 4.5 Placements & Contracts (hub: `sales` → `sale`, `stud-services`/`stud-service`, `contracts`/`contract`)
-- **Sales list + Show more** — **GAP→G10/G2**. Teaches placement_type & sale_status.
+- **Sales list (grouped by litter)** — cards grouped under each sold pup's litter, with
+  a trailing "External acquisitions" bucket for dogs with no litter link; **not**
+  paginated. **GAP→G2**. Teaches placement_type & sale_status.
 - **Sale detail — fee fields above date fields** — `price`/`deposit`/`transport_fee`/
   deferred boarding, then the date ladder. The deposit→balance lifecycle needs an
   **open** sale. **GAP→G2/G9**. `referred_by` auto-tag (dependency). Prompt to log a
   placement event (dependency, not a stored link).
-- **Stud services list + detail** — outgoing **and** incoming; in-person **and** ai;
-  `fee_structure` gates `pick_status` visibility (dependency); in-person + `sent_date`
-  feeds away-board (dependency). **GAP→G8**.
+- **Stud services list (grouped by our dog) + detail** — outgoing **and** incoming;
+  in-person **and** ai; `fee_structure` gates `pick_status`/`pick_value_amount`
+  visibility (dependency); in-person + `sent_date` feeds away-board (dependency); cards
+  grouped by `our_dog_id`, **not** paginated. **GAP→G8**.
 - **Contracts list + detail** — all five types; lease hides sale/stud fields and shows
   lease dates; `related_dog_id`/`related_contact_id` only for lease/co_own/other;
   governing-contract = most-recent signed (dependency into companion); `document_url`
   pointer. **GAP→G7**.
 
 ### 4.6 Financials (hub: `financials`)
-- **Summary card** (grand total + per-category) over the **ledger table** (category /
-  subject-type / year filters + CSV export). Anchors exist across kennel/dog/litter +
-  one event-linked (🔗). **GAP→G14** (add a pairing-subject expense).
-- **Hub-level "+ Add Expense"** against any subject (expandable modal).
-- Teaches: costs only (revenue lives on Sale/StudService); no `general` subject —
-  overhead rides your kennel; event cost writes here, not on the event (dependency).
+- **Top toggle — Overview / Income / Expenses** (`?view=`). An **"Invoice / Receipt"**
+  generator opens as a modal from the header.
+- **Overview** — income-vs-expenses at a glance: Earned / Anticipated income tiles,
+  total Expenses, and Net (earned − expenses), plus a component/category breakdown.
+- **Income** — the **derived** income view (`data/incomeView.js`): one row per Sale /
+  outgoing StudService, split earned vs anticipated; clicking a row opens a compact
+  **Adjust** modal that writes money/status/paid-date back. Income is never stored —
+  it's recomputed from Sale/StudService status + paid fields, and the non-cash
+  `pick_value_amount` estimate rides its own line. Thin until **GAP→G8** adds an
+  incoming stud service.
+- **Expenses** — the Expense ledger: running total, per-category **seg-tabs** plus
+  subject-type / year filters + CSV export, and a **"+ Add Expense"** modal against any
+  subject. Anchors span kennel/dog/litter + one event-linked (🔗). **GAP→G14** (add a
+  pairing-subject expense).
+- Teaches: costs live on Expenses, revenue is **derived** from Sale/StudService (no
+  income table); no `general` subject — overhead rides your kennel; an event's cost
+  writes an Expense here, not on the event (dependency).
 
 ### 4.7 More menu — Reports, Companion, Import/Export
 - **Reports** — the four analytics report pages; each `reportView` with filters + CSV.
@@ -243,7 +258,7 @@ screen. Each needs a live seeded example (fixes noted).
 
 | Field (entity) | Effect elsewhere | Seed example |
 |---|---|---|
-| `disposition='available'` (Dog) | Feeds Today "Available puppies" + Prospective companion bundle | Fern ✓ |
+| `disposition` (Dog; **puppy-only** — clears when status moves past `puppy`) | Feeds Today's **Active litters** card (per-litter selling roster) + Prospective companion bundle; `available`/`keeping`/`placed` render only while the dog is a `puppy` | Fern (puppy, `available`) ✓; a `keeping` puppy → **G3/F** |
 | `ownership_type ∈ {external,leased_in}` (Dog) | Forces `owner_contact_id`; hides `kennel_id` | Gunnar/Nell ✓; **lease → G5** |
 | `breeder_kennel_id` (Dog) | "Who produced it", distinct from `kennel_id`; auto-prefills from owned dam's kennel | Gunnar (outside) ✓; Fern/Birch/Hazel (auto) ✓ |
 | `Dog.url` | Companion `photosUrl` | **G6** |
@@ -254,11 +269,13 @@ screen. Each needs a live seeded example (fixes noted).
 | `expected_due_date` past + no litter (Pairing) | Overdue-pairing nudge | **G1** |
 | `whelp_date` (Litter) | `estimated_ready_date` = +56d prefill | closed litter ✓ (prefill not shown) |
 | `expected_price_*`/`expected_deposit_*` (Litter) | Sale price/deposit prefill by pup sex; Prospective bundle price | **G4** |
+| `accept_deposits_date` (Litter) | Shown to prospective families in the companion bundle when set (`companionExport` `acceptDepositsDate`) | **G3/G4** (set on the new litter) |
 | `nickname` (Litter) | Title fallback across detail/list/report | **G3** (set on a new litter) |
 | `referred_by_contact_id` (Sale/StudService) | Auto-tags contact `buyer_referrer`/`stud_referrer` | Tessa/Dana ✓ |
 | `transport_fee` + `deferred_boarding_*` (Sale) | Family bundle remaining-balance math | **G9** |
 | `balance_due_date` (Sale) | Shown under computed balance in family bundle | **G2** (needs open sale) |
-| `fee_structure` (StudService) | Gates `pick_status`; partner-bundle compensation | flat_plus_pick ✓; **ai/flat_fee → G8** |
+| `fee_structure` (StudService) | Gates `pick_status`/`pick_value_amount`; partner-bundle compensation | flat_plus_pick ✓; **ai/flat_fee → G8** |
+| `pick_value_amount` (StudService, pick fee structures) | Non-cash income **estimate** (≠ cash `fee_amount`): its own line in the Financials Income view, the Stud-services report, and the partner companion bundle | flat_plus_pick svc ✓ |
 | `type='in_person'` + `sent_date` (StudService) | Away-board row; location from partner `address` | Birch/Ellen ✓ |
 | `contract_type='lease'` | Hides sale/stud fields, shows lease dates; drives partner membership | **G7** |
 | `related_contact_id` (Contract) | Partner companion membership + bundle scope | **G7** |
@@ -278,11 +295,14 @@ screen. Each needs a live seeded example (fixes noted).
 Rather than bolt on disconnected records, extend Thornfield's existing narrative so
 every new record has a reason to exist. Proposed narrative threads (each closes gaps):
 
-- **Thread A — "the current litter" (closes G3, G4, G10-litters).** Add Pairing **P4**
-  (Juniper × an outside stud) that whelped a **second, open litter** ("Autumn litter",
-  `nickname` set, per-sex pricing set, status `weaning`→`ready`) with 4–5 puppies, some
-  `available` (disposition), giving Breeding real content, a priced litter, and enough
-  rows for "Show more". One pup is `for_sale`/on an **open sale** (Thread C).
+- **Thread A — "the current litter" (closes G3, G4, contributes to G10).** Add Pairing
+  **P4** (Juniper × an outside stud) that whelped a **second, open litter** ("Autumn
+  litter", `nickname` set, per-sex pricing set, `accept_deposits_date` set, status
+  `weaning`→`ready`) with 4–5 puppies — some `available` and one `keeping` (the
+  promote-nudge / `keeping`-disposition anchor, Thread F) — giving Breeding real
+  content and a priced litter. P4 is also one of the extra pairings that push the
+  pairing count past 5 so Breeding's chain "Show more" fires (G10). One pup is on an
+  **open sale** (Thread C).
 - **Thread B — "the incoming stud client" (closes G8, part of G7).** Add an **incoming**
   stud service (an outside dam visits Percy), `type='ai'`, plus its signed contract —
   balancing the existing outgoing/in-person one.
@@ -301,11 +321,22 @@ every new record has a reason to exist. Proposed narrative threads (each closes 
 - **Thread F — "kennel setup done right" (closes G12).** Set Thornfield's
   `preferred_tests`/`preferred_breeds`, `promote_nudge_enabled=true` + `promote_age_*`,
   and make a `keeping` puppy old enough to fire the promote nudge (closes part of G1).
-- **Thread G — "nudge liveness" (closes G1).** Tune relative dates so, on tutorial day:
-  one pairing is **overdue** (expected_due_date past, no litter); one stud service is
-  `arranged` with a passed `sent_date` (status-advance nudge); a `heat_cycle` event has
-  a real `event_end_date` in the recent past with no follow-up pairing (heat→pairing);
-  plus the promote nudge from Thread F. Aim for **one live example per nudge rule**.
+- **Thread G — "nudge liveness" (closes G1).** Tune relative dates and litter/roster
+  state so tutorial day carries **one live example per nudge rule** across all **eight**
+  (§19): (1) a stud service `arranged` with a passed `sent_date` (status → in-progress /
+  completed); (2) the promote nudge from Thread F (a `keeping` puppy past its kennel
+  threshold); (3) a completed stud service with no `pairing_id` yet (stud→pairing);
+  (4) a `heat_cycle` event with a real `event_end_date` in the recent past and no
+  follow-up pairing (heat→pairing); (5) a pairing **overdue** (`expected_due_date` past,
+  no litter); plus the three **litter-lifecycle** rules — (6) a `ready` litter whose
+  whole roster is `placed`/`keeping` with ≥1 `placed` (litter→sold), (7) a
+  `sold`/`closed` litter with a pup back to `available` (litter→reopen), and (8) a
+  `sold` litter where every placed pup has a `delivered` sale (litter→close). **Caveat:**
+  the three litter rules are mutually exclusive *per litter* (a litter can't be `ready`
+  and `sold` at once), so demonstrating all three live at the same moment needs distinct
+  litters in distinct states — the closed/sold Boston litter, the Autumn litter (Thread
+  A), and a staged sold litter between them carry these; §9.3 allows documenting any one
+  that's intentionally not live on a given seed day.
 - **Thread H — contacts & expenses polish (closes G13, G14).** Add a `groomer` and an
   `other` contact; set `email`/`address`/`companion_note` on 2–3 more; add one
   `pairing`-subject expense.
@@ -339,7 +370,7 @@ points at; "Control" = taught from the dropdown (teach-from-control fallback).
 |---|---|---|
 | `OWNERSHIP_TYPE` | owned, co_owned, external, leased_in **or** leased_out | the other lease direction |
 | `DOG_STATUS` | puppy, active_breeding, retired_breeding, pet_home, deceased, external_reference, for_sale | — |
-| `DISPOSITION` | undecided, keeping, available, placed | — |
+| `DISPOSITION` (puppy-only) | undecided, keeping, available, placed — **each on a `status='puppy'` dog** (disposition clears once status moves past `puppy`, so the `keeping` anchor is a kept puppy, not a promoted breeder) | — |
 | `PAIRING_STATUS` | planned, confirmed_pregnant, whelped, + one overdue | bred, not_pregnant, failed, cancelled |
 | `LITTER_STATUS` | expected, weaning/ready, closed | sold, whelped (transient) |
 | `SALE_STATUS` | deposit_paid (open), delivered | deposit_pending, paid_in_full, returned, cancelled |
@@ -351,8 +382,8 @@ points at; "Control" = taught from the dropdown (teach-from-control fallback).
 | `FEE_STRUCTURE` | flat_plus_pick, + flat_fee | pick_of_litter, other |
 | `CONTACT_TYPE` | vet, breeder, buyer, co_owner, buyer_referrer, stud_referrer, groomer, other | — |
 | `WAITLIST_STATUS` | none, active, fulfilled | — |
-| `EVENT_TYPES` | ≥1 per subject-type family incl. a span (boarding/medication/heat) and a placement | rare types (surgery/injury) optional as records |
-| `EXPENSE_CATEGORIES` | food, veterinary, testing, facility, supplies, marketing, registration | remainder |
+| `EVENT_TYPES` | ≥1 per subject-type family incl. a span (boarding/medication/heat), a placement, and an **`acquisition`** (first event on a purchased dog; its Cost field defaults to the `dog_purchase` category) | rare types (surgery/injury) optional as records |
+| `EXPENSE_CATEGORIES` | food, veterinary, testing, facility, supplies, marketing, registration, **`dog_purchase`** (captured from an `acquisition` event's cost) | remainder (boarding, stud_fee, insurance, other) |
 | `EXPENSE_SUBJECT_TYPES` | dog, litter, pairing, kennel | — |
 | Breed (free vocab, D2) | Boston Terrier **and** Boxer, both on Thornfield's `preferred_breeds` | further breeds |
 
@@ -365,7 +396,7 @@ Each item is a new row or a previously-unset plain field — **no schema change*
 - [ ] **G1** ← Threads F+G: tune dates + kennel config so one nudge per rule is live.
 - [ ] **G2** ← Thread C: one open sale (`deposit_paid`, future `balance_due_date`).
 - [ ] **G3** ← Thread A: a second, open, priced litter (weaning/ready) + an `expected`
-      litter; enough pairings/litters for "Show more".
+      litter; enough **pairings** (>5) for Breeding's chain "Show more" (see G10).
 - [ ] **G4** ← Thread A: set `expected_price_*`/`expected_deposit_*`/`nickname` on the
       new litter.
 - [ ] **G5** ← Thread D: a `leased_in`/`leased_out` dog with owner set.
@@ -375,7 +406,9 @@ Each item is a new row or a previously-unset plain field — **no schema change*
       dates + a non-signed status example).
 - [ ] **G8** ← Thread B: an incoming, `ai` stud service + contract.
 - [ ] **G9** ← Thread C: `transport_fee` + `deferred_boarding_*` on the open sale.
-- [ ] **G10** ← Threads A/B/C: cross >5 rows in a paginated list.
+- [ ] **G10** ← Threads A/I (+ any added pairings): get the **pairing** count past 5 so
+      Breeding's chain "Show more" triggers — the only paginated list left (Sales & Stud
+      are grouped, not paginated).
 - [ ] **G11** ← Thread E: boarding span + medication span + a couple instant medical types.
 - [ ] **G12** ← Thread F: kennel `preferred_tests`/`preferred_breeds`/promote config.
 - [ ] **G13** ← Thread H: groomer/other contacts; broaden email/address/companion_note.
@@ -392,7 +425,9 @@ Each item is a new row or a previously-unset plain field — **no schema change*
    unless the stop's *purpose* is to teach an empty/first-run state.
 2. **Enum target met** (§7): every "must have a record" cell is satisfied.
 3. **Nudges live:** on a fresh seed run "today", the Today Nudges section shows ≥1 of
-   each of the five rules (or a documented reason a rule is intentionally omitted).
+   each of the **eight** rules (§19), or a documented reason a rule is intentionally
+   omitted — the three litter-lifecycle rules are mutually exclusive per litter, so
+   covering all three at once requires distinct litters in the right states.
 4. **Companion all three tabs non-empty:** Prospective, Current families, Partners each
    have ≥1 recipient whose bundle builds and renders (price where applicable).
 5. **Every §5.2 dependency has a live example** or is explicitly deferred.
@@ -450,8 +485,10 @@ Each item is a new row or a previously-unset plain field — **no schema change*
   it's a link, not app shell). Editing `sampleData.js` still bumps `CACHE_NAME` per §2.7.
 - **D5 — Nudge determinism → TUNE relative dates.** Do **not** re-seed at tutorial launch.
   Tune each nudge-dependent record's `daysFromToday`/`monthsFromToday` offsets (Threads
-  F+G) so all five nudge rules are live on seed day, accepting drift if the user seeds now
-  and takes the tutorial much later. §9 criterion 3 is evaluated against a fresh seed's
+  F+G) so all eight nudge rules (§19) are live on seed day — as far as they can co-exist
+  (§9.3: the three litter-lifecycle rules can't all fire on one litter) — accepting drift
+  if the user seeds now and takes the tutorial much later. §9 criterion 3 is evaluated
+  against a fresh seed's
   "today". If drift proves a problem in practice, revisit re-seed-on-launch as a v2 change.
 
 ---
