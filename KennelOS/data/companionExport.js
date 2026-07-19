@@ -218,6 +218,7 @@ export async function buildProspectiveBundle(contact) {
       nickname: l.nickname || '',
       breed: (damDog && damDog.breed) || (sireDog && sireDog.breed) || '',
       whelpDate: l.whelp_date || null,
+      acceptDepositsDate: l.accept_deposits_date || null,
       readyDate: l.estimated_ready_date || null,
       sire: await dogCard(sireDog),
       dam: await dogCard(damDog),

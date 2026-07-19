@@ -261,6 +261,7 @@
         if (l.breed) h += '<span class="chip">' + esc(l.breed) + '</span>';
         var meta = '';
         meta += row('Born', l.whelpDate ? esc(fmtDate(l.whelpDate)) : '');
+        meta += row('Accepting deposits', l.acceptDepositsDate ? esc(fmtDate(l.acceptDepositsDate)) : '');
         meta += row('Estimated ready', l.readyDate ? esc(fmtDate(l.readyDate)) : '');
         if (meta) h += '<div style="margin-top:8px;">' + meta + '</div>';
         if (l.readyDate) h += '<p class="disclaimer">*' + esc(READY_DISCLAIMER) + '</p>';
