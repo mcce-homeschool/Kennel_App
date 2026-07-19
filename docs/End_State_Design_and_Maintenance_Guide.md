@@ -441,7 +441,17 @@ way.
   portable domain data.
 - **sampleData.js** — the "Thornfield Kennels" demo. Seeds through the **repo layer** (same
   validation as real data) and tracks created IDs in one manifest object (not an
-  `is_sample` schema flag), so clearing is a lookup, not a scan.
+  `is_sample` schema flag), so clearing is a lookup, not a scan. Deliberately **broad**
+  (Tutorial Sample-Data Coverage Spec §6, Phase 2) so a first-run tour can point at a live
+  example on every hub: a two-breed program (Boston Terriers **and** Boxers), a priced,
+  actively-selling **Autumn litter** with an open sale (transport fee + deferred-boarding
+  balance math), an **expected** litter, a lease (leased-in Boxer + `lease` contract) and a
+  `co_own` contract, an **incoming AI** stud service, and dates tuned so seven of the eight
+  Today nudges (§19) are live on a fresh seed — the litter→**close** rule is intentionally
+  not live (it needs a `sold` litter whose placed pups are all `delivered`, which conflicts
+  with the reopen/sold anchors and the packet size, per the spec's §9.3). Companion has ≥1
+  recipient on all three tabs (prospective / current families / partners). Editing this file
+  still bumps `CACHE_NAME` (§ service worker); it adds no new file or FK.
 - **seedImport.js** — optional breed+test vocabulary seed (from
   `resources/common_tests_by_breed_seed.csv` or a user file). Appends to
   `Kennel.preferred_tests` / `preferred_breeds`; creates **no** records. Deliberately

@@ -4,9 +4,14 @@
 // Design (brief §2): seed through the repo layer so sample records go through
 // the exact same validation real data does; track created IDs in one manifest
 // object rather than an `is_sample` schema flag, so clearing needs no scan.
-// v2 unifies all six tables that exist through Stage 3 (Dog, Event, Contact,
-// Kennel, Pairing, Litter) into one seed/clear set — this replaces v1 entirely,
-// it is not a diff.
+//
+// Tutorial coverage (Tutorial Sample-Data Coverage Spec §6, Phase 2): the packet
+// is deliberately expanded so a first-run guided tour can stop on every hub and
+// point at a live example — a priced "Autumn" litter with an open sale, a second
+// (Boxer) breed line, a lease and a co-ownership, an incoming AI stud service,
+// and dates tuned so the Today nudges fire. Every addition is DATA — no schema
+// change, no new FK — and every id still lands in the manifest so clear/reset
+// stays clean. See the spec's §6 threads (A–I) tagged inline below.
 import { db } from './db.js';
 import { dogRepo } from './dogRepo.js';
 import { HistoryEvent } from './eventRepo.js';
@@ -66,10 +71,23 @@ export async function seedSampleData() {
     sales: [], contracts: [], stud_services: [], expenses: []
   };
 
+  const BREED = 'Boston Terrier';
+  const BOXER = 'Boxer'; // Thread I (D2): a small second program alongside the Bostons.
+
   // Kennels — Thornfield is the user's own kennel; Meadow Ridge is Dana Ruiz's
   // (Own-Kennel Identity addendum §5).
+  // Thread F (G12): Thornfield carries its program config — a preferred-test
+  // checklist (feeds planned-test suggestions), preferred breeds (both lines,
+  // feeds breed autocomplete), and promote-nudge thresholds so a kept puppy old
+  // enough surfaces the promote-lifecycle nudge (§19/§4.3).
   const thornfield = await kennelRepo.create({
-    kennel_name: 'Thornfield Kennels', prefix: 'THORN', location: 'Hartland, VT', is_own_kennel: true
+    kennel_name: 'Thornfield Kennels', prefix: 'THORN', location: 'Hartland, VT', is_own_kennel: true,
+    preferred_tests: [
+      'OFA Patella', 'OFA Cardiac (Advanced)', 'BAER Hearing', 'Companion Animal Eye Exam (CAER)',
+      'Juvenile Hereditary Cataract (DNA)', 'Degenerative Myelopathy (DNA)', 'Holter Monitor (ARVC)'
+    ],
+    preferred_breeds: [BREED, BOXER],
+    promote_nudge_enabled: true, promote_age_male_months: 14, promote_age_female_months: 11
   });
   const meadowRidge = await kennelRepo.create({
     kennel_name: 'Meadow Ridge Kennels', prefix: 'MDWR', location: 'Concord, NH', is_own_kennel: false
@@ -81,7 +99,11 @@ export async function seedSampleData() {
     name: 'Dr. Patricia Nguyen', contact_type: ['vet'], phone: '555-0101'
   });
   const dana = await contactRepo.create({
-    name: 'Dana Ruiz', contact_type: ['breeder'], kennel_id: meadowRidge.id, phone: '555-0102'
+    name: 'Dana Ruiz', contact_type: ['breeder'], kennel_id: meadowRidge.id, phone: '555-0102',
+    // companion_note (Thread H/G13): Dana is the lessor on Sage's lease below, so
+    // she is a partner recipient — give her a recipient-facing note.
+    email: 'dana.ruiz@example.com', address: 'Concord, NH',
+    companion_note: 'Thanks for trusting Thornfield with Sage this season — updates to follow.'
   });
   const sam = await contactRepo.create({
     name: 'Sam Okafor', contact_type: ['co_owner'], phone: '555-0103'
@@ -95,9 +117,9 @@ export async function seedSampleData() {
   await contactRepo.archive(marcus.id);
 
   // Stage 4: buyers are Contacts, not a separate table (Data Model v3 §5.5).
-  // Priya buys Hazel (waitlist fulfilled by a completed sale); Owen exercises
-  // the empty-waitlist demo (active, no Sale record yet); Ellen owns the
-  // external female used in the sample stud service.
+  // Priya buys Hazel (waitlist fulfilled by a delivered sale); Owen exercises the
+  // ACTIVE-waitlist prospective demo (active, no Sale record yet); Ellen owns the
+  // external females used in the sample stud service and the overdue pairing.
   const priya = await contactRepo.create({
     name: 'Priya Shah', contact_type: ['buyer'], waitlist_status: 'fulfilled',
     first_contact_source: 'Instagram', phone: '555-0106', email: 'priya.shah@example.com',
@@ -107,26 +129,59 @@ export async function seedSampleData() {
   });
   const owen = await contactRepo.create({
     name: 'Owen Farrow', contact_type: ['buyer'], waitlist_status: 'active',
-    first_contact_source: 'Referral', phone: '555-0107'
+    first_contact_source: 'Referral', phone: '555-0107',
+    // Thread H/G13: Owen is the active-waitlist PROSPECTIVE recipient, so give him
+    // an email + a recipient-facing note the prospective share page can carry.
+    email: 'owen.farrow@example.com', address: 'Montpelier, VT',
+    companion_note: 'Great to have you on the list for the Autumn litter — first pick weekend is coming up!'
   });
   // address (Data Integrity Brief §5): the away-board resolves an in-person
   // stud service's location from the partner contact's address, so Ellen
   // needs one for studServiceBirch below to show a real location, not "—".
   const ellen = await contactRepo.create({
-    name: 'Ellen Brooks', contact_type: ['breeder'], phone: '555-0108', address: 'Burlington, VT'
+    name: 'Ellen Brooks', contact_type: ['breeder'], phone: '555-0108', address: 'Burlington, VT',
+    email: 'ellen.brooks@example.com',
+    // companion_note (Thread H/G13): Ellen is the outgoing-stud partner recipient.
+    companion_note: 'Looking forward to a lovely litter from Birch and Nell.'
   });
-  // Nora — buyer on the Daisy sale below (Puppy Record feature demo). Carries a
-  // full address so the Puppy Record's Buyer card has every field populated.
+  // Nora — buyer on the Daisy sale (Puppy Record feature demo). Carries a full
+  // address so the Puppy Record's Buyer card has every field populated. Her sale
+  // is open (deposit_paid), so she is also a CURRENT FAMILY companion recipient.
   const nora = await contactRepo.create({
     name: 'Nora Kim', contact_type: ['buyer'], waitlist_status: 'fulfilled',
     first_contact_source: 'Website', phone: '555-0109', email: 'nora.kim@example.com',
     address: '48 Birchwood Lane, Burlington, VT 05401'
   });
-  manifest.contacts.push(patricia.id, dana.id, sam.id, tessa.id, marcus.id, priya.id, owen.id, ellen.id, nora.id);
+  // Jamal — buyer on the open Autumn-litter sale (Thread C, G2/G9). A full address
+  // + companion_note so his current-family share page and the balance math are
+  // fully populated.
+  const jamal = await contactRepo.create({
+    name: 'Jamal Reed', contact_type: ['buyer'], waitlist_status: 'fulfilled',
+    first_contact_source: 'Referral', phone: '555-0110', email: 'jamal.reed@example.com',
+    address: '12 Maple Court, Lebanon, NH 03766',
+    companion_note: 'Can’t wait for you to meet your Autumn puppy — pickup details inside.'
+  });
+  // Thread H (G13): a groomer and an "other" contact so those contact types have
+  // a live record, not just a dropdown entry.
+  const grace = await contactRepo.create({
+    name: 'Grace Halloran', contact_type: ['groomer'], phone: '555-0111',
+    email: 'grace@example.com', address: 'White River Junction, VT'
+  });
+  const rex = await contactRepo.create({
+    name: 'Rex Regional Pet Transport', contact_type: ['other'], phone: '555-0112',
+    email: 'dispatch@rexpettransport.example.com'
+  });
+  // Hugo — owner of the outside Boxer stud (Titan) used for the incoming AI stud
+  // service (Thread B, G8); the partner contact on that arrangement.
+  const hugo = await contactRepo.create({
+    name: 'Hugo Marsh', contact_type: ['breeder'], phone: '555-0113', address: 'Keene, NH'
+  });
+  manifest.contacts.push(
+    patricia.id, dana.id, sam.id, tessa.id, marcus.id, priya.id, owen.id, ellen.id,
+    nora.id, jamal.id, grace.id, rex.id, hugo.id
+  );
 
-  // Dogs — ancestors first so each generation can reference the last. Every
-  // sample dog is Boston Terrier (brief §6).
-  const BREED = 'Boston Terrier';
+  // Dogs — ancestors first so each generation can reference the last.
 
   const ash = await dogRepo.create({
     call_name: 'Ash', sex: 'male', breed: BREED,
@@ -141,15 +196,16 @@ export async function seedSampleData() {
   await dogRepo.archive(willow.id);
 
   // Juniper carries a recorded COI (Stage 5 §9) — genomic, from Embark. It's a
-  // user-attested value on the Dog record, not computed by the app.
+  // user-attested value on the Dog record, not computed by the app. planned_tests
+  // + url (Thread A/G6): a photo pointer (external URL, D4) and a planned-test
+  // plan that unions with Thornfield.preferred_tests in the test combobox.
   const juniper = await dogRepo.create({
     call_name: 'Juniper', sex: 'female', breed: BREED,
     date_of_birth: '2019-11-03', sire_id: ash.id, dam_id: willow.id,
-    // registered_name/registration_number/microchip_id/color_markings/registry
-    // (Puppy Record feature demo): so the parent card on a printed puppy record
-    // has every field populated, not just call name + breed.
     registered_name: 'Thornfield Midnight Juniper', registration_number: 'AKC WS71029304',
     microchip_id: '985141000123456', color_markings: 'Black & white, seal points', registry: 'AKC',
+    url: 'https://images.example.com/thornfield/juniper.jpg',
+    planned_tests: ['OFA Patella', 'Companion Animal Eye Exam (CAER)'],
     ownership_type: 'owned', status: 'active_breeding', kennel_id: thornfield.id,
     recorded_coi: { value: 6.25, method: 'genomic', source: 'Embark', as_of_date: '2023-03-01' }
   });
@@ -157,10 +213,7 @@ export async function seedSampleData() {
   // Gunnar stays kennel_id: null — external, owned by Dana Ruiz. His kennel
   // identity flows through owner_contact_id, not kennel_id. His recorded COI uses
   // a DIFFERENT method/source (pedigree, AKC 5-gen) so the mixed-provenance
-  // display is exercised (Stage 5 §9). breeder_kennel_id points at Meadow
-  // Ridge — Dana's outside kennel — exercising the "acquired dog, outside
-  // breeder" case (as opposed to Fern/Birch/Hazel below, whose in-house
-  // breeder_kennel_id comes from the auto-prefill instead).
+  // display is exercised (Stage 5 §9). breeder_kennel_id points at Meadow Ridge.
   const gunnar = await dogRepo.create({
     call_name: 'Gunnar', sex: 'male', breed: BREED,
     date_of_birth: '2018-06-01', dob_is_estimated: true,
@@ -171,28 +224,44 @@ export async function seedSampleData() {
     recorded_coi: { value: 4.1, method: 'pedigree', source: 'AKC 5-gen', as_of_date: '2022-11-15' }
   });
 
+  // Ivy — a second owned Boston dam (Thread A): the dam of the current "Autumn"
+  // litter, so Juniper isn't the only breeding female. planned_tests + url (G6).
+  const ivy = await dogRepo.create({
+    call_name: 'Ivy', sex: 'female', breed: BREED,
+    date_of_birth: '2021-05-10',
+    registered_name: 'Thornfield Wild Ivy', registration_number: 'AKC WS84550012',
+    microchip_id: '985141000223344', color_markings: 'Seal brindle & white', registry: 'AKC',
+    url: 'https://images.example.com/thornfield/ivy.jpg',
+    planned_tests: ['OFA Patella', 'BAER Hearing'],
+    ownership_type: 'owned', status: 'active_breeding', kennel_id: thornfield.id
+  });
+
   // Pairing P1 — the actual, whelped breeding that produced Fern/Birch/Hazel.
   const pairingP1 = await pairingRepo.create({
     sire_id: gunnar.id, dam_id: juniper.id, pairing_type: 'actual', method: 'natural',
     status: 'whelped', planned_date: '2025-06-18', expected_due_date: '2025-08-20'
   });
 
-  // Litter — dam/sire authoritative on the litter itself, pairing_id links back
-  // to P1 (data model §5.4). Status closed: all three puppies have moved on,
-  // even though the individual dogs sit at different life stages.
+  // Litter 1 — the founding Boston litter (Fern/Birch/Hazel). dam/sire authoritative
+  // on the litter; pairing_id links back to P1 (data model §5.4). Status SOLD with
+  // one puppy (Fern) still `available`: her placement fell through, so she is on
+  // the roster again — this drives the litter→reopen nudge (§19). Thread G(7).
   const litter = await litterRepo.create({
-    pairing_id: pairingP1.id, dam_id: juniper.id, sire_id: gunnar.id,
+    pairing_id: pairingP1.id, dam_id: juniper.id, sire_id: gunnar.id, nickname: 'Summer litter',
     whelp_date: '2025-08-20', litter_registration_number: 'THORN-L-2025-01',
     puppies_born_total: 3, puppies_born_alive: 3, puppies_born_deceased: 0, puppies_born_abnormalities: 0,
-    status: 'closed'
+    status: 'sold'
   });
 
   // Fern/Birch/Hazel carry breeder_kennel_id: thornfield.id — Juniper (their dam)
   // is an owned dog whose own kennel_id is Thornfield, exercising the
   // dam-is-my-dog auto-prefill (dog.js / puppyForm.js) rather than a manual set.
+  // Fern — `available` again on a SOLD litter (see litter above): the reopen-nudge
+  // anchor. url (G6): a puppy photo for the companion prospective/family bundle.
   const fern = await dogRepo.create({
     call_name: 'Fern', sex: 'female', breed: BREED,
     date_of_birth: '2025-08-20', sire_id: gunnar.id, dam_id: juniper.id, litter_id: litter.id,
+    url: 'https://images.example.com/thornfield/fern.jpg',
     ownership_type: 'owned', status: 'puppy', disposition: 'available', kennel_id: thornfield.id,
     breeder_kennel_id: thornfield.id
   });
@@ -209,14 +278,25 @@ export async function seedSampleData() {
     breeder_kennel_id: thornfield.id
   });
 
+  // Poppy — a female Thornfield kept back for breeding but not yet promoted. Old
+  // enough (past Thornfield's female promote threshold) but still `status: puppy`
+  // with `disposition: keeping`, so she surfaces the PROMOTE-LIFECYCLE nudge
+  // (§19/§4.3). Thread F. Relative DOB so she stays "old enough" on any seed day.
+  const poppy = await dogRepo.create({
+    call_name: 'Poppy', sex: 'female', breed: BREED,
+    date_of_birth: monthsFromToday(-12),
+    ownership_type: 'owned', status: 'puppy', disposition: 'keeping', kennel_id: thornfield.id,
+    breeder_kennel_id: thornfield.id
+  });
+
   // Litter 2 + Daisy (Puppy Record feature demo) — a second, standalone litter
-  // off the same pair, deliberately with no Pairing behind it (pairing_id is
-  // nullable — an imported/manually-entered litter often has none). Daisy
-  // carries every Dog field the Puppy Record can show, and her health history
-  // (below) touches all twelve health-relevant event types at once so the
-  // printed record's per-type cards can all be exercised in one puppy.
+  // off Juniper × Gunnar, deliberately with no Pairing behind it (pairing_id is
+  // nullable). Status `ready` with Daisy `placed` (her whole roster is one pup,
+  // spoken for) drives the litter→sold nudge (§19). Daisy carries every Dog field
+  // the Puppy Record can show, and her health history (below) touches all twelve
+  // health-relevant event types so the printed record's per-type cards all fill.
   const litter2 = await litterRepo.create({
-    dam_id: juniper.id, sire_id: gunnar.id,
+    dam_id: juniper.id, sire_id: gunnar.id, nickname: 'Spring litter',
     whelp_date: '2026-03-02', litter_registration_number: 'THORN-L-2026-01',
     puppies_born_total: 1, puppies_born_alive: 1, puppies_born_deceased: 0, puppies_born_abnormalities: 1,
     status: 'ready'
@@ -227,6 +307,46 @@ export async function seedSampleData() {
     registered_name: 'Thornfield Daisy Mae', registration_number: 'AKC WS99213045',
     microchip_id: '985141000998877', color_markings: 'Brindle & white, split face', registry: 'AKC',
     ownership_type: 'owned', status: 'puppy', disposition: 'placed', kennel_id: thornfield.id,
+    breeder_kennel_id: thornfield.id
+  });
+
+  // The current "Autumn" litter (Thread A, G3/G4) — Ivy × Gunnar, whelped ~9 weeks
+  // ago, status `ready`, priced per sex, with a nickname and an accept-deposits
+  // date. Relative dates so it reads as "now-ish" on any seed day. This is the
+  // priced, actively-selling litter behind Today's Active-litters card, the
+  // prospective companion bundle, and the open Autumn sale below.
+  const pairingP4 = await pairingRepo.create({
+    sire_id: gunnar.id, dam_id: ivy.id, pairing_type: 'actual', method: 'natural',
+    status: 'whelped', planned_date: daysFromToday(-126), expected_due_date: daysFromToday(-63)
+  });
+  const autumnLitter = await litterRepo.create({
+    pairing_id: pairingP4.id, dam_id: ivy.id, sire_id: gunnar.id, nickname: 'Autumn litter',
+    whelp_date: daysFromToday(-63), estimated_ready_date: daysFromToday(-7),
+    accept_deposits_date: daysFromToday(-30), litter_registration_number: 'THORN-L-2026-02',
+    puppies_born_total: 3, puppies_born_alive: 3, puppies_born_deceased: 0, puppies_born_abnormalities: 0,
+    expected_price_male: 2800, expected_price_female: 3000,
+    expected_deposit_male: 500, expected_deposit_female: 500,
+    status: 'ready'
+  });
+  // Autumn puppies: one available (feeds the prospective bundle + Active-litters
+  // card), one placed on an OPEN sale (Thread C), one kept.
+  const wrenPup = await dogRepo.create({
+    call_name: 'Wren', sex: 'female', breed: BREED,
+    date_of_birth: daysFromToday(-63), sire_id: gunnar.id, dam_id: ivy.id, litter_id: autumnLitter.id,
+    url: 'https://images.example.com/thornfield/wren.jpg',
+    ownership_type: 'owned', status: 'puppy', disposition: 'available', kennel_id: thornfield.id,
+    breeder_kennel_id: thornfield.id
+  });
+  const cedarPup = await dogRepo.create({
+    call_name: 'Cedar', sex: 'male', breed: BREED,
+    date_of_birth: daysFromToday(-63), sire_id: gunnar.id, dam_id: ivy.id, litter_id: autumnLitter.id,
+    ownership_type: 'owned', status: 'puppy', disposition: 'placed', kennel_id: thornfield.id,
+    breeder_kennel_id: thornfield.id
+  });
+  const asterPup = await dogRepo.create({
+    call_name: 'Aster', sex: 'female', breed: BREED,
+    date_of_birth: daysFromToday(-63), sire_id: gunnar.id, dam_id: ivy.id, litter_id: autumnLitter.id,
+    ownership_type: 'owned', status: 'puppy', disposition: 'keeping', kennel_id: thornfield.id,
     breeder_kennel_id: thornfield.id
   });
 
@@ -246,37 +366,111 @@ export async function seedSampleData() {
     ownership_type: 'external', owner_contact_id: ellen.id, status: 'external_reference'
   });
 
-  manifest.dogs.push(ash.id, willow.id, juniper.id, gunnar.id, fern.id, birch.id, hazel.id, daisy.id, percy.id, nell.id);
+  // Dahlia — a second external Boston dam (Ellen's) bred by our co-owned stud
+  // Percy. Her pairing is OVERDUE with no litter recorded yet, driving the
+  // overdue-pairing nudge (§19). Thread G(5).
+  const dahlia = await dogRepo.create({
+    call_name: 'Dahlia', sex: 'female', breed: BREED,
+    date_of_birth: '2021-08-22', dob_is_estimated: true,
+    ownership_type: 'external', owner_contact_id: ellen.id, status: 'external_reference'
+  });
 
-  // Pairing P2 — same pair, planned only, no litter yet. Exercises the "Create
-  // Litter from this Pairing" empty state and an empty pairing timeline.
+  // --- Boxer line (Thread I / D2) — a small second program on the SAME own
+  // kennel (no second fake kennel), so the Dogs breed filter and reports show >1
+  // breed and Thornfield.preferred_breeds is exercised. ------------------------
+  const diesel = await dogRepo.create({
+    call_name: 'Diesel', sex: 'male', breed: BOXER,
+    date_of_birth: '2021-08-01',
+    registered_name: 'Thornfield Diesel Engine', registration_number: 'AKC WS81002233',
+    color_markings: 'Fawn, black mask', registry: 'AKC',
+    planned_tests: ['Holter Monitor (ARVC)', 'OFA Cardiac (Advanced)'],
+    ownership_type: 'owned', status: 'active_breeding', kennel_id: thornfield.id,
+    breeder_kennel_id: thornfield.id
+  });
+  // Juno — our Boxer dam bred by AI to an outside stud (Titan). The incoming AI
+  // stud service below is `completed` with no linked pairing yet, driving the
+  // stud→pairing nudge (§19/§4.7). Her only pairing (Diesel × Juno) is `failed`
+  // (terminal), so it doesn't count against that nudge's dedup.
+  const juno = await dogRepo.create({
+    call_name: 'Juno', sex: 'female', breed: BOXER,
+    date_of_birth: '2022-04-15',
+    ownership_type: 'owned', status: 'active_breeding', kennel_id: thornfield.id,
+    breeder_kennel_id: thornfield.id
+  });
+  // Titan — outside Boxer stud (Hugo's), the partner dog on the incoming AI
+  // service. External; identity flows through owner_contact_id.
+  const titan = await dogRepo.create({
+    call_name: 'Titan', sex: 'male', breed: BOXER,
+    date_of_birth: '2020-03-01', dob_is_estimated: true,
+    ownership_type: 'external', owner_contact_id: hugo.id, status: 'external_reference'
+  });
+  // Sage — a Boxer dam LEASED IN from Dana for a breeding (Thread D, G5). Owner is
+  // required for a leased_in dog (dogRepo), and the lease contract below documents
+  // it. Her recent concluded heat (with no pairing yet) drives the heat→pairing
+  // nudge (§19/§4.5).
+  const sage = await dogRepo.create({
+    call_name: 'Sage', sex: 'female', breed: BOXER,
+    date_of_birth: '2022-09-20',
+    ownership_type: 'leased_in', owner_contact_id: dana.id, status: 'active_breeding'
+  });
+
+  manifest.dogs.push(
+    ash.id, willow.id, juniper.id, gunnar.id, ivy.id,
+    fern.id, birch.id, hazel.id, poppy.id, daisy.id,
+    wrenPup.id, cedarPup.id, asterPup.id, percy.id, nell.id, dahlia.id,
+    diesel.id, juno.id, titan.id, sage.id
+  );
+
+  // Pairing P2 — Juniper × Gunnar, planned only, no litter yet. Exercises the
+  // "Create Litter from this Pairing" empty state and an empty pairing timeline.
   const pairingP2 = await pairingRepo.create({
     sire_id: gunnar.id, dam_id: juniper.id, pairing_type: 'planned', status: 'planned',
     planned_date: monthsFromToday(4)
   });
 
-  // Pairing P3 — the actual breeding produced by the sample Stud Service below.
-  // StudService.pairing_id is the canonical link (Data Model v3 §5.8); there is
-  // no Pairing.stud_service_id, so this pairing carries no back-pointer of its own.
+  // Pairing P3 — Birch × Nell, the current breeding behind the outgoing stud
+  // service (Birch is physically away at Ellen's now). Recently bred, no due date
+  // yet, so it is NOT overdue. StudService.pairing_id is the canonical link.
   const pairingP3 = await pairingRepo.create({
     sire_id: birch.id, dam_id: nell.id, pairing_type: 'actual', method: 'ai_chilled',
-    status: 'confirmed_pregnant', planned_date: '2026-05-01'
+    status: 'bred', planned_date: daysFromToday(-3)
   });
 
-  manifest.pairings.push(pairingP1.id, pairingP2.id, pairingP3.id);
-  manifest.litters.push(litter.id, litter2.id);
+  // Pairing P5 — Percy × Dahlia, confirmed pregnant and now PAST its expected due
+  // date with no litter recorded → overdue-pairing nudge (§19). Thread G(5).
+  const pairingP5 = await pairingRepo.create({
+    sire_id: percy.id, dam_id: dahlia.id, pairing_type: 'actual', method: 'natural',
+    status: 'confirmed_pregnant', planned_date: daysFromToday(-72), expected_due_date: daysFromToday(-9)
+  });
 
-  // Stage 4 — Stud Service: Birch (our dog) services Nell (Ellen's outside
-  // female). Links to Pairing P3 via the canonical pairing_id.
-  // type/sent_date/no returned_date (Data Integrity Brief §5): this IS the
-  // sample's away-board row now — an ongoing in-person stay. The parallel
-  // "Boarding for stud service" event that used to duplicate this trip is
-  // gone; the board reads this record directly via studServiceRepo.getBoardRows().
-  // fee_structure/pick_status/pick_value_amount (Companion feature §1/§20): a
-  // flat_plus_pick arrangement so the partner companion bundle exercises both a
-  // cash fee_amount and a pick_status. `pending` — Ellen hasn't claimed her pick
-  // yet. pick_value_amount is the breeder's own income-tracking estimate of
-  // what that pick puppy is worth, separate from the cash fee_amount.
+  // Pairing P6 — Diesel × Juno, an earlier Boxer breeding that FAILED (didn't
+  // take). Terminal status, so it doesn't dedup Juno's stud→pairing nudge; it
+  // gives the Boxer line a pairing and exercises PAIRING_STATUS `failed`. Thread I.
+  const pairingP6 = await pairingRepo.create({
+    sire_id: diesel.id, dam_id: juno.id, pairing_type: 'actual', method: 'natural',
+    status: 'failed', planned_date: daysFromToday(-150)
+  });
+
+  manifest.pairings.push(
+    pairingP1.id, pairingP2.id, pairingP3.id, pairingP4.id, pairingP5.id, pairingP6.id
+  );
+  manifest.litters.push(litter.id, litter2.id, autumnLitter.id);
+
+  // Litter 3 — an EXPECTED litter with no puppies yet (Thread A, G3): Juniper ×
+  // Gunnar off the planned pairing P2. Exercises LITTER_STATUS `expected` and the
+  // "no roster yet" litter-detail state. Linked to P2 (also its own dam/sire).
+  const expectedLitter = await litterRepo.create({
+    pairing_id: pairingP2.id, dam_id: juniper.id, sire_id: gunnar.id, nickname: 'Winter litter',
+    litter_registration_number: 'THORN-L-2026-03', status: 'expected'
+  });
+  manifest.litters.push(expectedLitter.id);
+
+  // --- Stud Service SS1 (outgoing, in-person) — Birch services Nell at Ellen's.
+  // Links to Pairing P3 via the canonical pairing_id. `arranged` with a passed
+  // sent_date and no returned_date: Birch is physically away right now, so this is
+  // the away-board row AND drives the stud-service status nudge ("mark in
+  // progress", §19/§4.2). flat_plus_pick with pick_value_amount so the partner
+  // companion bundle exercises both a cash fee and a non-cash pick estimate.
   const studServiceBirch = await studServiceRepo.create({
     direction: 'outgoing', our_dog_id: birch.id, partner_dog_id: nell.id, partner_contact_id: ellen.id,
     fee_amount: 800, fee_structure: 'flat_plus_pick', pick_status: 'pending', pick_value_amount: 1500,
@@ -284,11 +478,11 @@ export async function seedSampleData() {
     // referred_by (Referral tracking): Dana sent this arrangement our way — the
     // repo auto-tags her contact as a 'stud_referrer'.
     referred_by_contact_id: dana.id,
-    status: 'completed', result_notes: 'Successful AI breeding; pregnancy confirmed by ultrasound.'
+    status: 'arranged', result_notes: 'Sent to Ellen’s for a natural breeding; awaiting confirmation.'
   });
   const studServiceContract = await contractRepo.create({
     contract_type: 'stud_service', status: 'signed', related_stud_service_id: studServiceBirch.id,
-    title: 'Stud Service Agreement — Birch × Nell', signed_date: '2026-04-15',
+    title: 'Stud Service Agreement — Birch × Nell', signed_date: daysFromToday(-10),
     // document_url (Companion feature §20): a placeholder "anyone with the link"
     // pointer the partner bundle carries.
     document_url: 'https://drive.example.com/thornfield/birch-nell-stud-agreement',
@@ -297,8 +491,50 @@ export async function seedSampleData() {
   manifest.stud_services.push(studServiceBirch.id);
   manifest.contracts.push(studServiceContract.id);
 
-  // Stage 4 — Sale: Hazel placed with Priya Shah (pet home, delivered). Contract
-  // owns related_sale_id (canonical); there is no Sale.contract_id.
+  // --- Stud Service SS2 (incoming, AI) — we bred our Boxer dam Juno by shipped
+  // semen from Hugo's outside stud Titan (Thread B, G8). `incoming` (our dog is
+  // the dam), `ai` (shipped, so it never hits the away-board), flat_fee (money we
+  // PAY — an expense, never income). `completed` with NO linked pairing yet →
+  // drives the stud→pairing nudge (§19/§4.7). Its signed contract balances the
+  // outgoing one above.
+  const studServiceJuno = await studServiceRepo.create({
+    direction: 'incoming', our_dog_id: juno.id, partner_dog_id: titan.id, partner_contact_id: hugo.id,
+    fee_amount: 1200, fee_structure: 'flat_fee', type: 'ai', sent_date: daysFromToday(-25),
+    status: 'completed', result_notes: 'Shipped chilled semen, AI performed by repro vet.'
+  });
+  const studServiceJunoContract = await contractRepo.create({
+    contract_type: 'stud_service', status: 'signed', related_stud_service_id: studServiceJuno.id,
+    title: 'Stud Service Agreement — Titan × Juno (AI)', signed_date: daysFromToday(-32),
+    document_url: 'https://drive.example.com/thornfield/titan-juno-stud-agreement',
+    terms_summary: 'Flat fee, one shipment of chilled semen, no live-guarantee re-breed.'
+  });
+  manifest.stud_services.push(studServiceJuno.id);
+  manifest.contracts.push(studServiceJunoContract.id);
+
+  // --- Contracts: a co-ownership and a lease (Thread D, G7) --------------------
+  // co_own (status `sent` — the non-signed CONTRACT_STATUS example): documents
+  // Percy's co-ownership with Sam. related_dog_id/related_contact_id are the only
+  // way a co_own/lease/other contract reaches its dog/counterparty.
+  const percyCoOwnContract = await contractRepo.create({
+    contract_type: 'co_own', status: 'sent', related_dog_id: percy.id, related_contact_id: sam.id,
+    title: 'Co-Ownership Agreement — Percy', signed_date: '',
+    terms_summary: 'Shared ownership; show and breeding decisions made jointly.'
+  });
+  // lease (signed): Sage leased in from Dana with lease dates. Makes Dana a LEASE
+  // PARTNER in the Companion (partner membership comes from a live lease/co_own
+  // contract with a counterparty), the third companion recipient type.
+  const sageLeaseContract = await contractRepo.create({
+    contract_type: 'lease', status: 'signed', related_dog_id: sage.id, related_contact_id: dana.id,
+    title: 'Breeding Lease — Sage', signed_date: daysFromToday(-40),
+    lease_start_date: daysFromToday(-40), lease_end_date: daysFromToday(120),
+    document_url: 'https://drive.example.com/thornfield/sage-lease',
+    terms_summary: 'One-season breeding lease; pick arrangement per addendum.'
+  });
+  manifest.contracts.push(percyCoOwnContract.id, sageLeaseContract.id);
+
+  // --- Sales ------------------------------------------------------------------
+  // Hazel placed with Priya (pet home, delivered — terminal). Contract owns
+  // related_sale_id (canonical); there is no Sale.contract_id.
   const hazelSale = await saleRepo.create({
     dog_id: hazel.id, buyer_contact_id: priya.id, sale_date: '2025-12-20',
     price: 2500, deposit_amount: 500, deposit_date: '2025-11-01', balance_paid_date: '2025-12-20',
@@ -311,18 +547,15 @@ export async function seedSampleData() {
   const hazelContract = await contractRepo.create({
     contract_type: 'sale', status: 'signed', related_sale_id: hazelSale.id,
     title: 'Puppy Purchase Agreement — Hazel', signed_date: '2025-12-15',
-    // document_url (Companion feature §20): the family bundle carries this as a
-    // pointer to the signed contract via the governing-contract rule.
     document_url: 'https://drive.example.com/thornfield/hazel-purchase-agreement',
     terms_summary: 'Pet-home placement, spay/neuter clause, health guarantee.'
   });
   manifest.sales.push(hazelSale.id);
   manifest.contracts.push(hazelContract.id);
 
-  // Sale: Daisy reserved by Nora Kim, deposit paid but NOT delivered (Puppy
-  // Record feature demo — the "Print Puppy Record" picker on the Sales hub
-  // only lists non-delivered sales, so this is what makes Daisy selectable
-  // there; Hazel's sale above is already delivered and deliberately isn't).
+  // Daisy reserved by Nora, deposit paid but NOT delivered (open) — the Puppy
+  // Record "Print" picker lists non-delivered sales, and an open sale makes Nora
+  // a current-family companion recipient.
   const daisySale = await saleRepo.create({
     dog_id: daisy.id, buyer_contact_id: nora.id, sale_date: '2026-05-20',
     price: 2800, deposit_amount: 600, deposit_date: '2026-04-01',
@@ -338,8 +571,23 @@ export async function seedSampleData() {
   manifest.sales.push(daisySale.id);
   manifest.contracts.push(daisyContract.id);
 
-  // Events — spread across all three subject types to cover most of the catalog
-  // (brief §6).
+  // Cedar (Autumn litter) on an OPEN sale to Jamal (Thread C, G2/G9): deposit
+  // paid, a future balance-due date, a transport fee, and deferred pickup boarding
+  // — so the family companion bundle's computed remaining-balance math is
+  // exercised (price + transport + boarding×units − deposit). A `show` placement
+  // type broadens PLACEMENT_TYPE coverage beyond `pet`.
+  const cedarSale = await saleRepo.create({
+    dog_id: cedarPup.id, buyer_contact_id: jamal.id, sale_date: daysFromToday(-20),
+    price: 2800, deposit_amount: 500, deposit_date: daysFromToday(-20), balance_due_date: daysFromToday(21),
+    transport_fee: 250,
+    deferred_boarding_amount: 25, deferred_boarding_frequency: 'Day', deferred_boarding_duration_days: 10,
+    placement_type: 'show', status: 'deposit_paid', lead_source: 'Referral',
+    referred_by_contact_id: marcus.id,
+    notes: 'Reserved from the Autumn litter; buyer delayed pickup, boarding with us until then.'
+  });
+  manifest.sales.push(cedarSale.id);
+
+  // Events — spread across all three subject types to cover the catalog.
   const dogEvents = [
     // Juniper — annual vaccines with a now-OVERDUE reminder (Stage 5 §9): the
     // rabies booster reminder has slipped past its date and is still pending.
@@ -352,6 +600,10 @@ export async function seedSampleData() {
       details: { joint: 'Hips', method: 'OFA', rating: 'Good' } },
     { subject_id: juniper.id, event_type: 'title_earned', event_date: '2021-10-03', title: 'Earned CGC',
       details: { title_abbreviation: 'CGC', organization: 'AKC' } },
+    { subject_id: juniper.id, event_type: 'genetic_test', event_date: '2023-03-01', title: 'Panel results',
+      details: { panel_name: 'Embark Breeder Panel', lab: 'Embark', result: 'Clear' } },
+    { subject_id: juniper.id, event_type: 'breed_specific_test', event_date: '2023-03-05', title: 'Patellar luxation screen',
+      details: { test_name: 'Patellar Luxation', result: 'Normal' } },
     // Gunnar
     { subject_id: gunnar.id, event_type: 'genetic_test', event_date: '2023-03-01', title: 'Panel results',
       details: { panel_name: 'Embark Breeder Panel', lab: 'Embark', result: 'Clear' } },
@@ -359,64 +611,59 @@ export async function seedSampleData() {
       details: { test_name: 'Patellar Luxation', result: 'Normal' } },
     { subject_id: gunnar.id, event_type: 'title_earned', event_date: '2020-09-12', title: 'Earned JH',
       details: { title_abbreviation: 'JH', organization: 'AKC' } },
-    // Juniper — a second genetic + breed-specific test alongside her ofa_pennhip
-    // above, so her parent card's pipe-separated test line (Puppy Record feature)
-    // carries more than one entry too.
-    { subject_id: juniper.id, event_type: 'genetic_test', event_date: '2023-03-01', title: 'Panel results',
+    // Diesel — an ACQUISITION event (Thread I/G6/§7): the first event on a dog we
+    // bought, with a purchase Cost that writes a `dog_purchase` expense (below).
+    { subject_id: diesel.id, event_type: 'acquisition', event_date: '2022-02-14', title: 'Purchased from Ridgeline Boxers',
+      details: { source: 'Ridgeline Boxers (Rutland, VT)' } },
+    { subject_id: diesel.id, event_type: 'genetic_test', event_date: '2023-06-01', title: 'Panel results',
       details: { panel_name: 'Embark Breeder Panel', lab: 'Embark', result: 'Clear' } },
-    { subject_id: juniper.id, event_type: 'breed_specific_test', event_date: '2023-03-05', title: 'Patellar luxation screen',
-      details: { test_name: 'Patellar Luxation', result: 'Normal' } },
+    // Sage — a concluded HEAT (span with event_end_date in the recent past) and no
+    // pairing recorded since → the heat→pairing nudge (§19/§4.5). Thread G(3).
+    { subject_id: sage.id, event_type: 'heat_cycle', event_date: daysFromToday(-22), event_end_date: daysFromToday(-15),
+      title: 'Heat cycle', details: { notes: 'Standing heat days 9–13; leased in for this breeding.' } },
+    // Percy — a completed BOARDING span (Thread E/G11): a grow-out stay with a
+    // related contact, showing a span row + related_contact_id on the timeline.
+    { subject_id: percy.id, event_type: 'boarding', event_date: daysFromToday(-40), event_end_date: daysFromToday(-33),
+      title: 'Boarding — co-owner rotation', related_contact_id: sam.id,
+      details: { location: 'Sam Okafor’s (co-owner)', boarding_reason: 'Co-owner rotation', notes: 'Routine time with his co-owner.' } },
+    // Percy — future-dated vet_visit with a DUE-SOON reminder (within 30 days).
+    { subject_id: percy.id, event_type: 'vet_visit', event_date: '2026-08-15', title: 'Annual checkup',
+      reminder_date: daysFromToday(14),
+      details: { reason: 'Annual checkup', vet: 'Dr. Patricia Nguyen' } },
     // Fern
     { subject_id: fern.id, event_type: 'milestone', event_date: '2025-10-15', title: 'Eyes open',
       details: { description: 'Eyes open' } },
-    { subject_id: fern.id, event_type: 'weight_check', event_date: '2026-06-01', title: 'Weight check',
-      details: { weight_lbs: 4, weight_oz: 2.5, time_of_day: 'AM' } },
     { subject_id: fern.id, event_type: 'vaccination', event_date: '2026-05-01', title: 'Puppy shots (2nd round)',
       details: { vaccine: 'DHPP', lot_number: 'C1029' } },
     { subject_id: fern.id, event_type: 'evaluation', event_date: '2026-06-15', title: 'Puppy evaluation',
       details: { evaluator: 'Dr. Patricia Nguyen', temperament_notes: 'Confident, food-motivated.', structure_notes: 'Level topline, good angulation.' } },
-    // Fern — scheduled drop-off (Stage4.5 Addendum §D5): a second Thornfield
-    // puppy going home next week, deliberately with NO Sale record yet — a
-    // placement event never carries a stored link to one (§D1). Owen is already
-    // the sample's active-waitlist buyer, so this doubles as his placement.
-    { subject_id: fern.id, event_type: 'placement', event_date: daysFromToday(7), title: 'Scheduled pickup',
-      related_contact_id: owen.id,
-      details: { placement_time: '10:00 AM', location: 'Thornfield Kennels', notes: 'Fern going home with the Farrows.' } },
-    // Birch — health-tested after promotion to breeding stock
-    { subject_id: birch.id, event_type: 'milestone', event_date: '2025-10-15', title: 'Eyes open',
-      details: { description: 'Eyes open' } },
-    { subject_id: birch.id, event_type: 'weight_check', event_date: '2026-06-01', title: 'Weight check',
-      details: { weight_lbs: 4, weight_oz: 12.0, time_of_day: 'PM' } },
-    { subject_id: birch.id, event_type: 'vaccination', event_date: '2026-05-01', title: 'Puppy shots (2nd round)',
-      details: { vaccine: 'DHPP', lot_number: 'C1029' } },
+    // Fern — a DISMISSED reminder (Stage 5 §9): visible under "Show dismissed".
+    { subject_id: fern.id, event_type: 'vaccination', event_date: '2026-06-01', title: 'Rabies booster',
+      reminder_date: daysFromToday(20), reminder_dismissed: true,
+      details: { vaccine: 'Rabies', lot_number: 'C2210' } },
+    // Birch — health-tested after promotion to breeding stock; UPCOMING reminder
+    // (beyond 30 days) demonstrating complete-and-chain.
     { subject_id: birch.id, event_type: 'genetic_test', event_date: '2026-06-20', title: 'Panel results',
       details: { panel_name: 'Embark Breeder Panel', lab: 'Embark', result: 'Clear' } },
-    // Birch's outgoing stud stay with Ellen no longer gets a parallel boarding
-    // event (Data Integrity Brief §5 away-board de-dup) — studServiceBirch
-    // above (type: in_person, sent_date set, no returned_date) is now the
-    // sole source for that trip on the Location/Status Board.
+    { subject_id: birch.id, event_type: 'preventative', event_date: daysFromToday(-2), title: 'Heartworm preventative',
+      reminder_date: daysFromToday(90),
+      details: { product: 'Heartgard', dose: '1 chew' } },
     // Hazel
     { subject_id: hazel.id, event_type: 'vaccination', event_date: '2026-05-01', title: 'Puppy shots (2nd round)',
       details: { vaccine: 'DHPP', lot_number: 'C1029' } },
     { subject_id: hazel.id, event_type: 'note', event_date: '2025-12-20', title: 'Placed in pet home',
       details: {}, notes: 'Went home with a family in Concord, NH — regular updates from the family.' },
-    // Percy — future-dated, tests the "upcoming" treatment. Also carries a
-    // DUE-SOON reminder (Stage 5 §9): within the reminder view's 30-day window.
-    { subject_id: percy.id, event_type: 'vet_visit', event_date: '2026-08-15', title: 'Annual checkup',
-      reminder_date: daysFromToday(14),
-      details: { reason: 'Annual checkup', vet: 'Dr. Patricia Nguyen' } },
-    // Birch — an UPCOMING reminder (Stage 5 §9): beyond the 30-day window, so it
-    // lands in the reminder view's "Upcoming" bucket. A preventative that also
-    // demonstrates complete-and-chain (log the next dose, carrying a new reminder).
-    { subject_id: birch.id, event_type: 'preventative', event_date: daysFromToday(-2), title: 'Heartworm preventative',
-      reminder_date: daysFromToday(90),
-      details: { product: 'Heartgard', dose: '1 chew' } },
-    // Fern — a DISMISSED reminder (Stage 5 §9): already handled, so it's off the
-    // pending buckets but visible under the reminder view's "Show dismissed"
-    // toggle. Exercises reminder_dismissed (a plain field, not archive/status).
-    { subject_id: fern.id, event_type: 'vaccination', event_date: '2026-06-01', title: 'Rabies booster',
-      reminder_date: daysFromToday(20), reminder_dismissed: true,
-      details: { vaccine: 'Rabies', lot_number: 'C2210' } },
+    // Wren (Autumn, available) — early puppy milestones.
+    { subject_id: wrenPup.id, event_type: 'milestone', event_date: daysFromToday(-49), title: 'Eyes open',
+      details: { description: 'Eyes open' } },
+    { subject_id: wrenPup.id, event_type: 'weight_check', event_date: daysFromToday(-7), title: 'Weight check',
+      details: { weight_lbs: 3, weight_oz: 8, time_of_day: 'AM' } },
+    // Cedar (Autumn, placed) — a SCHEDULED PICKUP placement event next week, with
+    // the buyer as related_contact and NO stored Sale link (§D1). Drives Today's
+    // "Due outs & upcoming".
+    { subject_id: cedarPup.id, event_type: 'placement', event_date: daysFromToday(7), title: 'Scheduled pickup',
+      related_contact_id: jamal.id,
+      details: { dropoff_method: 'Local pickup', placement_time: '10:00 AM', location: 'Thornfield Kennels', notes: 'Cedar going home with the Reeds.' } },
     // Daisy — all twelve health-relevant event types on one puppy (Puppy Record
     // feature demo), so every per-type card on the printed record has content.
     { subject_id: daisy.id, event_type: 'abnormalities', event_date: '2026-03-02', title: 'Newborn exam finding',
@@ -453,12 +700,20 @@ export async function seedSampleData() {
     { subject_id: pairingP1.id, event_type: 'ultrasound', event_date: '2025-07-16', title: 'Ultrasound',
       details: { confirmed: 'Yes', estimated_count: 3 } },
     { subject_id: pairingP1.id, event_type: 'pregnancy_update', event_date: '2025-07-20', title: 'Pregnancy update',
-      details: { note: 'Active, eating well, on schedule for an early-to-mid August whelp.' } }
+      details: { note: 'Active, eating well, on schedule for an early-to-mid August whelp.' } },
+    // Autumn pairing (P4) — a short timeline so the Autumn litter's pairing reads
+    // as a real breeding.
+    { subject_id: pairingP4.id, event_type: 'breeding_tie', event_date: daysFromToday(-126), title: 'Breeding tie',
+      details: { tie_date: daysFromToday(-126), method: 'Natural' } },
+    { subject_id: pairingP4.id, event_type: 'ultrasound', event_date: daysFromToday(-98), title: 'Ultrasound',
+      details: { confirmed: 'Yes', estimated_count: 3 } }
   ];
 
   const litterEvents = [
     { subject_id: litter.id, event_type: 'whelping_summary', event_date: '2025-08-20', title: 'Whelping summary',
-      details: { total_born: 3, live_born: 3, notes: 'Uncomplicated whelp, all three nursing well within the hour.' } }
+      details: { total_born: 3, live_born: 3, notes: 'Uncomplicated whelp, all three nursing well within the hour.' } },
+    { subject_id: autumnLitter.id, event_type: 'whelping_summary', event_date: daysFromToday(-63), title: 'Whelping summary',
+      details: { total_born: 3, live_born: 3, notes: 'Three healthy pups; Ivy an attentive first-time dam.' } }
   ];
 
   for (const e of dogEvents) {
@@ -486,7 +741,7 @@ export async function seedSampleData() {
   manifest.events.push(vetVisit.id);
 
   const expenses = [
-    // Kennel-wide overhead (subject_type='kennel') — the whole point of the new table.
+    // Kennel-wide overhead (subject_type='kennel') — the whole point of the table.
     { subject_type: 'kennel', subject_id: thornfield.id, amount: 1200, category: 'facility', expense_date: daysFromToday(-45), vendor: 'Whelping barn lease', notes: 'Quarterly' },
     { subject_type: 'kennel', subject_id: thornfield.id, amount: 340.50, category: 'food', expense_date: daysFromToday(-30), vendor: 'Chewy', notes: 'Bulk kibble' },
     { subject_type: 'kennel', subject_id: thornfield.id, amount: 65, category: 'registration', expense_date: daysFromToday(-60), vendor: 'AKC', notes: 'Kennel name renewal' },
@@ -494,6 +749,12 @@ export async function seedSampleData() {
     // Dog- and litter-level costs.
     { subject_type: 'dog', subject_id: juniper.id, amount: 199, category: 'testing', expense_date: '2023-03-01', vendor: 'Embark', notes: 'Breeder panel' },
     { subject_type: 'litter', subject_id: litter.id, amount: 210.75, category: 'supplies', expense_date: '2025-08-25', vendor: 'Whelping supplies', notes: 'Pads, scale, ID collars' },
+    // Pairing-subject expense (Thread H/G14) — progesterone timing for the Autumn
+    // breeding, attached to its pairing.
+    { subject_type: 'pairing', subject_id: pairingP4.id, amount: 90, category: 'testing', expense_date: daysFromToday(-130), vendor: 'Green Mountain Vet', notes: 'Progesterone timing' },
+    // dog_purchase (Thread I/G6/§7) — Diesel's acquisition cost, category captured
+    // from his acquisition event's Cost field.
+    { subject_type: 'dog', subject_id: diesel.id, amount: 2500, category: 'dog_purchase', expense_date: '2022-02-14', vendor: 'Ridgeline Boxers', notes: 'Purchase of Diesel' },
     // Captured-from-event row (links back to the vet visit above).
     { event_id: vetVisit.id, subject_type: 'dog', subject_id: juniper.id, amount: 145, category: 'veterinary', expense_date: daysFromToday(-20), vendor: 'Green Mountain Vet', notes: 'Exam + medication' }
   ];
@@ -516,7 +777,7 @@ export async function seedSampleData() {
 // clearSampleData via resetCompanionSettings().
 function seedCompanionSettings() {
   for (const type of COMPANION_TYPES) {
-    setCompanionSettings(type, { kennelName: 'Thornfield Kennels', tagline: 'Boston Terriers · Est. 2015' });
+    setCompanionSettings(type, { kennelName: 'Thornfield Kennels', tagline: 'Boston Terriers & Boxers · Est. 2015' });
   }
 }
 

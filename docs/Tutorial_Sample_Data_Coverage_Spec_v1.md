@@ -391,30 +391,42 @@ points at; "Control" = taught from the dropdown (teach-from-control fallback).
 
 ## 8. Remediation checklist (data-only; maps gaps → threads)
 
-Each item is a new row or a previously-unset plain field — **no schema change**.
+Each item is a new row or a previously-unset plain field — **no schema change**. **All
+closed in `data/sampleData.js` (Phase 2)** and verified in a browser: seed loads with zero
+repo-validation errors, clear/reset empties every table, and seven of the eight §19 nudges
+fire on a fresh seed (see the litter→close note under G-nudges below).
 
-- [ ] **G1** ← Threads F+G: tune dates + kennel config so one nudge per rule is live.
-- [ ] **G2** ← Thread C: one open sale (`deposit_paid`, future `balance_due_date`).
-- [ ] **G3** ← Thread A: a second, open, priced litter (weaning/ready) + an `expected`
-      litter; enough **pairings** (>5) for Breeding's chain "Show more" (see G10).
-- [ ] **G4** ← Thread A: set `expected_price_*`/`expected_deposit_*`/`nickname` on the
-      new litter.
-- [ ] **G5** ← Thread D: a `leased_in`/`leased_out` dog with owner set.
-- [ ] **G6** ← Threads A/E: set `registered_name`/`registry`/`registration_number`/
-      `microchip_id`/`color_markings`/`url`/`planned_tests` on ≥2 dogs.
-- [ ] **G7** ← Thread D: `co_own` + `lease` contracts (with related dog/contact + lease
-      dates + a non-signed status example).
-- [ ] **G8** ← Thread B: an incoming, `ai` stud service + contract.
-- [ ] **G9** ← Thread C: `transport_fee` + `deferred_boarding_*` on the open sale.
-- [ ] **G10** ← Threads A/I (+ any added pairings): get the **pairing** count past 5 so
-      Breeding's chain "Show more" triggers — the only paginated list left (Sales & Stud
-      are grouped, not paginated).
-- [ ] **G11** ← Thread E: boarding span + medication span + a couple instant medical types.
-- [ ] **G12** ← Thread F: kennel `preferred_tests`/`preferred_breeds`/promote config.
-- [ ] **G13** ← Thread H: groomer/other contacts; broaden email/address/companion_note.
-- [ ] **G14** ← Thread H: one pairing-subject expense.
-- [ ] **D2** ← Thread I: ≥2 Boxer dogs + a Boxer pairing; Thornfield `preferred_breeds`
-      includes Boxer; Dogs breed-filter and reports show >1 breed.
+- [x] **G1** ← Threads F+G: dates + kennel config tuned so one nudge per rule is live —
+      stud-status (Birch, `arranged`), promote (Poppy), stud→pairing (Juno's incoming AI),
+      heat→pairing (Sage), overdue-pairing (Percy × Dahlia), litter→sold (Daisy's litter),
+      litter→reopen (founding litter + available Fern). **litter→close is intentionally not
+      live** (needs a `sold` litter whose placed pups are all `delivered` — mutually
+      exclusive with the reopen/sold anchors per §9.3, and adding it would push sales past
+      the packet size).
+- [x] **G2** ← Thread C: Cedar's open sale to Jamal (`deposit_paid`, future `balance_due_date`).
+- [x] **G3** ← Thread A: the priced, `ready` **Autumn litter** (Ivy × Gunnar) + an
+      `expected` **Winter litter**; six pairings (>5) so Breeding's chain "Show more" fires.
+- [x] **G4** ← Thread A: `expected_price_*`/`expected_deposit_*`/`nickname`/`accept_deposits_date`
+      set on the Autumn litter.
+- [x] **G5** ← Thread D: **Sage**, a `leased_in` Boxer dam with owner (Dana) set.
+- [x] **G6** ← Threads A/E: `registered_name`/`registry`/`registration_number`/
+      `microchip_id`/`color_markings`/`url`(photo)/`planned_tests` across Juniper, Ivy,
+      Gunnar, Daisy, Diesel + puppy photos.
+- [x] **G7** ← Thread D: a `co_own` contract (Percy, status `sent` — the non-signed example)
+      + a signed `lease` contract (Sage, with lease dates).
+- [x] **G8** ← Thread B: **Juno's incoming, `ai`, `flat_fee`** stud service + signed contract.
+- [x] **G9** ← Thread C: `transport_fee` + `deferred_boarding_*` on Cedar's open sale.
+- [x] **G10** ← Threads A/I: pairing count is 6 (>5), so Breeding's chain "Show more" triggers.
+- [x] **G11** ← Threads E/A: a `boarding` span (Percy, related contact) + `medication` span
+      (Daisy) + instant medical types across Daisy.
+- [x] **G12** ← Thread F: Thornfield `preferred_tests`/`preferred_breeds`/promote config set.
+- [x] **G13** ← Thread H: **Grace** (groomer) + **Rex** (other) contacts; email/address/
+      companion_note broadened across Owen/Ellen/Dana/Jamal.
+- [x] **G14** ← Thread H: a `pairing`-subject testing expense on the Autumn pairing.
+- [x] **D2** ← Thread I: **Diesel/Juno/Titan/Sage** (Boxers) + a Boxer pairing (Diesel ×
+      Juno, `failed`); Thornfield `preferred_breeds` includes Boxer; Dogs breed-filter and
+      reports show two breeds. An `acquisition` event on Diesel carries a `dog_purchase`
+      expense (§7 enum coverage).
 
 ---
 
@@ -455,7 +467,11 @@ Each item is a new row or a previously-unset plain field — **no schema change*
 3. **Phase 2 — Expand the seed by narrative thread (§6)**, closing gaps in this order:
    G3/G4 (litter) → G2/G9 (open sale) → G1/G12/F+G (nudges+kennel) → G5/G7 (lease/co-own)
    → G8 (incoming stud) → G6/G11 (dog fields + medical history) → G13/G14 (polish).
-   Re-run clear/reset after each thread.
+   Re-run clear/reset after each thread. ✅ **Done → `data/sampleData.js`.** All §8 gaps
+   closed (see the checklist); final packet ≈ 20 dogs (16 Boston + 4 Boxer), 13 contacts,
+   6 pairings, 4 litters, 3 sales, 2 stud services, 6 contracts, ~46 events, 9 expenses.
+   Verified in a browser: zero validation errors, clear/reset empties every table, seven of
+   eight §19 nudges live (litter→close documented as intentionally omitted, §9.3).
 4. **Phase 3 — Reconcile dependencies & dates.** Verify every §5.2 example is live on
    "today"; lock relative dating.
 5. **Phase 4 — Acceptance pass (§9)** + docs/service-worker/reference-registry updates.
