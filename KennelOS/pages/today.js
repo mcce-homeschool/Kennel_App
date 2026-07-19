@@ -330,8 +330,7 @@ function renderAvailable(dogs, litters) {
       }).join('')
     : `<div class="empty-state">No litters with available puppies.</div>`;
   const title = `Active litters${active.length ? ` <span class="muted" style="font-size:14px;">(${active.length})</span>` : ''}`;
-  const headerExtra = `<a class="btn btn-sm" href="sale.html?new=1">+ Add sale</a>`;
-  availableEl.innerHTML = cardShell(title, inner, { key: 'active-litters', isEmpty, headerExtra, marginTop: true });
+  availableEl.innerHTML = cardShell(title, inner, { key: 'active-litters', isEmpty, marginTop: true });
 }
 
 // --- 4. Kennel overview (slow-changing; sits last) --------------------------
