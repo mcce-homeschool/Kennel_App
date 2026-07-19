@@ -972,7 +972,13 @@ amount upserts the linked `Expense` the normal event↔cost way (above).
   report): a summary card (grand total + per-category breakdown) over the standard
   `reportView` ledger table (category/subject-type/year filters + CSV export), plus a
   hub-level **"+ Add Expense"** that logs a cost against **any** subject (dog / litter /
-  pairing / kennel) from one place. Analytics queries stay under Reports.
+  pairing / kennel) from one place. Analytics queries stay under Reports. **Sectioned by
+  category** (dogs.html bucket-tab pattern): a `seg-tabs` row built from `EXPENSE_CATEGORIES`
+  (never hand-listed, so a new category needs no second edit), one tab per category via
+  `financials.html?bucket=<value>` pre-filtering the loaded ledger to that category, plus
+  **All** last and the default (no `bucket` param). The ledger is always loaded
+  newest-to-oldest by `expense_date` before any bucket filter runs, so every tab — All
+  included — opens newest-first.
 
 ### Migration & safety
 
