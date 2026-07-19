@@ -53,11 +53,6 @@ const els = {
 // first type when absent/unknown.
 const activeType = COMPANION_TYPES.includes(param('type')) ? param('type') : COMPANION_TYPES[0];
 
-// A sale is "open" until it reaches one of these terminal states — a current
-// family is one with a sale that is still in flight (deposit pending / deposit
-// paid / paid in full).
-const CLOSED_SALE_STATUSES = new Set(['delivered', 'returned', 'cancelled']);
-
 const ctx = {
   contacts: [],
   // Contact-id membership sets, one per package type, recomputed on each load.
@@ -154,27 +149,25 @@ async function loadData() {
   ]);
   ctx.contacts = contacts.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true }));
 
-  // Current families: buyers with a sale that hasn't reached a terminal state.
+  // Current families: buyers with an open sale — the same saleRepo.isOpenSale
+  // predicate the family bundle builder uses, so membership and bundle contents
+  // stay in lockstep (non-terminal status: not delivered/returned/cancelled).
   ctx.openSaleBuyerIds = new Set();
   for (const s of sales) {
-    if (s.is_archived || !s.buyer_contact_id) continue;
-    if (s.status && !CLOSED_SALE_STATUSES.has(s.status)) ctx.openSaleBuyerIds.add(s.buyer_contact_id);
+    if (s.buyer_contact_id && saleRepo.isOpenSale(s)) ctx.openSaleBuyerIds.add(s.buyer_contact_id);
   }
 
   // Partners: a stud service whose return date hasn't passed (empty or future),
-  // a lease whose end date hasn't passed, or any co-own / other contract.
+  // or a live lease / co_own / other contract — the same isLivePartnerContract
+  // predicate the bundle builder uses, so membership and bundle contents agree
+  // (non-terminal status; unexpired for leases).
   ctx.partnerIds = new Set();
   for (const ss of studServices) {
     if (ss.is_archived || !ss.partner_contact_id) continue;
     if (!ss.returned_date || ss.returned_date >= today) ctx.partnerIds.add(ss.partner_contact_id);
   }
   for (const c of contracts) {
-    if (c.is_archived || !c.related_contact_id) continue;
-    if (c.contract_type === 'lease') {
-      if (!c.lease_end_date || c.lease_end_date >= today) ctx.partnerIds.add(c.related_contact_id);
-    } else if (c.contract_type === 'co_own' || c.contract_type === 'other') {
-      ctx.partnerIds.add(c.related_contact_id);
-    }
+    if (contractRepo.isLivePartnerContract(c, today)) ctx.partnerIds.add(c.related_contact_id);
   }
 }
 

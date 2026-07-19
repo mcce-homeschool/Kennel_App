@@ -744,8 +744,9 @@ view. The main app stays single-user/offline/all-local; this adds *recipients*.
     bundles **now carry price** — this reverses the earlier "prospective = shared
     availability, NO price" invariant. Still **no per-recipient private data**: the
     availability is the same for every prospect.
-  - **`family`** — a current family (a buyer with a sale): **one rich card per placed
-    pup** (`pups[]`, from `saleRepo.getByBuyer` → dog). Each pup carries `callName`,
+  - **`family`** — a current family (a buyer with an **open** sale): **one rich card per placed
+    pup** (`pups[]`, from `saleRepo.getByBuyer` filtered by `saleRepo.isOpenSale` → dog —
+    terminal sales, `delivered`/`returned`/`cancelled`, never appear, matching membership). Each pup carries `callName`,
     `sex`, `photosUrl` (`Dog.url`), `litterNickname` (when set), `sire`/`dam` (call +
     registered name), a **computed `age` `{ageWeeks, ageDays}`** as-of the generation
     date (**never the raw DOB**), a `placement` block or an `estimatedReadyDate`,
@@ -778,11 +779,22 @@ view. The main app stays single-user/offline/all-local; this adds *recipients*.
     `flat_plus_pick`) — and a **Contract** section carrying the service's own
     governing/most-recent contract as `contract` = `{signedDate, documentUrl}` (shown
     "Not Signed" when the signed date is null, + a "View/sign contract here" link)),
-    `externalPairings` (pairings involving their external/leased-in dogs), and the
-    top-level `contracts` (lease/co_own/other contracts where `related_contact_id` =
-    them, each with `type`, `status`, `signedDate` — shown "Not Signed" when null —
-    `terms`, and `document_url`; there is **no** contract `returned_date`, brief
-    decision 2).
+    and the top-level `contracts` (lease/co_own/other contracts where `related_contact_id` =
+    them). Each is **projected per type** by `projectContract()`: all carry `type`,
+    `title`, `status`, `signedDate` (shown "Not Signed" when null), `terms`, and
+    `document_url`; a **`lease`** also carries `startDate`/`endDate` (`lease_start_date`/
+    `lease_end_date`) and `dog` (the leased dog as `dogRef` = `{registeredName, callName}`);
+    a **`co_own`** also carries `dog`. The shell titles the card by type when it holds a
+    single type ("Lease agreement" / "Co-ownership"), else "Contracts". These are reduced
+    to the **live contract per distinct agreement, not the full history**: only
+    `contractRepo.isLivePartnerContract(c, today)` contracts survive (non-archived,
+    counterparty set, **not** a terminal status — `declined`/`cancelled`/`void` — and, for
+    a lease, not past `lease_end_date`), then they are grouped by `(contract_type,
+    related_dog_id)` and each group collapses to `governingContract()` (most-recent
+    signed) or the most-recent-by-`created_at` fallback. The **same
+    `isLivePartnerContract` predicate drives partner membership** in `companion.js`, so
+    who appears and what their bundle shows can't drift. There is **no** contract
+    `returned_date`, brief decision 2.
   - **`dogCard` / completed tests** (shared projection): prospective sire/dam and
     partner stud/dam use `dogCard(dog)` → `{registeredName, callName, photosUrl,
     tests}`, where `tests` is `completedTests(dogId)` reading
@@ -808,13 +820,17 @@ view. The main app stays single-user/offline/all-local; this adds *recipients*.
   the recipient will see, sending nothing. Both actions share `buildSendArtifacts`,
   so the preview can never drift from the send. **Membership predicates** (`companion.js`): a
   **prospective** is a Contact with `waitlist_status === 'active'`; a **family** is a
-  buyer with an **open** (non-terminal) sale — any non-archived Sale whose `status` is
-  not in `{delivered, returned, cancelled}`; a **partner** is a Contact who is the
+  buyer with an **open** sale per `saleRepo.isOpenSale(s)` (non-archived, status not in
+  `{delivered, returned, cancelled}`); a **partner** is a Contact who is the
   `partner_contact_id` on a non-archived StudService whose `returned_date` is empty or
-  `>= today`, **or** the `related_contact_id` on a non-archived `lease` contract whose
-  `lease_end_date` is empty or `>= today`, **or** on any non-archived `co_own`/`other`
-  contract (no date gate). A Contact can appear under more than one tab — that's
-  expected. These are display filters only; they gate nothing in the bundle builder.
+  `>= today`, **or** the `related_contact_id` on a `lease`/`co_own`/`other` contract
+  that is live per `contractRepo.isLivePartnerContract(c, today)` (non-archived,
+  non-terminal status, and — for a lease — not past `lease_end_date`). A Contact can
+  appear under more than one tab — that's expected. The prospective filter is
+  display-only, but the **family** and **partner** predicates are shared with the bundle
+  builder (the family bundle filters sales on the same `isOpenSale`; the partner
+  `contracts` block filters on the same `isLivePartnerContract`), so membership and
+  bundle contents stay in lockstep.
 - **Two-layer messaging.** Layer 1 is per-type config (`kennelName`/`tagline`/
   `introText`/`announcement`/`closer`) in `settings.js` under the `companion` key,
   edited in the console's template card (one per type). Layer 2 is
