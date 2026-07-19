@@ -13,7 +13,7 @@ import {
   STUD_SERVICE_DIRECTION, FEE_STRUCTURE, STUD_SERVICE_STATUS, STUD_SERVICE_TYPE,
   CONTRACT_TYPE, CONTRACT_STATUS, SEX, descriptor
 } from '../data/vocab.js';
-import { esc, badge, fmtDate, param, confirmAction } from '../assets/ui.js';
+import { esc, badge, fmtDate, param } from '../assets/ui.js';
 import { getMyContactId } from '../data/kennelSetup.js';
 import { attachNewContactButton } from '../assets/contactPicker.js';
 
@@ -359,17 +359,45 @@ async function save() {
   }
 }
 
+// A yes/no confirmation in the app's own styled modal (never window.confirm).
+// Resolves true on confirm, false on cancel/dismiss/backdrop-click.
+function confirmModal({ title, message = '', confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false }) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
+      <h2 style="margin-top:0;">${esc(title)}</h2>
+      ${message ? `<p class="muted">${esc(message)}</p>` : ''}
+      <div class="form-actions">
+        <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" id="cm-confirm">${esc(confirmLabel)}</button>
+        <button class="btn" id="cm-cancel">${esc(cancelLabel)}</button>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    const done = (val) => { overlay.remove(); resolve(val); };
+    overlay.querySelector('#cm-confirm').addEventListener('click', () => done(true));
+    overlay.querySelector('#cm-cancel').addEventListener('click', () => done(false));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) done(false); });
+  });
+}
+
 async function toggleArchive() {
   const s = ctx.original;
   const verb = s.is_archived ? 'Unarchive' : 'Archive';
-  if (!confirmAction(`${verb} this stud service?`)) return;
+  const ok = await confirmModal({ title: `${verb} this stud service?`, confirmLabel: verb });
+  if (!ok) return;
   ctx.original = s.is_archived ? await studServiceRepo.unarchive(s.id) : await studServiceRepo.archive(s.id);
   renderAll();
 }
 
 async function doDelete() {
   const s = ctx.original;
-  if (!confirmAction('Permanently delete this stud service? This cannot be undone.')) return;
+  const ok = await confirmModal({
+    title: 'Delete this stud service?',
+    message: 'Permanently delete this stud service? This cannot be undone.',
+    confirmLabel: 'Delete', danger: true
+  });
+  if (!ok) return;
   try {
     await studServiceRepo.hardDelete(s.id);
     location.href = 'stud-services.html';
