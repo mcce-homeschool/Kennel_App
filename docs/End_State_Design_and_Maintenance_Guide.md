@@ -800,8 +800,13 @@ view. The main app stays single-user/offline/all-local; this adds *recipients*.
   match the type), and the bundle type "Prepare link" builds (there is no per-row type
   picker — the tab **is** the type). Each recipient row is **collapsed by default** to
   a one-line header (name + a `note` badge when `companion_note` is set + email/phone);
-  clicking the header reveals the note editor, Save note / Prepare link actions, and the
-  built link — so a long filtered list stays scannable. **Membership predicates** (`companion.js`): a
+  clicking the header reveals the note editor, Save note / Preview / Prepare link
+  actions, and the built link — so a long filtered list stays scannable. **Preview**
+  builds the same bundle "Prepare link" would (persisting any unsaved note first) and
+  opens a modal showing the channel body text plus the real `companion-view.html`
+  shell loaded in an iframe off that bundle's hash — a byte-for-byte render of what
+  the recipient will see, sending nothing. Both actions share `buildSendArtifacts`,
+  so the preview can never drift from the send. **Membership predicates** (`companion.js`): a
   **prospective** is a Contact with `waitlist_status === 'active'`; a **family** is a
   buyer with an **open** (non-terminal) sale — any non-archived Sale whose `status` is
   not in `{delivered, returned, cancelled}`; a **partner** is a Contact who is the
