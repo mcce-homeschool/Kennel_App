@@ -473,8 +473,48 @@ fire on a fresh seed (see the litter→close note under G-nudges below).
    Verified in a browser: zero validation errors, clear/reset empties every table, seven of
    eight §19 nudges live (litter→close documented as intentionally omitted, §9.3).
 4. **Phase 3 — Reconcile dependencies & dates.** Verify every §5.2 example is live on
-   "today"; lock relative dating.
+   "today"; lock relative dating. ✅ **Done.** Re-derived every §19 nudge condition and
+   every §5.2 dependency against `data/sampleData.js`'s relative dates by hand, then
+   confirmed in a browser (fresh seed, zero console errors): all seven intended nudges
+   fire (stud-status/Birch, promote/Poppy, stud→pairing/Juno, heat→pairing/Sage,
+   overdue-pairing/Percy×Dahlia, litter→sold/Daisy, litter→reopen/Fern), litter→close
+   stays intentionally silent, and the Financials earned/anticipated/balance math
+   (transport + deferred boarding × units) reconciles exactly. clear/reset still empties
+   every table with zero contamination. One reconciliation fix: Cedar's open sale had
+   `referred_by_contact_id` pointing at Marcus Webb, a contact archived since the
+   original seed purely to demo "Show archived" — an archived contact shouldn't read as
+   a live referrer on a sale dated weeks ago, so the field is now unset (the
+   `buyer_referrer`/`stud_referrer` auto-tag dependency is already covered live via
+   Tessa and Dana). All dates are `daysFromToday`/`monthsFromToday`-relative already, so
+   nothing needed re-anchoring — "lock relative dating" was a verify, not a rewrite.
 5. **Phase 4 — Acceptance pass (§9)** + docs/service-worker/reference-registry updates.
+   ✅ **Done.** Ran the §9 checklist against the current seed:
+   - **§9.1 Matrix green** — `Tutorial_Coverage_Matrix_v1.md` reconciled row-by-row
+     against the expanded seed (it predated Phase 2's seed expansion in git history).
+     Every closed-gap row flipped to ✅ with a real anchor; stale anchors fixed (e.g.
+     "Fern placement" → Cedar's scheduled pickup); §C's gap table became a resolution
+     log; a report page the original walk missed (Litter P&L) was added to the
+     inventory.
+   - **§9.2 Enum target met** — going through §7's table line by line (not just the
+     G1–G14/D2 list) surfaced two values with no live record that the original gap
+     catalog never caught: `DOG_STATUS: 'for_sale'` and `DISPOSITION: 'undecided'`.
+     Closed both, data-only, no schema change: a new dog **Clover** (`status:
+     'for_sale'`, retired-age, no sire/dam — same no-ancestry pattern as
+     Percy/Nell/Dahlia/Titan/Sage) and switching **Aster**'s disposition from
+     `keeping` to `undecided` (Poppy already anchors `keeping`, so no coverage was
+     lost). `LITTER_STATUS: 'closed'` stays deferred — that one's the same accepted
+     trade-off as the litter→close nudge (§9.3), not a new finding. Packet is now 21
+     dogs (was 20).
+   - **§9.3–§9.7** — nudges, Companion tabs, §5.2 dependencies, clear/reset, and
+     validation-cleanliness were already confirmed in Phase 3 and re-verified after
+     the two Phase 4 additions (same clean results, dog count 20→21, zero
+     contamination, zero console errors).
+   - **§9.8 Docs updated** — no new field/FK/table, so `referenceRegistry.js` and the
+     End-State guide's data-model sections needed no change; the guide's one stale
+     fact (`CACHE_NAME` example, still reading v68 from before Phase 3) was corrected.
+     `CACHE_NAME` bumped v71→v72 for this phase's `sampleData.js` edit (Clover/Aster).
+   - **§9.9** — `node --check data/sampleData.js` passes; the packet was served over
+     HTTP and walked end-to-end in a browser after every change in this phase.
 6. **Phase 5 — Hand off to the wizard-runtime spec** with a frozen anchor list.
 
 ---
