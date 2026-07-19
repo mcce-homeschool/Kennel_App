@@ -113,7 +113,7 @@ and commonly blank at entry time.
 
 | Entity | Required | Notable other fields |
 |---|---|---|
-| **Dog** | `call_name`, `sex`, `breed`, `ownership_type`, `status` | `registered_name`, `date_of_birth`, `date_of_death`, `sire_id`, `dam_id`, `litter_id`, `breeder_kennel_id` (the kennel that *produced* this dog — own or an outside contact's; distinct from `kennel_id` below, which of the user's own kennels it belongs to *now*; auto-prefilled from the litter's dam's own `kennel_id` when that dam is owned/co-owned), `owner_contact_id`, `co_owner_contact_ids[]`, `kennel_id`, `color_markings`, `registry`, `registration_number`, `microchip_id`, `url` (plain, unindexed — a link for this dog, e.g. a registry page or listing), `planned_tests[]`, `recorded_coi{value,method,source,as_of_date}`, `disposition` (`undecided`/`keeping`/`available`/`placed` — breeder intent, orthogonal to `status`; feeds the Today "Available puppies" feed and the promote-lifecycle nudge, §19), `notes`. Owner required when `ownership_type ∈ {external, leased_in}`. |
+| **Dog** | `call_name`, `sex`, `breed`, `ownership_type`, `status` | `registered_name`, `date_of_birth`, `date_of_death`, `sire_id`, `dam_id`, `litter_id`, `breeder_kennel_id` (the kennel that *produced* this dog — own or an outside contact's; distinct from `kennel_id` below, which of the user's own kennels it belongs to *now*; auto-prefilled from the litter's dam's own `kennel_id` when that dam is owned/co-owned), `owner_contact_id`, `co_owner_contact_ids[]`, `kennel_id`, `color_markings`, `registry`, `registration_number`, `microchip_id`, `url` (plain, unindexed — a link for this dog, e.g. a registry page or listing), `planned_tests[]`, `recorded_coi{value,method,source,as_of_date}`, `disposition` (`undecided`/`keeping`/`available`/`placed` — breeder intent; **puppy-only** — a valid value only while `status='puppy'`, forced null for any other life-stage. Enforced centrally in `dogRepo` create/update (clears on the status change out of puppy, including in the same edit) and mirrored in the UI: the dog form shows the field only for a puppy, `sale.js` won't offer to set one on a non-puppy, and the profile hides the row otherwise. Feeds the Today "Available puppies" feed, the promote-lifecycle nudge, and the litter-lifecycle nudges, §19), `notes`. Owner required when `ownership_type ∈ {external, leased_in}`. |
 | **Contact** | `name` | `contact_type[]` (multi), `email`, `phone`, `address`, `kennel_id`, `waitlist_status`, `first_contact_source`, `notes`, `companion_note` (plain, unindexed — a per-recipient message **meant for the recipient's eyes**, shown on their companion share page; deliberately distinct from the private `notes`; the Companion feature's Layer-2 override of the per-type announcement, §20). Buyers are Contacts — **there is no Buyer table**. `address` also resolves an in-person stud service's away-board location (§19). |
 | **Kennel** | `kennel_name` | `is_own_kennel`, `prefix`, `location`, `website` (plain, unindexed — a link for this kennel, e.g. its public site or listing; mirrors `Dog.url`), `preferred_tests[]`, `preferred_breeds[]`, `promote_nudge_enabled` (bool, default off), `promote_age_male_months`/`promote_age_female_months` (numbers — the promote-lifecycle nudge's per-kennel thresholds, §19). Lightweight; added inline from Contact form. |
 | **Pairing** | `sire_id`, `dam_id`, `pairing_type`, `status` | `method`, `planned_date` (displayed as "Planned first date" — the first planned/tie date), `last_observed_date` (plain, unindexed — a subsequent observed tie/breeding date), `expected_due_date` (prefilled on the detail page as 63 days after `planned_date` when still empty, never clobbering a deliberate edit), `notes`. Sire ≠ dam (hard block). |
@@ -675,7 +675,7 @@ awareness) and returns zero or more:
 ```
 { key, title, detail, subjectHref, actions: [{ label, run: async () => {} }] }
 ```
-Five rules, each producing its own stable `key` so a dismissal survives re-computation:
+Eight rules, each producing its own stable `key` so a dismissal survives re-computation:
 - **Stud-service status** — `sent_date` passed + `status='arranged'` → suggest
   `in_progress`; `returned_date` passed + `status ∈ {arranged, in_progress}` → suggest
   `completed` (never both; completed wins if both conditions hold).
@@ -698,6 +698,21 @@ Five rules, each producing its own stable `key` so a dismissal survives re-compu
   against it yet (`litterRepo.getForPairing`), suggests either fix: mark the pairing
   `whelped` directly, or deep-link to `litter.html?new=1&pairing=<id>` (the same
   prefill the pairing page's own "Create Litter" button uses).
+- **Litter → sold** — a non-archived litter in `ready` status whose whole puppy roster
+  is resolved to `placed`/`keeping`, with **at least one** actually `placed` (an
+  all-`keeping` litter sold nothing, so it never fires), suggests marking the litter
+  `sold`.
+- **Litter → reopen** — a `sold` or `closed` litter with any puppy back to `available`
+  suggests reopening it to `ready`.
+- **Litter → close** — a `sold` litter with no `available` puppy where **every** `placed`
+  puppy has a `delivered` sale suggests marking it `closed`. A placed puppy with no
+  delivered sale — including one with no sale row at all — blocks the nudge.
+
+The three litter-lifecycle rules are aggregate facts over a litter's derived puppy
+roster (and, for close, its sales), so `computeNudges()` groups the already-loaded
+`dogRepo.getAll()` result by `litter_id` in one pass and adds `saleRepo.getAll()` to
+its parallel load rather than re-scanning per record on each pup/sale save. Their
+actions mutate only `Litter.status` via `litterRepo.update`; nothing auto-mutates.
 
 The stud→pairing and heat→pairing rules share one dedup helper
 (`pairingExistsForDam`): a pairing counts as "already handled" if it's for the same
