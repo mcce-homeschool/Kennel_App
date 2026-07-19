@@ -507,3 +507,55 @@ table.data tr.row-detail .dl-meta { margin: 0; }
    column instead of running off the right edge on narrow screens. min-width:0
    lets the grid cell shrink below its content's intrinsic width. */
 .dl-meta dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+
+/* --- Guided tour (Wizard Runtime Spec v1 §9) -----------------------------
+   Spotlight coach-marks: a transparent full-viewport click-blocker plus a
+   box-shadow "cutout" applied to the real target element itself — no mask,
+   no cutout-geometry math. The overlay sits below the target's own stacking
+   context (z-index 10001 > 10000) so the target stays clickable through it. */
+.wizard-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: transparent;
+}
+.wizard-spotlight-target {
+  position: relative;
+  z-index: 10001;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6), 0 0 0 3px var(--accent) inset;
+  border-radius: var(--radius-sm);
+}
+.wizard-tooltip {
+  position: fixed;
+  z-index: 10002;
+  max-width: 320px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+.wizard-tooltip-centered {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.wizard-step-count { color: var(--text-muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.wizard-tooltip-title { margin: 4px 0 8px; }
+.wizard-tooltip-body { margin: 0 0 14px; color: var(--text); }
+.wizard-tooltip-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.wizard-resume-pill {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 10002;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-dark);
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+.wizard-resume-pill:hover { background: var(--accent-dark); }

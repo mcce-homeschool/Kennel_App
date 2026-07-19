@@ -781,6 +781,31 @@ export async function seedSampleData() {
   // records); clearSampleData resets them back to defaults alongside the records.
   seedCompanionSettings();
 
+  // Named ids (Wizard Runtime Spec v1 §3.2) — the guided tour's step catalog is a
+  // static import (data/wizardSteps.js) that hard-names anchor records in its copy
+  // ("Juniper", "the Autumn litter", …) but still needs the *current* seed's real
+  // ids to build detail-page links. Rather than re-querying the database at
+  // runtime, it reads this map off the manifest the seed just wrote — deterministic
+  // per-seed, no schema, no extra Dexie read.
+  manifest.named = {
+    juniper: juniper.id, ivy: ivy.id, gunnar: gunnar.id, daisy: daisy.id, diesel: diesel.id,
+    poppy: poppy.id, sage: sage.id, aster: asterPup.id, percy: percy.id, fern: fern.id,
+    wren: wrenPup.id, cedar: cedarPup.id, birch: birch.id, hazel: hazel.id, clover: clover.id,
+    willow: willow.id, nell: nell.id, dahlia: dahlia.id, juno: juno.id, titan: titan.id, ash: ash.id,
+    thornfield: thornfield.id, meadowRidge: meadowRidge.id,
+    priya: priya.id, owen: owen.id, ellen: ellen.id, jamal: jamal.id, dana: dana.id,
+    tessa: tessa.id, grace: grace.id, rex: rex.id, nora: nora.id, marcus: marcus.id,
+    sam: sam.id, hugo: hugo.id, patricia: patricia.id,
+    summerLitter: litter.id, springLitter: litter2.id, autumnLitter: autumnLitter.id, winterLitter: expectedLitter.id,
+    pairingP1: pairingP1.id, pairingP2: pairingP2.id, pairingP3: pairingP3.id,
+    pairingP4: pairingP4.id, pairingP5: pairingP5.id, pairingP6: pairingP6.id,
+    hazelSale: hazelSale.id, daisySale: daisySale.id, cedarSale: cedarSale.id,
+    studServiceBirch: studServiceBirch.id, studServiceJuno: studServiceJuno.id,
+    hazelContract: hazelContract.id, daisyContract: daisyContract.id,
+    studServiceContract: studServiceContract.id, studServiceJunoContract: studServiceJunoContract.id,
+    percyCoOwnContract: percyCoOwnContract.id, sageLeaseContract: sageLeaseContract.id
+  };
+
   setSampleDataManifest(manifest);
   return manifest;
 }

@@ -9,6 +9,7 @@ import { wasPersistRequested, markPersistRequested } from './data/settings.js';
 import { expenseRepo } from './data/expenseRepo.js';
 import { maybeShowFirstRunPrompt, renderSampleBanner } from './assets/sampleDataUI.js';
 import { maybeShowKennelSetupPrompt, renderKennelBanner } from './assets/kennelSetupUI.js';
+import { maybeOfferWizardStart, renderWizardMenuEntry, runWizardStep } from './assets/wizardUI.js';
 
 async function firstRunPersistence() {
   if (wasPersistRequested()) return;
@@ -32,7 +33,8 @@ function registerServiceWorker() {
 // reload right after sample data gets cleared — ever reaches it.
 async function firstRunFlow() {
   const choice = await maybeShowFirstRunPrompt();
-  if (choice !== 'seeded') maybeShowKennelSetupPrompt();
+  if (choice !== 'seeded') { maybeShowKennelSetupPrompt(); return; }
+  maybeOfferWizardStart(); // only reached on the 'seeded' branch (Wizard Runtime Spec v1 §6.1)
 }
 
 function boot() {
@@ -44,6 +46,8 @@ function boot() {
   expenseRepo.migrateEventCosts().catch(() => { /* non-fatal */ });
   renderSampleBanner();
   renderKennelBanner();
+  renderWizardMenuEntry();
+  runWizardStep();
   firstRunFlow();
 }
 

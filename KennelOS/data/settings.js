@@ -12,7 +12,9 @@ const KEYS = {
   myKennelSetupSkipped: 'kennelOS.myKennelSetupSkipped',
   companion: 'kennelOS.companion',
   invoiceDefaults: 'kennelOS.invoiceDefaults',
-  expensesMigrated: 'kennelOS.expensesMigrated'
+  expensesMigrated: 'kennelOS.expensesMigrated',
+  wizardStatus: 'kennelOS.wizardStatus',
+  wizardStepIndex: 'kennelOS.wizardStepIndex'
 };
 
 export function getLastBackupDate() {
@@ -220,6 +222,28 @@ export function getExpensesMigrated() {
 
 export function markExpensesMigrated() {
   localStorage.setItem(KEYS.expensesMigrated, '1');
+}
+
+// --- Guided tour (first-run wizard) -----------------------------------------
+// Wizard Runtime Spec v1 §2.1. `wizardStatus` is absent → treated as 'unseen';
+// `wizardStepIndex` is written on every advance/retreat regardless of status, so
+// pausing mid-tour never loses the spot.
+export function getWizardStatusRaw() {
+  return localStorage.getItem(KEYS.wizardStatus); // null | 'unseen' | 'active' | 'dismissed' | 'completed'
+}
+
+export function setWizardStatusRaw(status) {
+  localStorage.setItem(KEYS.wizardStatus, status);
+}
+
+export function getWizardStepIndexRaw() {
+  const raw = localStorage.getItem(KEYS.wizardStepIndex);
+  const n = raw == null ? 0 : parseInt(raw, 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export function setWizardStepIndexRaw(index) {
+  localStorage.setItem(KEYS.wizardStepIndex, String(index));
 }
 
 // Full app reset (Reset App to Start): drop every key this app owns in
