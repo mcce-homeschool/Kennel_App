@@ -115,7 +115,14 @@ export async function seedSampleData() {
   const ellen = await contactRepo.create({
     name: 'Ellen Brooks', contact_type: ['breeder'], phone: '555-0108', address: 'Burlington, VT'
   });
-  manifest.contacts.push(patricia.id, dana.id, sam.id, tessa.id, marcus.id, priya.id, owen.id, ellen.id);
+  // Nora — buyer on the Daisy sale below (Puppy Record feature demo). Carries a
+  // full address so the Puppy Record's Buyer card has every field populated.
+  const nora = await contactRepo.create({
+    name: 'Nora Kim', contact_type: ['buyer'], waitlist_status: 'fulfilled',
+    first_contact_source: 'Website', phone: '555-0109', email: 'nora.kim@example.com',
+    address: '48 Birchwood Lane, Burlington, VT 05401'
+  });
+  manifest.contacts.push(patricia.id, dana.id, sam.id, tessa.id, marcus.id, priya.id, owen.id, ellen.id, nora.id);
 
   // Dogs — ancestors first so each generation can reference the last. Every
   // sample dog is Boston Terrier (brief §6).
@@ -138,6 +145,11 @@ export async function seedSampleData() {
   const juniper = await dogRepo.create({
     call_name: 'Juniper', sex: 'female', breed: BREED,
     date_of_birth: '2019-11-03', sire_id: ash.id, dam_id: willow.id,
+    // registered_name/registration_number/microchip_id/color_markings/registry
+    // (Puppy Record feature demo): so the parent card on a printed puppy record
+    // has every field populated, not just call name + breed.
+    registered_name: 'Thornfield Midnight Juniper', registration_number: 'AKC WS71029304',
+    microchip_id: '985141000123456', color_markings: 'Black & white, seal points', registry: 'AKC',
     ownership_type: 'owned', status: 'active_breeding', kennel_id: thornfield.id,
     recorded_coi: { value: 6.25, method: 'genomic', source: 'Embark', as_of_date: '2023-03-01' }
   });
@@ -152,6 +164,8 @@ export async function seedSampleData() {
   const gunnar = await dogRepo.create({
     call_name: 'Gunnar', sex: 'male', breed: BREED,
     date_of_birth: '2018-06-01', dob_is_estimated: true,
+    registered_name: 'Meadow Ridge Maximus Gunnar', registration_number: 'AKC WS78341201',
+    microchip_id: '985141000456789', color_markings: 'Seal & white, Irish marked', registry: 'AKC',
     ownership_type: 'external', owner_contact_id: dana.id, status: 'external_reference',
     breeder_kennel_id: meadowRidge.id,
     recorded_coi: { value: 4.1, method: 'pedigree', source: 'AKC 5-gen', as_of_date: '2022-11-15' }
@@ -195,6 +209,27 @@ export async function seedSampleData() {
     breeder_kennel_id: thornfield.id
   });
 
+  // Litter 2 + Daisy (Puppy Record feature demo) — a second, standalone litter
+  // off the same pair, deliberately with no Pairing behind it (pairing_id is
+  // nullable — an imported/manually-entered litter often has none). Daisy
+  // carries every Dog field the Puppy Record can show, and her health history
+  // (below) touches all twelve health-relevant event types at once so the
+  // printed record's per-type cards can all be exercised in one puppy.
+  const litter2 = await litterRepo.create({
+    dam_id: juniper.id, sire_id: gunnar.id,
+    whelp_date: '2026-03-02', litter_registration_number: 'THORN-L-2026-01',
+    puppies_born_total: 1, puppies_born_alive: 1, puppies_born_deceased: 0, puppies_born_abnormalities: 1,
+    status: 'ready'
+  });
+  const daisy = await dogRepo.create({
+    call_name: 'Daisy', sex: 'female', breed: BREED,
+    date_of_birth: '2026-03-02', sire_id: gunnar.id, dam_id: juniper.id, litter_id: litter2.id,
+    registered_name: 'Thornfield Daisy Mae', registration_number: 'AKC WS99213045',
+    microchip_id: '985141000998877', color_markings: 'Brindle & white, split face', registry: 'AKC',
+    ownership_type: 'owned', status: 'puppy', disposition: 'placed', kennel_id: thornfield.id,
+    breeder_kennel_id: thornfield.id
+  });
+
   const percy = await dogRepo.create({
     call_name: 'Percy', sex: 'male', breed: BREED,
     date_of_birth: '2024-03-10',
@@ -211,7 +246,7 @@ export async function seedSampleData() {
     ownership_type: 'external', owner_contact_id: ellen.id, status: 'external_reference'
   });
 
-  manifest.dogs.push(ash.id, willow.id, juniper.id, gunnar.id, fern.id, birch.id, hazel.id, percy.id, nell.id);
+  manifest.dogs.push(ash.id, willow.id, juniper.id, gunnar.id, fern.id, birch.id, hazel.id, daisy.id, percy.id, nell.id);
 
   // Pairing P2 — same pair, planned only, no litter yet. Exercises the "Create
   // Litter from this Pairing" empty state and an empty pairing timeline.
@@ -229,7 +264,7 @@ export async function seedSampleData() {
   });
 
   manifest.pairings.push(pairingP1.id, pairingP2.id, pairingP3.id);
-  manifest.litters.push(litter.id);
+  manifest.litters.push(litter.id, litter2.id);
 
   // Stage 4 — Stud Service: Birch (our dog) services Nell (Ellen's outside
   // female). Links to Pairing P3 via the canonical pairing_id.
@@ -284,6 +319,25 @@ export async function seedSampleData() {
   manifest.sales.push(hazelSale.id);
   manifest.contracts.push(hazelContract.id);
 
+  // Sale: Daisy reserved by Nora Kim, deposit paid but NOT delivered (Puppy
+  // Record feature demo — the "Print Puppy Record" picker on the Sales hub
+  // only lists non-delivered sales, so this is what makes Daisy selectable
+  // there; Hazel's sale above is already delivered and deliberately isn't).
+  const daisySale = await saleRepo.create({
+    dog_id: daisy.id, buyer_contact_id: nora.id, sale_date: '2026-05-20',
+    price: 2800, deposit_amount: 600, deposit_date: '2026-04-01',
+    placement_type: 'pet', status: 'deposit_paid', lead_source: 'Website',
+    notes: 'Reserved — pickup scheduled for late May.'
+  });
+  const daisyContract = await contractRepo.create({
+    contract_type: 'sale', status: 'signed', related_sale_id: daisySale.id,
+    title: 'Puppy Purchase Agreement — Daisy', signed_date: '2026-04-01',
+    document_url: 'https://drive.example.com/thornfield/daisy-purchase-agreement',
+    terms_summary: 'Pet-home placement, spay clause, health guarantee.'
+  });
+  manifest.sales.push(daisySale.id);
+  manifest.contracts.push(daisyContract.id);
+
   // Events — spread across all three subject types to cover most of the catalog
   // (brief §6).
   const dogEvents = [
@@ -301,8 +355,17 @@ export async function seedSampleData() {
     // Gunnar
     { subject_id: gunnar.id, event_type: 'genetic_test', event_date: '2023-03-01', title: 'Panel results',
       details: { panel_name: 'Embark Breeder Panel', lab: 'Embark', result: 'Clear' } },
+    { subject_id: gunnar.id, event_type: 'breed_specific_test', event_date: '2022-11-15', title: 'Patellar luxation screen',
+      details: { test_name: 'Patellar Luxation', result: 'Normal' } },
     { subject_id: gunnar.id, event_type: 'title_earned', event_date: '2020-09-12', title: 'Earned JH',
       details: { title_abbreviation: 'JH', organization: 'AKC' } },
+    // Juniper — a second genetic + breed-specific test alongside her ofa_pennhip
+    // above, so her parent card's pipe-separated test line (Puppy Record feature)
+    // carries more than one entry too.
+    { subject_id: juniper.id, event_type: 'genetic_test', event_date: '2023-03-01', title: 'Panel results',
+      details: { panel_name: 'Embark Breeder Panel', lab: 'Embark', result: 'Clear' } },
+    { subject_id: juniper.id, event_type: 'breed_specific_test', event_date: '2023-03-05', title: 'Patellar luxation screen',
+      details: { test_name: 'Patellar Luxation', result: 'Normal' } },
     // Fern
     { subject_id: fern.id, event_type: 'milestone', event_date: '2025-10-15', title: 'Eyes open',
       details: { description: 'Eyes open' } },
@@ -353,7 +416,33 @@ export async function seedSampleData() {
     // toggle. Exercises reminder_dismissed (a plain field, not archive/status).
     { subject_id: fern.id, event_type: 'vaccination', event_date: '2026-06-01', title: 'Rabies booster',
       reminder_date: daysFromToday(20), reminder_dismissed: true,
-      details: { vaccine: 'Rabies', lot_number: 'C2210' } }
+      details: { vaccine: 'Rabies', lot_number: 'C2210' } },
+    // Daisy — all twelve health-relevant event types on one puppy (Puppy Record
+    // feature demo), so every per-type card on the printed record has content.
+    { subject_id: daisy.id, event_type: 'abnormalities', event_date: '2026-03-02', title: 'Newborn exam finding',
+      details: { type: 'Umbilical hernia' } },
+    { subject_id: daisy.id, event_type: 'illness', event_date: '2026-03-20', title: 'Mild GI upset',
+      details: { diagnosis: 'Dietary indiscretion', treatment: 'Bland diet 3 days, resolved.' } },
+    { subject_id: daisy.id, event_type: 'medication', event_date: '2026-03-20', event_end_date: '2026-03-23', title: 'Metronidazole course',
+      details: { drug: 'Metronidazole', dose: '50mg', frequency: 'Twice daily' } },
+    { subject_id: daisy.id, event_type: 'injury', event_date: '2026-04-05', title: 'Minor toe scrape',
+      details: { description: 'Small scrape on left front toe from the yard.', severity: 'Minor' } },
+    { subject_id: daisy.id, event_type: 'genetic_test', event_date: '2026-04-10', title: 'Panel results',
+      details: { panel_name: 'Embark Breeder Panel', lab: 'Embark', result: 'Clear' } },
+    { subject_id: daisy.id, event_type: 'ofa_pennhip', event_date: '2026-04-10', title: 'Preliminary hip screen',
+      details: { joint: 'Hips', method: 'PennHIP', rating: 'Within normal limits' } },
+    { subject_id: daisy.id, event_type: 'breed_specific_test', event_date: '2026-04-10', title: 'Patellar luxation screen',
+      details: { test_name: 'Patellar Luxation', result: 'Normal' } },
+    { subject_id: daisy.id, event_type: 'vaccination', event_date: '2026-04-15', title: 'Puppy shots (1st round)',
+      details: { vaccine: 'DHPP', lot_number: 'D5521', next_due: '2026-05-15' } },
+    { subject_id: daisy.id, event_type: 'preventative', event_date: '2026-04-20', title: 'Deworming',
+      details: { product: 'Panacur', dose: '2 mL' } },
+    { subject_id: daisy.id, event_type: 'vet_visit', event_date: '2026-04-25', title: 'Puppy wellness exam',
+      details: { reason: 'Wellness check', vet: 'Dr. Patricia Nguyen', findings: 'Healthy, on growth curve.' } },
+    { subject_id: daisy.id, event_type: 'weight_check', event_date: '2026-05-01', title: 'Weight check',
+      details: { weight_lbs: 6, weight_oz: 4, time_of_day: 'AM' } },
+    { subject_id: daisy.id, event_type: 'surgery', event_date: '2026-05-10', title: 'Spay',
+      details: { procedure: 'Ovariohysterectomy', vet: 'Dr. Patricia Nguyen', outcome: 'Uncomplicated, recovered well.' } }
   ];
 
   const pairingEvents = [

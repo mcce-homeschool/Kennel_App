@@ -14,6 +14,10 @@ const PAGE_SIZE = 5; // recent sales shown before "Show more"
 const body = document.getElementById('sale-list');
 const errorBox = document.getElementById('page-error');
 
+// Kept current by main() on every load, read fresh when the print modal opens
+// (not just the paginated "recent" slice shown on the page).
+const state = { sales: [], dogsById: new Map(), contactsById: new Map() };
+
 function showError(msg) { errorBox.innerHTML = `<div class="inline-error">${esc(msg)}</div>`; }
 
 // Best available date for "recent", newest first.
@@ -77,6 +81,9 @@ async function main() {
   ]);
   const dogsById = new Map(dogs.map((d) => [d.id, d]));
   const contactsById = new Map(contacts.map((c) => [c.id, c]));
+  state.sales = sales;
+  state.dogsById = dogsById;
+  state.contactsById = contactsById;
 
   const contractsBySale = new Map();
   for (const c of contracts) {
@@ -138,5 +145,52 @@ body.addEventListener('change', async (e) => {
     await main();
   } catch (err) { showError(err.message || String(err)); }
 });
+
+// --- Print Puppy Record modal --------------------------------------------
+// Lets the breeder jump straight to a puppy's printable record without first
+// opening its Sale — scoped to non-delivered sales (a delivered puppy is
+// already gone; nothing left to hand a buyer). Ordered by dog name.
+function openPrintModal() {
+  const eligible = state.sales
+    .filter((s) => s.status !== 'delivered')
+    .map((s) => ({ sale: s, dogName: state.dogsById.get(s.dog_id)?.call_name || '(unnamed)', buyerName: state.contactsById.get(s.buyer_contact_id)?.name || '' }))
+    .sort((a, b) => a.dogName.localeCompare(b.dogName));
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  const options = eligible
+    .map((e) => `<option value="${esc(e.sale.id)}">${esc(e.dogName)}${e.buyerName ? ` → ${esc(e.buyerName)}` : ''}</option>`)
+    .join('');
+  overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
+      <h2 style="margin-top:0;">Print a Puppy Record</h2>
+      ${eligible.length ? `
+        <div class="field">
+          <label>Puppy</label>
+          <select id="ppm-select">${options}</select>
+        </div>` : `<p class="muted">No non-delivered sales to print.</p>`}
+      <div class="form-actions">
+        ${eligible.length ? `<button class="btn btn-primary" id="ppm-print">Print</button>` : ''}
+        <button class="btn" id="ppm-cancel">Cancel</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const close = () => overlay.remove();
+  overlay.querySelector('#ppm-cancel').addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+  const printBtn = overlay.querySelector('#ppm-print');
+  if (printBtn) {
+    printBtn.addEventListener('click', () => {
+      const saleId = overlay.querySelector('#ppm-select').value;
+      // autoprint=1 tells puppy-record.js to invoke window.print() itself once
+      // it finishes rendering, so this really is a one-click "Print" button.
+      window.open(`puppy-record.html?sale=${encodeURIComponent(saleId)}&autoprint=1`, '_blank');
+      close();
+    });
+  }
+}
+
+document.getElementById('btn-print-puppy-record').addEventListener('click', openPrintModal);
 
 main().catch((e) => showError(e.message || String(e)));
