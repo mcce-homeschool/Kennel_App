@@ -6,8 +6,8 @@ import { contractRepo } from '../data/contractRepo.js';
 import { dogRepo } from '../data/dogRepo.js';
 import { contactRepo } from '../data/contactRepo.js';
 import { litterRepo } from '../data/litterRepo.js';
-import { PLACEMENT_TYPE, SALE_STATUS, CONTRACT_TYPE, CONTRACT_STATUS, BOARDING_FREQUENCY_OPTIONS } from '../data/vocab.js';
-import { esc, badge, fmtDate, todayYMD, param, confirmAction } from '../assets/ui.js';
+import { PLACEMENT_TYPE, SALE_STATUS, DISPOSITION, CONTRACT_TYPE, CONTRACT_STATUS, BOARDING_FREQUENCY_OPTIONS, descriptor } from '../data/vocab.js';
+import { esc, badge, fmtDate, todayYMD, param } from '../assets/ui.js';
 import { openEventForm } from '../assets/eventForm.js';
 import { attachNewContactButton } from '../assets/contactPicker.js';
 
@@ -374,56 +374,168 @@ function promptOwnershipUpdate(sale) {
   });
 }
 
+// --- Styled-modal helpers (local to the sale page) -----------------------
+// A yes/no confirmation in the app's own modal (never window.confirm). Resolves
+// true on confirm, false on skip/dismiss/backdrop-click.
+function confirmModal({ title, message = '', confirmLabel = 'Confirm', cancelLabel = 'Skip', danger = false }) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
+      <h2 style="margin-top:0;">${esc(title)}</h2>
+      ${message ? `<p class="muted">${esc(message)}</p>` : ''}
+      <div class="form-actions">
+        <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" id="cm-confirm">${esc(confirmLabel)}</button>
+        <button class="btn" id="cm-cancel">${esc(cancelLabel)}</button>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    const done = (val) => { overlay.remove(); resolve(val); };
+    overlay.querySelector('#cm-confirm').addEventListener('click', () => done(true));
+    overlay.querySelector('#cm-cancel').addEventListener('click', () => done(false));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) done(false); });
+  });
+}
+
+// A single-select prompt in the app's own modal. `options` is a vocab-style
+// [{value,label}] list; resolves to the chosen value, or null on skip/dismiss.
+function selectModal({ title, message = '', label = '', options, defaultValue = '', confirmLabel = 'Confirm', cancelLabel = 'Skip' }) {
+  return new Promise((resolve) => {
+    const optsHtml = options.map((o) =>
+      `<option value="${esc(o.value)}"${o.value === defaultValue ? ' selected' : ''}>${esc(o.label)}</option>`).join('');
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
+      <h2 style="margin-top:0;">${esc(title)}</h2>
+      ${message ? `<p class="muted">${esc(message)}</p>` : ''}
+      <div class="field">
+        <label>${esc(label)}</label>
+        <select id="sm-value">${optsHtml}</select>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" id="sm-confirm">${esc(confirmLabel)}</button>
+        <button class="btn" id="sm-cancel">${esc(cancelLabel)}</button>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    const done = (val) => { overlay.remove(); resolve(val); };
+    overlay.querySelector('#sm-confirm').addEventListener('click', () => done(overlay.querySelector('#sm-value').value || null));
+    overlay.querySelector('#sm-cancel').addEventListener('click', () => done(null));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) done(null); });
+  });
+}
+
+// Opens the shared event modal and resolves once it's saved or dismissed, so the
+// post-save sequence can await it before navigating/re-rendering.
+function openEventFormAwait(opts) {
+  return new Promise((resolve) => {
+    openEventForm({ ...opts, onSaved: () => resolve(true), onCancel: () => resolve(false) });
+  });
+}
+
+// Offer to set the sold dog's disposition (breeder intent). `defaultValue` seeds
+// the dropdown (Placed on a new sale; Available when a sale falls through). Skips
+// the write when the choice matches what the dog already has.
+async function promptDisposition(sale, { title, message, defaultValue }) {
+  const dog = await dogRepo.getById(sale.dog_id);
+  if (!dog) return;
+  const choice = await selectModal({
+    title, message, label: 'Disposition',
+    options: DISPOSITION, defaultValue, confirmLabel: 'Update'
+  });
+  if (choice && choice !== dog.disposition) await dogRepo.update(dog.id, { disposition: choice });
+}
+
 async function save() {
   clearError();
   const candidate = normalizeMoney(readForm());
-  const prevStatus = ctx.mode === 'new' ? null : ctx.original.status;
+  const isNew = ctx.mode === 'new';
+  const prevStatus = isNew ? null : ctx.original.status;
   try {
-    let saved;
-    if (ctx.mode === 'new') {
-      saved = await saleRepo.create(candidate);
-    } else {
-      saved = await saleRepo.update(ctx.original.id, candidate);
-    }
+    const saved = isNew
+      ? await saleRepo.create(candidate)
+      : await saleRepo.update(ctx.original.id, candidate);
+
+    // --- Post-save prompt sequence: each awaits the previous, all optional
+    // (a Skip never blocks the save that already happened above). ---
+
     // Co-own placement convenience (Data Model v3 §5.6): pairs naturally with
     // adding the buyer to the dog's co_owner_contact_ids — never automatic.
     if (saved.placement_type === 'co_own') {
       const dog = await dogRepo.getById(saved.dog_id);
       if (dog && !(dog.co_owner_contact_ids || []).includes(saved.buyer_contact_id)) {
-        if (confirmAction('This is a co-own placement. Also add the buyer as a co-owner of this dog?')) {
-          await dogRepo.update(dog.id, { co_owner_contact_ids: [...(dog.co_owner_contact_ids || []), saved.buyer_contact_id] });
-        }
+        const ok = await confirmModal({
+          title: 'Add buyer as a co-owner?',
+          message: 'This is a co-own placement. Also add the buyer as a co-owner of this dog?'
+        });
+        if (ok) await dogRepo.update(dog.id, { co_owner_contact_ids: [...(dog.co_owner_contact_ids || []), saved.buyer_contact_id] });
       }
     }
 
-    const finish = async () => {
-      if (ctx.mode === 'new') { location.href = `sale.html?id=${encodeURIComponent(saved.id)}`; return; }
-      ctx.original = saved;
-      ctx.mode = 'view';
-      await loadRefs();
-      ctx.original = await saleRepo.getById(saved.id);
-      renderAll();
-    };
-
-    // Ownership-update prompt (#7) fires only on the transition INTO delivered,
-    // before the existing placement-event prompt below.
+    // Ownership-update prompt fires only on the transition INTO delivered.
+    // Choosing "External" also sets the dog's status to external_reference.
     if (saved.status === 'delivered' && prevStatus !== 'delivered') {
       await promptOwnershipUpdate(saved);
     }
 
-    // Soft-suggestion prompt (Stage4.5 Addendum §D4) — offered, never forced;
-    // no stored Sale↔event link. Only on the transition INTO a prompt-worthy
-    // status, so re-saving an already-delivered sale doesn't re-nag.
-    const enteringPlacementPrompt = PLACEMENT_PROMPT_STATUSES.includes(saved.status) && prevStatus !== saved.status;
-    if (enteringPlacementPrompt && confirmAction('Log a scheduled pickup for this placement?')) {
-      openEventForm({
-        subjectType: 'dog', subjectId: saved.dog_id,
-        prefill: { event_type: 'placement', related_contact_id: saved.buyer_contact_id, title: 'Puppy pickup' },
-        onSaved: finish, onCancel: finish
+    // Any new sale → offer to update the dog's disposition, defaulting to Placed.
+    if (isNew) {
+      await promptDisposition(saved, {
+        title: 'Update this dog’s disposition?',
+        message: 'A sale was just recorded for this dog.',
+        defaultValue: 'placed'
       });
-    } else {
-      await finish();
     }
+
+    // Editing a sale into Returned/Cancelled → offer to set disposition back,
+    // defaulting to Available (the dog is available again).
+    if (!isNew && ['returned', 'cancelled'].includes(saved.status) && prevStatus !== saved.status) {
+      await promptDisposition(saved, {
+        title: 'Update this dog’s disposition?',
+        message: `This sale is now "${descriptor(SALE_STATUS, saved.status).label}" — update the dog's disposition back?`,
+        defaultValue: 'available'
+      });
+    }
+
+    // All three deferred-pickup fields set → offer to schedule a boarding event.
+    const hasDeferred = saved.deferred_boarding_amount != null && saved.deferred_boarding_amount !== ''
+      && !!saved.deferred_boarding_frequency && !!saved.deferred_boarding_duration_days;
+    if (hasDeferred) {
+      const ok = await confirmModal({
+        title: 'Schedule a boarding event?',
+        message: 'This sale has a deferred pickup boarding rate. Schedule a boarding event for it?'
+      });
+      if (ok) {
+        await openEventFormAwait({
+          subjectType: 'dog', subjectId: saved.dog_id,
+          prefill: { event_type: 'boarding', title: 'Deferred pickup boarding' }
+        });
+      }
+    }
+
+    // Soft-suggestion prompt (Stage4.5 Addendum §D4) — only on the transition
+    // INTO a prompt-worthy status, so re-saving an already-delivered sale
+    // doesn't re-nag.
+    if (PLACEMENT_PROMPT_STATUSES.includes(saved.status) && prevStatus !== saved.status) {
+      const ok = await confirmModal({
+        title: 'Log a scheduled pickup for this placement?',
+        confirmLabel: 'Log'
+      });
+      if (ok) {
+        await openEventFormAwait({
+          subjectType: 'dog', subjectId: saved.dog_id,
+          prefill: { event_type: 'placement', related_contact_id: saved.buyer_contact_id, title: 'Puppy pickup' }
+        });
+      }
+    }
+
+    // Finish: navigate (new) or re-render in place (edit).
+    if (isNew) { location.href = `sale.html?id=${encodeURIComponent(saved.id)}`; return; }
+    ctx.original = saved;
+    ctx.mode = 'view';
+    await loadRefs();
+    ctx.original = await saleRepo.getById(saved.id);
+    renderAll();
   } catch (e) {
     showError(e.message || String(e));
   }
@@ -432,14 +544,20 @@ async function save() {
 async function toggleArchive() {
   const s = ctx.original;
   const verb = s.is_archived ? 'Unarchive' : 'Archive';
-  if (!confirmAction(`${verb} this sale?`)) return;
+  const ok = await confirmModal({ title: `${verb} this sale?`, confirmLabel: verb, cancelLabel: 'Cancel' });
+  if (!ok) return;
   ctx.original = s.is_archived ? await saleRepo.unarchive(s.id) : await saleRepo.archive(s.id);
   renderAll();
 }
 
 async function doDelete() {
   const s = ctx.original;
-  if (!confirmAction('Permanently delete this sale? This cannot be undone.')) return;
+  const ok = await confirmModal({
+    title: 'Delete this sale?',
+    message: 'Permanently delete this sale? This cannot be undone.',
+    confirmLabel: 'Delete', cancelLabel: 'Cancel', danger: true
+  });
+  if (!ok) return;
   try {
     await saleRepo.hardDelete(s.id);
     location.href = 'sales.html';
