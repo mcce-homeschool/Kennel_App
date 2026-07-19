@@ -473,8 +473,25 @@ fire on a fresh seed (see the litter→close note under G-nudges below).
    Verified in a browser: zero validation errors, clear/reset empties every table, seven of
    eight §19 nudges live (litter→close documented as intentionally omitted, §9.3).
 4. **Phase 3 — Reconcile dependencies & dates.** Verify every §5.2 example is live on
-   "today"; lock relative dating.
+   "today"; lock relative dating. ✅ **Done.** Re-derived every §19 nudge condition and
+   every §5.2 dependency against `data/sampleData.js`'s relative dates by hand, then
+   confirmed in a browser (fresh seed, zero console errors): all seven intended nudges
+   fire (stud-status/Birch, promote/Poppy, stud→pairing/Juno, heat→pairing/Sage,
+   overdue-pairing/Percy×Dahlia, litter→sold/Daisy, litter→reopen/Fern), litter→close
+   stays intentionally silent, and the Financials earned/anticipated/balance math
+   (transport + deferred boarding × units) reconciles exactly. clear/reset still empties
+   every table with zero contamination. One reconciliation fix: Cedar's open sale had
+   `referred_by_contact_id` pointing at Marcus Webb, a contact archived since the
+   original seed purely to demo "Show archived" — an archived contact shouldn't read as
+   a live referrer on a sale dated weeks ago, so the field is now unset (the
+   `buyer_referrer`/`stud_referrer` auto-tag dependency is already covered live via
+   Tessa and Dana). All dates are `daysFromToday`/`monthsFromToday`-relative already, so
+   nothing needed re-anchoring — "lock relative dating" was a verify, not a rewrite.
 5. **Phase 4 — Acceptance pass (§9)** + docs/service-worker/reference-registry updates.
+   Note for that pass: `Tutorial_Coverage_Matrix_v1.md` predates Phase 2's seed expansion
+   in git history and has at least one stale anchor (Today → "Due outs & upcoming" names
+   "Fern placement (+7d)"; the live anchor is now Cedar's scheduled-pickup placement
+   event) — reconcile the matrix's anchors against the current seed as part of Phase 4.
 6. **Phase 5 — Hand off to the wizard-runtime spec** with a frozen anchor list.
 
 ---

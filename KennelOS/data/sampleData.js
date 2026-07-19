@@ -582,7 +582,6 @@ export async function seedSampleData() {
     transport_fee: 250,
     deferred_boarding_amount: 25, deferred_boarding_frequency: 'Day', deferred_boarding_duration_days: 10,
     placement_type: 'show', status: 'deposit_paid', lead_source: 'Referral',
-    referred_by_contact_id: marcus.id,
     notes: 'Reserved from the Autumn litter; buyer delayed pickup, boarding with us until then.'
   });
   manifest.sales.push(cedarSale.id);
