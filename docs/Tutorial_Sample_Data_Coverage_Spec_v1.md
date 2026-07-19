@@ -104,6 +104,13 @@ walking each page in the browser is **Phase 1 of the build** (the End-State guid
 page catalog is the checklist; don't trust this doc's section lists to be exhaustive
 until each page has been opened).
 
+> **Phase 1 is done.** The completed matrix lives in
+> **`Tutorial_Coverage_Matrix_v1.md`** — built by walking every page and verified in a
+> browser. It corrects §4 in several structural ways (the hubs land on *consolidated*
+> pages: Today→`today.html`, Breeding→`breeding.html`, etc.; "Nudges" is a card, not a
+> page; Dog Detail has 12 sections; kennels have no detail editor). Read that matrix as
+> the current map; §4 below is kept as the historical first pass.
+
 ### 3.2 The field-dependency catalog
 
 Two tables the tour's copy is written from:
@@ -409,7 +416,7 @@ Each item is a new row or a previously-unset plain field — **no schema change*
    (the wizard's step list at the section grain), because the seed exists to serve it.
 2. **Phase 1 — Complete the coverage matrix (§3.1)** by walking every page in the
    browser; confirm each screen's real sections/expandables (don't trust §4 to be
-   exhaustive). Output: the green/gap matrix.
+   exhaustive). Output: the green/gap matrix. ✅ **Done → `Tutorial_Coverage_Matrix_v1.md`.**
 3. **Phase 2 — Expand the seed by narrative thread (§6)**, closing gaps in this order:
    G3/G4 (litter) → G2/G9 (open sale) → G1/G12/F+G (nudges+kennel) → G5/G7 (lease/co-own)
    → G8 (incoming stud) → G6/G11 (dog fields + medical history) → G13/G14 (polish).
