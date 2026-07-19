@@ -676,9 +676,13 @@ async function openGenerateModal() {
   function lineRowHtml(key) {
     const ln = st.lines[key];
     const label = INVOICE_LINE_LABELS[key] || key;
-    const dueField = st.doc === 'invoice'
-      ? `<label class="check-inline" style="gap:4px;">Due by <input type="date" class="ln-due" value="${esc(ln.dueDate || '')}"></label>`
-      : '';
+    // Deposits are always due immediately, so they get a static note rather than
+    // a date picker; the other four line types carry a calculated due date.
+    const dueField = st.doc !== 'invoice'
+      ? ''
+      : (key === 'deposit'
+        ? `<span class="faint">Due immediately</span>`
+        : `<label class="check-inline" style="gap:4px;">Due by <input type="date" class="ln-due" value="${esc(ln.dueDate || '')}"></label>`);
     return `<div class="gen-line" data-key="${esc(key)}" style="border-top:1px solid var(--border); padding:8px 0;">
       <label class="check-inline" style="gap:8px;"><input type="checkbox" class="ln-include"${ln.include ? ' checked' : ''}> <strong>${esc(label)}</strong> <span class="faint">${esc(fmtMoney(ln.base))}</span></label>
       <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin-top:5px; padding-left:24px;">
@@ -797,8 +801,10 @@ async function openGenerateModal() {
       const persist = { invoice_number: st.number.trim() || null, invoice_notes: st.notes.trim() || null };
       if (st.doc === 'receipt') { persist.payment_method = st.payMethod.trim() || null; persist.payment_reference = st.payReference.trim() || null; }
       await repo.update(st.record.id, persist);
+      // Open the document but don't auto-print — the owner triggers the actual
+      // download/print themselves with the page's "Print / Save as PDF" button.
       const url = `invoice.html?source=${encodeURIComponent(st.source)}&id=${encodeURIComponent(st.record.id)}`
-        + `&doc=${encodeURIComponent(st.doc)}&cfg=${encodeURIComponent(JSON.stringify(cfg))}&autoprint=1`;
+        + `&doc=${encodeURIComponent(st.doc)}&cfg=${encodeURIComponent(JSON.stringify(cfg))}`;
       window.open(url, '_blank');
       close();
     } catch (e) {

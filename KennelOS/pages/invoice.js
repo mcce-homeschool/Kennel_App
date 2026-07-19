@@ -12,7 +12,9 @@
 //            { number, notes, lines:[{key,mode:'full'|'partial',collected,dueDate}],
 //              methods:[…]  (invoice: accepted methods),
 //              payMethod, payReference  (receipt: method used) }
-//   autoprint = 1  → open the print dialog once rendered
+//
+// The document never prints itself — the owner triggers the browser's
+// Print → Save as PDF with the page's "Print / Save as PDF" button.
 //
 // Full vs Partial per line (owner's model):
 //   • Partial → the line prints "<Name> (partial)" and its amount IS the entered
@@ -135,7 +137,10 @@ async function main() {
 
     if (isReceipt) {
       const amount = partial ? collected : Math.max(base - collected, 0);
+      // Partial → "(partial)". Full but with a prior partial payment already
+      // collected → this line is the remaining balance, so print "(balance)".
       if (partial) label += ' (partial)';
+      else if (collected > 0) label += ' (balance)';
       paidTotal += amount;
       rowsHtml.push(`<tr><td>${esc(label)}</td><td class="num">${esc(money(amount))}</td></tr>`);
     } else {
@@ -143,7 +148,11 @@ async function main() {
       if (partial) label += ' (partial)';
       if (!partial) collectedFull += collected;
       subtotal += amount;
-      const due = line.dueDate ? esc(fmtDateMDY(line.dueDate)) : '<span class="faint">—</span>';
+      // Deposits are always due immediately; the calculated due date (expected
+      // pickup / nine-weeks-of-age) applies only to the other four line types.
+      const due = line.key === 'deposit'
+        ? 'Immediately'
+        : (line.dueDate ? esc(fmtDateMDY(line.dueDate)) : '<span class="faint">—</span>');
       rowsHtml.push(`<tr>
         <td>${esc(label)}${marker ? `<sup>${esc(marker)}</sup>` : ''}</td>
         <td>${due}</td>
@@ -260,8 +269,6 @@ async function main() {
 
     <div class="inv-generated">Generated ${esc(fmtDateMDY(todayYMD()))} · KennelOS</div>
   `;
-
-  if (param('autoprint')) setTimeout(() => window.print(), 200);
 }
 
 document.getElementById('inv-print').addEventListener('click', () => window.print());
