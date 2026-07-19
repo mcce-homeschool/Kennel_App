@@ -123,7 +123,7 @@ function renderBody() {
     body.innerHTML = `<div class="card">
       <h2 style="margin-top:0;">Import complete</h2>
       <p class="muted">Added <strong>${state.result.breedsAdded}</strong> new breed suggestion(s) and <strong>${state.result.testsAdded}</strong> new test(s) to <strong>${esc(targetKennel()?.kennel_name || '')}</strong>. Already-present entries were left untouched.</p>
-      <p class="muted">Prune anything you don't want from the kennel's <strong>Preferred tests</strong> panel (Kennels page). Breed suggestions now appear on the dog form.</p>
+      <p class="muted">Prune anything you don't want from the kennel's <strong>Preferred tests</strong> panel (on the kennel's own page — open it from the Kennels list). Breed suggestions now appear on the dog form.</p>
       <div class="form-actions">
         <a class="btn" href="import-export.html">Back to Import / Export</a>
         <button class="btn" id="seed-again">Import another file</button>

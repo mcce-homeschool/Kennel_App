@@ -532,9 +532,11 @@ against any subject, §21), `reports`, `companion` (the Companion Messaging cons
 §20), `import-export`, plus root `index.html`.
 Dogs: `dog` (detail), `roster`, `pedigree`.
 Breeding: `pairings`/`pairing`, `litters`/`litter`, `active-breeding`, `live-births`.
-People: `contact`, `kennels` (list) / `kennel` (detail — a lean read-only profile
-whose real job is hosting that kennel's Expenses ledger; editing kennels stays on
-the `kennels` list). Both map to the People hub in `HUB_CHILDREN`.
+People: `contact`, `kennels` (list — identity CRUD only: name/prefix/location/own
++ archive/delete) / `kennel` (detail — hosts that kennel's Expenses ledger plus,
+for own kennels, its program configuration: the preferred-tests panel and the
+lifecycle-nudge thresholds; identity edits stay on the `kennels` list). Both map
+to the People hub in `HUB_CHILDREN`.
 Placements/contracts: `sale`/`sales`, `stud-service`/`stud-services`,
 `contract`/`contracts`.
 Today cluster: `dashboard`, `reminders`, `upcoming`, `board`, `scheduled-placements`.
