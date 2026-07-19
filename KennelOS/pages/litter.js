@@ -7,7 +7,7 @@ import { litterRepo, ReferenceBlockedError } from '../data/litterRepo.js';
 import { pairingRepo } from '../data/pairingRepo.js';
 import { dogRepo } from '../data/dogRepo.js';
 import { LITTER_STATUS, PAIRING_STATUS, DOG_STATUS, SEX, descriptor } from '../data/vocab.js';
-import { esc, badge, fmtDate, todayYMD, param, confirmAction } from '../assets/ui.js';
+import { esc, badge, fmtDate, todayYMD, param, confirmModal } from '../assets/ui.js';
 import { addDaysToYMD } from '../data/dateUtils.js';
 import { renderTimeline } from '../assets/timeline.js';
 import { renderExpensePanel } from '../assets/expensePanel.js';
@@ -424,14 +424,14 @@ async function save() {
 async function toggleArchive() {
   const l = ctx.original;
   const verb = l.is_archived ? 'Unarchive' : 'Archive';
-  if (!confirmAction(`${verb} this litter?`)) return;
+  if (!(await confirmModal({ title: `${verb} this litter?`, confirmLabel: verb }))) return;
   ctx.original = l.is_archived ? await litterRepo.unarchive(l.id) : await litterRepo.archive(l.id);
   renderAll();
 }
 
 async function doDelete() {
   const l = ctx.original;
-  if (!confirmAction('Permanently delete this litter? This cannot be undone.')) return;
+  if (!(await confirmModal({ title: 'Delete this litter?', message: 'Permanently delete this litter? This cannot be undone.', confirmLabel: 'Delete', danger: true }))) return;
   try {
     await litterRepo.hardDelete(l.id);
     location.href = 'litters.html';

@@ -6,7 +6,7 @@
 // convenience "Cost" field on the event form.
 import { expenseRepo } from '../data/expenseRepo.js';
 import { EXPENSE_CATEGORIES } from '../data/vocab.js';
-import { esc, badge, fmtDate, fmtMoney, todayYMD, confirmAction } from './ui.js';
+import { esc, badge, fmtDate, fmtMoney, todayYMD, confirmModal } from './ui.js';
 import { openEventForm } from './eventForm.js';
 
 const CATEGORY_OPTIONS = EXPENSE_CATEGORIES.map((c) => `<option value="${esc(c.value)}">${esc(c.label)}</option>`).join('');
@@ -154,7 +154,7 @@ export function renderExpensePanel(opts) {
       x.is_archived ? await expenseRepo.unarchive(x.id) : await expenseRepo.archive(x.id);
       refresh();
     } else if (act === 'delete') {
-      if (confirmAction(`Permanently delete this ${fmtMoney(x.amount)} expense? This cannot be undone.`)) {
+      if (await confirmModal({ title: 'Delete expense?', message: `Permanently delete this ${fmtMoney(x.amount)} expense? This cannot be undone.`, confirmLabel: 'Delete', danger: true })) {
         await expenseRepo.hardDelete(x.id);
         refresh();
       }

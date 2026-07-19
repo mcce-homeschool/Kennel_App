@@ -13,7 +13,7 @@ import {
   STUD_SERVICE_DIRECTION, FEE_STRUCTURE, STUD_SERVICE_STATUS, STUD_SERVICE_TYPE,
   CONTRACT_TYPE, CONTRACT_STATUS, SEX, descriptor
 } from '../data/vocab.js';
-import { esc, badge, fmtDate, param } from '../assets/ui.js';
+import { esc, badge, fmtDate, param, confirmModal } from '../assets/ui.js';
 import { getMyContactId } from '../data/kennelSetup.js';
 import { attachNewContactButton } from '../assets/contactPicker.js';
 
@@ -357,28 +357,6 @@ async function save() {
   } catch (e) {
     showError(e.message || String(e));
   }
-}
-
-// A yes/no confirmation in the app's own styled modal (never window.confirm).
-// Resolves true on confirm, false on cancel/dismiss/backdrop-click.
-function confirmModal({ title, message = '', confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false }) {
-  return new Promise((resolve) => {
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
-      <h2 style="margin-top:0;">${esc(title)}</h2>
-      ${message ? `<p class="muted">${esc(message)}</p>` : ''}
-      <div class="form-actions">
-        <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" id="cm-confirm">${esc(confirmLabel)}</button>
-        <button class="btn" id="cm-cancel">${esc(cancelLabel)}</button>
-      </div>
-    </div>`;
-    document.body.appendChild(overlay);
-    const done = (val) => { overlay.remove(); resolve(val); };
-    overlay.querySelector('#cm-confirm').addEventListener('click', () => done(true));
-    overlay.querySelector('#cm-cancel').addEventListener('click', () => done(false));
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) done(false); });
-  });
 }
 
 async function toggleArchive() {

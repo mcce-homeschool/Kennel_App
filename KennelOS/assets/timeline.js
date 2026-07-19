@@ -4,7 +4,7 @@ import { HistoryEvent } from '../data/eventRepo.js';
 import { expenseRepo } from '../data/expenseRepo.js';
 import { contactRepo } from '../data/contactRepo.js';
 import { EVENT_TYPES, descriptor } from '../data/vocab.js';
-import { esc, badge, fmtDate, fmtMoney, todayYMD, confirmAction } from './ui.js';
+import { esc, badge, fmtDate, fmtMoney, todayYMD, confirmModal, alertModal } from './ui.js';
 import { openEventForm } from './eventForm.js';
 
 // Compact "label: value" summary of an event's type-specific details.
@@ -106,14 +106,14 @@ export function renderTimeline(opts) {
       ev.is_archived ? await HistoryEvent.unarchive(ev.id) : await HistoryEvent.archive(ev.id);
       refresh();
     } else if (act === 'delete') {
-      if (confirmAction(`Permanently delete “${ev.title}”? This cannot be undone.`)) {
+      if (await confirmModal({ title: `Delete “${ev.title}”?`, message: 'This cannot be undone.', confirmLabel: 'Delete', danger: true })) {
         try {
           await HistoryEvent.hardDelete(ev.id);
           refresh();
         } catch (e) {
           // Blocked by a linked expense (EVENT_REFERENCES): clear the event's
           // Cost first (or archive the event) — the message names the blocker.
-          window.alert(e.message || String(e));
+          await alertModal({ title: 'Could not delete', message: e.message || String(e) });
         }
       }
     }

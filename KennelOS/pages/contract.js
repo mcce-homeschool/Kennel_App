@@ -9,7 +9,7 @@ import { studServiceRepo } from '../data/studServiceRepo.js';
 import { dogRepo } from '../data/dogRepo.js';
 import { contactRepo } from '../data/contactRepo.js';
 import { CONTRACT_TYPE, CONTRACT_STATUS, SEX, descriptor } from '../data/vocab.js';
-import { esc, badge, fmtDate, param, confirmAction } from '../assets/ui.js';
+import { esc, badge, fmtDate, param, confirmModal } from '../assets/ui.js';
 
 const els = {
   title: document.getElementById('contract-title'),
@@ -273,14 +273,14 @@ async function save() {
 async function toggleArchive() {
   const c = ctx.original;
   const verb = c.is_archived ? 'Unarchive' : 'Archive';
-  if (!confirmAction(`${verb} this contract?`)) return;
+  if (!(await confirmModal({ title: `${verb} this contract?`, confirmLabel: verb }))) return;
   ctx.original = c.is_archived ? await contractRepo.unarchive(c.id) : await contractRepo.archive(c.id);
   renderAll();
 }
 
 async function doDelete() {
   const c = ctx.original;
-  if (!confirmAction('Permanently delete this contract? This cannot be undone.')) return;
+  if (!(await confirmModal({ title: 'Delete this contract?', message: 'Permanently delete this contract? This cannot be undone.', confirmLabel: 'Delete', danger: true }))) return;
   try {
     await contractRepo.hardDelete(c.id);
     location.href = 'contracts.html';

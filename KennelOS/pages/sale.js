@@ -7,7 +7,7 @@ import { dogRepo } from '../data/dogRepo.js';
 import { contactRepo } from '../data/contactRepo.js';
 import { litterRepo } from '../data/litterRepo.js';
 import { PLACEMENT_TYPE, SALE_STATUS, DISPOSITION, CONTRACT_TYPE, CONTRACT_STATUS, BOARDING_FREQUENCY_OPTIONS, descriptor } from '../data/vocab.js';
-import { esc, badge, fmtDate, todayYMD, param } from '../assets/ui.js';
+import { esc, badge, fmtDate, todayYMD, param, confirmModal, selectModal } from '../assets/ui.js';
 import { openEventForm } from '../assets/eventForm.js';
 import { attachNewContactButton } from '../assets/contactPicker.js';
 
@@ -374,57 +374,7 @@ function promptOwnershipUpdate(sale) {
   });
 }
 
-// --- Styled-modal helpers (local to the sale page) -----------------------
-// A yes/no confirmation in the app's own modal (never window.confirm). Resolves
-// true on confirm, false on skip/dismiss/backdrop-click.
-function confirmModal({ title, message = '', confirmLabel = 'Confirm', cancelLabel = 'Skip', danger = false }) {
-  return new Promise((resolve) => {
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
-      <h2 style="margin-top:0;">${esc(title)}</h2>
-      ${message ? `<p class="muted">${esc(message)}</p>` : ''}
-      <div class="form-actions">
-        <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" id="cm-confirm">${esc(confirmLabel)}</button>
-        <button class="btn" id="cm-cancel">${esc(cancelLabel)}</button>
-      </div>
-    </div>`;
-    document.body.appendChild(overlay);
-    const done = (val) => { overlay.remove(); resolve(val); };
-    overlay.querySelector('#cm-confirm').addEventListener('click', () => done(true));
-    overlay.querySelector('#cm-cancel').addEventListener('click', () => done(false));
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) done(false); });
-  });
-}
-
-// A single-select prompt in the app's own modal. `options` is a vocab-style
-// [{value,label}] list; resolves to the chosen value, or null on skip/dismiss.
-function selectModal({ title, message = '', label = '', options, defaultValue = '', confirmLabel = 'Confirm', cancelLabel = 'Skip' }) {
-  return new Promise((resolve) => {
-    const optsHtml = options.map((o) =>
-      `<option value="${esc(o.value)}"${o.value === defaultValue ? ' selected' : ''}>${esc(o.label)}</option>`).join('');
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
-      <h2 style="margin-top:0;">${esc(title)}</h2>
-      ${message ? `<p class="muted">${esc(message)}</p>` : ''}
-      <div class="field">
-        <label>${esc(label)}</label>
-        <select id="sm-value">${optsHtml}</select>
-      </div>
-      <div class="form-actions">
-        <button class="btn btn-primary" id="sm-confirm">${esc(confirmLabel)}</button>
-        <button class="btn" id="sm-cancel">${esc(cancelLabel)}</button>
-      </div>
-    </div>`;
-    document.body.appendChild(overlay);
-    const done = (val) => { overlay.remove(); resolve(val); };
-    overlay.querySelector('#sm-confirm').addEventListener('click', () => done(overlay.querySelector('#sm-value').value || null));
-    overlay.querySelector('#sm-cancel').addEventListener('click', () => done(null));
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) done(null); });
-  });
-}
-
+// --- Sale-specific prompt helpers ----------------------------------------
 // Opens the shared event modal and resolves once it's saved or dismissed, so the
 // post-save sequence can await it before navigating/re-rendering.
 function openEventFormAwait(opts) {
@@ -441,7 +391,7 @@ async function promptDisposition(sale, { title, message, defaultValue }) {
   if (!dog) return;
   const choice = await selectModal({
     title, message, label: 'Disposition',
-    options: DISPOSITION, defaultValue, confirmLabel: 'Update'
+    options: DISPOSITION, defaultValue, confirmLabel: 'Update', cancelLabel: 'Skip'
   });
   if (choice && choice !== dog.disposition) await dogRepo.update(dog.id, { disposition: choice });
 }
@@ -466,7 +416,8 @@ async function save() {
       if (dog && !(dog.co_owner_contact_ids || []).includes(saved.buyer_contact_id)) {
         const ok = await confirmModal({
           title: 'Add buyer as a co-owner?',
-          message: 'This is a co-own placement. Also add the buyer as a co-owner of this dog?'
+          message: 'This is a co-own placement. Also add the buyer as a co-owner of this dog?',
+          cancelLabel: 'Skip'
         });
         if (ok) await dogRepo.update(dog.id, { co_owner_contact_ids: [...(dog.co_owner_contact_ids || []), saved.buyer_contact_id] });
       }
@@ -503,7 +454,8 @@ async function save() {
     if (hasDeferred) {
       const ok = await confirmModal({
         title: 'Schedule a boarding event?',
-        message: 'This sale has a deferred pickup boarding rate. Schedule a boarding event for it?'
+        message: 'This sale has a deferred pickup boarding rate. Schedule a boarding event for it?',
+        cancelLabel: 'Skip'
       });
       if (ok) {
         await openEventFormAwait({
@@ -519,7 +471,7 @@ async function save() {
     if (PLACEMENT_PROMPT_STATUSES.includes(saved.status) && prevStatus !== saved.status) {
       const ok = await confirmModal({
         title: 'Log a scheduled pickup for this placement?',
-        confirmLabel: 'Log'
+        confirmLabel: 'Log', cancelLabel: 'Skip'
       });
       if (ok) {
         await openEventFormAwait({
