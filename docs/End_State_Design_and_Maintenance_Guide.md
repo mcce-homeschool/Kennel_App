@@ -796,7 +796,10 @@ view. The main app stays single-user/offline/all-local; this adds *recipients*.
   first type. The active tab drives the whole page: the single template card shown, a
   plain-language **filter blurb** above it, the **recipients list** (only contacts that
   match the type), and the bundle type "Prepare link" builds (there is no per-row type
-  picker — the tab **is** the type). **Membership predicates** (`companion.js`): a
+  picker — the tab **is** the type). Each recipient row is **collapsed by default** to
+  a one-line header (name + a `note` badge when `companion_note` is set + email/phone);
+  clicking the header reveals the note editor, Save note / Prepare link actions, and the
+  built link — so a long filtered list stays scannable. **Membership predicates** (`companion.js`): a
   **prospective** is a Contact with `waitlist_status === 'active'`; a **family** is a
   buyer with an **open** (non-terminal) sale — any non-archived Sale whose `status` is
   not in `{delivered, returned, cancelled}`; a **partner** is a Contact who is the

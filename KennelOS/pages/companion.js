@@ -178,23 +178,32 @@ async function loadData() {
   }
 }
 
+// Each recipient collapses to just its header (name + contact + a "note" tag when
+// one's on file) — the note editor, actions, and link box hide behind the toggle
+// so a long filtered list stays scannable. Clicking the header expands one card.
 function recipientRow(contact) {
   const archivedTag = contact.is_archived ? ' <span class="badge badge-gray">Archived</span>' : '';
+  const noteTag = (contact.companion_note || '').trim() ? ' <span class="badge badge-blue">note</span>' : '';
   return `
     <div class="card" data-id="${esc(contact.id)}" style="margin-top:12px;">
-      <div class="row-between">
-        <strong>${esc(contact.name)}</strong>${archivedTag}
-        <span class="muted">${esc(contact.email || contact.phone || 'no email/phone on file')}</span>
+      <div class="r-header" style="display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none;">
+        <span class="r-arrow" style="display:inline-block; transition:transform 0.2s; font-size:12px;">▶</span>
+        <div class="row-between" style="flex:1; gap:8px;">
+          <span><strong>${esc(contact.name)}</strong>${archivedTag}<span class="r-note-tag">${noteTag}</span></span>
+          <span class="muted">${esc(contact.email || contact.phone || 'no email/phone on file')}</span>
+        </div>
       </div>
-      <div class="form-grid" style="margin-top:8px;">
-        <div class="field field-wide"><label>Personal note (shown alongside the announcement)</label><textarea class="r-note">${esc(contact.companion_note || '')}</textarea></div>
+      <div class="r-body" style="display:none; margin-top:10px;">
+        <div class="form-grid">
+          <div class="field field-wide"><label>Personal note (shown alongside the announcement)</label><textarea class="r-note">${esc(contact.companion_note || '')}</textarea></div>
+        </div>
+        <div style="margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <button class="btn btn-sm r-save-note">Save note</button>
+          <button class="btn btn-primary btn-sm r-prepare">Prepare link</button>
+          <span class="r-note-saved muted"></span>
+        </div>
+        <div class="r-link" style="margin-top:8px;"></div>
       </div>
-      <div style="margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        <button class="btn btn-sm r-save-note">Save note</button>
-        <button class="btn btn-primary btn-sm r-prepare">Prepare link</button>
-        <span class="r-note-saved muted"></span>
-      </div>
-      <div class="r-link" style="margin-top:8px;"></div>
     </div>`;
 }
 
@@ -209,6 +218,14 @@ function renderRecipients() {
   els.recipients.querySelectorAll('[data-id]').forEach((row) => {
     const id = row.dataset.id;
     const contact = ctx.contacts.find((c) => c.id === id);
+    const header = row.querySelector('.r-header');
+    const body = row.querySelector('.r-body');
+    const arrow = row.querySelector('.r-arrow');
+    header.addEventListener('click', () => {
+      const open = body.style.display !== 'none';
+      body.style.display = open ? 'none' : 'block';
+      arrow.style.transform = open ? 'rotate(0deg)' : 'rotate(90deg)';
+    });
     row.querySelector('.r-save-note').addEventListener('click', () => saveNote(row, contact));
     row.querySelector('.r-prepare').addEventListener('click', () => prepareLink(row, contact));
   });
@@ -220,6 +237,9 @@ async function saveNote(row, contact) {
     const note = row.querySelector('.r-note').value.trim();
     const saved = await contactRepo.update(contact.id, { companion_note: note });
     contact.companion_note = saved.companion_note;
+    // Keep the collapsed header's "note" tag in sync with what was just saved.
+    const tag = row.querySelector('.r-note-tag');
+    if (tag) tag.innerHTML = (saved.companion_note || '').trim() ? ' <span class="badge badge-blue">note</span>' : '';
     const flag = row.querySelector('.r-note-saved');
     flag.textContent = 'Note saved.';
     setTimeout(() => { flag.textContent = ''; }, 2000);
@@ -245,6 +265,8 @@ async function prepareLink(row, contact) {
     if (note !== (contact.companion_note || '')) {
       const saved = await contactRepo.update(contact.id, { companion_note: note });
       contact.companion_note = saved.companion_note;
+      const tag = row.querySelector('.r-note-tag');
+      if (tag) tag.innerHTML = (saved.companion_note || '').trim() ? ' <span class="badge badge-blue">note</span>' : '';
     }
 
     const bundle = await buildBundle(type, contact);
