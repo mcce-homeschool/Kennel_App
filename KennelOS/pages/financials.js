@@ -364,24 +364,31 @@ function openAdjust(row, onSaved) {
 }
 
 // The per-component breakdown block (Earned / Anticipated columns), reused by the
-// Income summary and the Overview. Only components actually present are listed.
+// Income summary and the Overview. It is a SINGLE grid (not one grid per row) so
+// the two numeric columns share tracks and line up cleanly down the whole list.
+// Only components actually present are listed; `pick` is a non-cash line whose
+// estimate spans both numeric columns.
 function componentBreakdownHtml(byComponent) {
-  const rows = INCOME_COMPONENTS.filter((c) => byComponent.get(c.value)).map((c) => {
+  const present = INCOME_COMPONENTS.filter((c) => byComponent.get(c.value));
+  if (!present.length) return '';
+  const money = (v) => (v ? esc(fmtMoney(v)) : '<span class="faint">—</span>');
+  const bd = 'border-top:1px solid var(--border); padding:6px 0;';
+  const cells = present.map((c) => {
     const acc = byComponent.get(c.value);
-    const isPick = c.value === 'pick';
-    const right = isPick
-      ? `<span class="faint">${esc(fmtMoney(acc.pick))} est.</span>`
-      : `<span>${acc.earned ? esc(fmtMoney(acc.earned)) : '<span class="faint">—</span>'}</span>
-         <span>${acc.anticipated ? esc(fmtMoney(acc.anticipated)) : '<span class="faint">—</span>'}</span>`;
-    return `<li style="display:grid; grid-template-columns:1fr auto auto; gap:16px; padding:6px 0; border-top:1px solid var(--border);">
-      <span>${badge(INCOME_COMPONENTS, c.value)}</span>${right}
-    </li>`;
+    if (c.value === 'pick') {
+      return `<div style="${bd}">${badge(INCOME_COMPONENTS, c.value)}</div>
+        <div class="faint" style="${bd} grid-column:2 / span 2; text-align:right;">${esc(fmtMoney(acc.pick))} est.</div>`;
+    }
+    return `<div style="${bd}">${badge(INCOME_COMPONENTS, c.value)}</div>
+      <div style="${bd} text-align:right;">${money(acc.earned)}</div>
+      <div style="${bd} text-align:right;">${money(acc.anticipated)}</div>`;
   }).join('');
-  if (!rows) return '';
-  return `
-    <li style="display:grid; grid-template-columns:1fr auto auto; gap:16px; padding:6px 0; font-size:12px;" class="muted">
-      <span></span><span>Earned</span><span>Anticipated</span>
-    </li>${rows}`;
+  return `<div style="display:grid; grid-template-columns:1fr auto auto; column-gap:16px; margin-top:12px;">
+    <div></div>
+    <div class="muted" style="font-size:12px; text-align:right;">Earned</div>
+    <div class="muted" style="font-size:12px; text-align:right;">Anticipated</div>
+    ${cells}
+  </div>`;
 }
 
 function renderIncomeSummary(rows) {
@@ -397,7 +404,7 @@ function renderIncomeSummary(rows) {
       </div>
     </div>
     <p class="muted" style="margin:4px 0 0; font-size:13px;">Across ${rows.length} record${rows.length === 1 ? '' : 's'} (active only).${totals.pick ? ` Plus ${esc(fmtMoney(totals.pick))} estimated non-cash pick value.` : ''}</p>
-    ${breakdown ? `<ul class="linked-list" style="margin:12px 0 0; padding:0; list-style:none;">${breakdown}</ul>` : ''}`;
+    ${breakdown}`;
 }
 
 // One income box (Earned or Anticipated) — its own card, table, filters, and CSV
@@ -498,7 +505,10 @@ async function initIncome() {
 // ("Anticipated income"); combined with `grid-auto-rows: 1fr` on the container
 // (initOverview), all four tiles render at identical size.
 function tile(label, value, tone) {
-  return `<div class="card" style="display:flex; flex-direction:column; justify-content:center; text-align:center; padding:16px;">
+  // margin:0 overrides the global `.card + .card { margin-top:16px }`, which would
+  // otherwise push tiles 2–4 down inside their grid cells and render them shorter.
+  // height:100% + the grid's align-items:stretch makes all four fill equal cells.
+  return `<div class="card" style="margin:0; height:100%; box-sizing:border-box; display:flex; flex-direction:column; justify-content:center; text-align:center; padding:16px;">
     <div class="muted" style="font-size:12px; text-transform:uppercase; letter-spacing:.04em; min-height:2.6em; display:flex; align-items:center; justify-content:center;">${esc(label)}</div>
     <div style="font-size:24px; font-weight:700; padding-top:6px; ${tone ? `color:var(--${tone});` : ''}">${esc(value)}</div>
   </div>`;
@@ -538,7 +548,7 @@ async function initOverview() {
       <section style="flex:1; min-width:260px;">
         <div class="row-between" style="align-items:baseline;"><h2 style="margin:0;">Income</h2>
           <a class="btn btn-sm" href="financials.html?view=income">View →</a></div>
-        <ul class="linked-list" style="margin:12px 0 0; padding:0; list-style:none;">${incomeBreak || '<li class="muted" style="padding:8px 0;">No income recorded yet.</li>'}</ul>
+        ${incomeBreak || '<p class="muted" style="margin:12px 0 0;">No income recorded yet.</p>'}
       </section>
       <section style="flex:1; min-width:260px;">
         <div class="row-between" style="align-items:baseline;"><h2 style="margin:0;">Expenses</h2>
