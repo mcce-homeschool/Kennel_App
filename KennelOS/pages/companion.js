@@ -199,6 +199,7 @@ function recipientRow(contact) {
         </div>
         <div style="margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           <button class="btn btn-sm r-save-note">Save note</button>
+          <button class="btn btn-sm r-preview">Preview</button>
           <button class="btn btn-primary btn-sm r-prepare">Prepare link</button>
           <span class="r-note-saved muted"></span>
         </div>
@@ -227,6 +228,7 @@ function renderRecipients() {
       arrow.style.transform = open ? 'rotate(0deg)' : 'rotate(90deg)';
     });
     row.querySelector('.r-save-note').addEventListener('click', () => saveNote(row, contact));
+    row.querySelector('.r-preview').addEventListener('click', () => previewMessage(row, contact));
     row.querySelector('.r-prepare').addEventListener('click', () => prepareLink(row, contact));
   });
 }
@@ -253,26 +255,80 @@ function channelBody(kennelName, url) {
   return `${opener}\n\n${url}`;
 }
 
+// Persist any unsaved note, build the point-in-time bundle for the active tab,
+// and derive the shared send artifacts: the compressed hash, the recipient URL,
+// and the channel body text. Both "Prepare link" and "Preview" run through this,
+// so the preview is byte-for-byte what a send would produce.
+async function buildSendArtifacts(row, contact) {
+  // Bundle type is the active package tab — no per-row picker anymore.
+  const type = activeType;
+  // Persist any unsaved note first so the bundle reflects what's on screen.
+  const note = row.querySelector('.r-note').value.trim();
+  if (note !== (contact.companion_note || '')) {
+    const saved = await contactRepo.update(contact.id, { companion_note: note });
+    contact.companion_note = saved.companion_note;
+    const tag = row.querySelector('.r-note-tag');
+    if (tag) tag.innerHTML = (saved.companion_note || '').trim() ? ' <span class="badge badge-blue">note</span>' : '';
+  }
+
+  const bundle = await buildBundle(type, contact);
+  const hash = compressToEncodedURIComponent(JSON.stringify(bundle));
+  const url = `${SHELL_URL}#${hash}`;
+  const bodyText = channelBody(bundle.kennelName, url);
+  return { bundle, hash, url, bodyText };
+}
+
+// Preview modal: the exact message this recipient will receive — the SMS/email
+// body text, and a live render of the page it links to. The page is the REAL
+// recipient shell (companion-view.html) loaded in an iframe off the same hash a
+// send would carry, so the preview can never drift from what actually renders.
+// Opening it sends nothing; it's a local render of the just-built bundle.
+function openPreviewModal({ bodyText, url, hash, updatedAt }) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  // Wider than the default modal so the shell's 680px column renders without a
+  // horizontal scrollbar; the iframe is the same static file the recipient opens.
+  overlay.innerHTML = `
+    <div class="modal" role="dialog" aria-modal="true" style="max-width:820px;">
+      <div class="row-between" style="align-items:flex-start; gap:12px;">
+        <h2 style="margin:0;">Message preview</h2>
+        <button class="btn btn-sm" id="pv-close">Close</button>
+      </div>
+      <p class="muted" style="margin:6px 0 12px;">Exactly what this recipient receives — the message text, and the page it links to. Opening this preview sends nothing.</p>
+      <div class="field">
+        <label>Message text (email &amp; SMS body)</label>
+        <textarea readonly rows="4" onclick="this.select()">${esc(bodyText)}</textarea>
+      </div>
+      <div class="field" style="margin-top:10px;">
+        <label>Recipient's page</label>
+        <iframe title="Companion page preview" style="width:100%; height:66vh; border:1px solid var(--border); border-radius:8px; background:#fff;"></iframe>
+        <span class="field-hint">Snapshot as of now (${esc(new Date(updatedAt).toLocaleString())}). Payload ${hash.length} chars.</span>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  // Set src after mount so the shell reads the hash and renders on load.
+  overlay.querySelector('iframe').src = url;
+  const done = () => overlay.remove();
+  overlay.querySelector('#pv-close').addEventListener('click', done);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) done(); });
+}
+
+async function previewMessage(row, contact) {
+  clearError();
+  try {
+    const { bundle, hash, url, bodyText } = await buildSendArtifacts(row, contact);
+    openPreviewModal({ bodyText, url, hash, updatedAt: bundle.updatedAt });
+  } catch (e) {
+    showError(e.message || String(e));
+  }
+}
+
 async function prepareLink(row, contact) {
   clearError();
   const linkBox = row.querySelector('.r-link');
   linkBox.innerHTML = `<span class="muted">Building…</span>`;
   try {
-    // Bundle type is the active package tab — no per-row picker anymore.
-    const type = activeType;
-    // Persist any unsaved note first so the bundle reflects what's on screen.
-    const note = row.querySelector('.r-note').value.trim();
-    if (note !== (contact.companion_note || '')) {
-      const saved = await contactRepo.update(contact.id, { companion_note: note });
-      contact.companion_note = saved.companion_note;
-      const tag = row.querySelector('.r-note-tag');
-      if (tag) tag.innerHTML = (saved.companion_note || '').trim() ? ' <span class="badge badge-blue">note</span>' : '';
-    }
-
-    const bundle = await buildBundle(type, contact);
-    const hash = compressToEncodedURIComponent(JSON.stringify(bundle));
-    const url = `${SHELL_URL}#${hash}`;
-    const bodyText = channelBody(bundle.kennelName, url);
+    const { bundle, hash, url, bodyText } = await buildSendArtifacts(row, contact);
 
     const overSms = hash.length > MAX_SMS_HASH_LEN;
     const overEmail = hash.length > MAX_EMAIL_HASH_LEN;
