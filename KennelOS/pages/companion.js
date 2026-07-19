@@ -1,8 +1,16 @@
 // companion.js — the Companion Messaging console: the ONE centralized place to
 // pre-configure the share-out messaging and send links.
 //
+// The page works ONE package type at a time, chosen by the ?type= seg-tabs
+// (like the Contacts group tabs). The active type scopes everything: the single
+// template card shown, the filter blurb, the recipients that appear, and the
+// bundle "Prepare link" builds. Membership per type: prospective = an active
+// waiting-list status; family = an open (non-terminal) sale; partner = a current
+// stud service / active lease / co-own / other contract. A contact can appear in
+// more than one package — that's expected.
+//
 // Two layers (see settings.js): Layer 1 is the per-type header copy (kennel
-// identity + intro + announcement), edited in the "Message templates" cards.
+// identity + intro + announcement), edited in the "Message template" card.
 // Layer 2 is Contact.companion_note, a per-recipient personal line editable
 // inline in the Recipients table, shown alongside the broadcast announcement
 // (not an override). "Prepare link" builds a fresh point-in-time bundle through the
@@ -18,7 +26,7 @@ import {
 } from '../data/settings.js';
 import { buildBundle } from '../data/companionExport.js';
 import { compressToEncodedURIComponent } from '../vendor/lz-string.min.mjs';
-import { esc } from '../assets/ui.js';
+import { esc, param, todayYMD } from '../assets/ui.js';
 
 // Payload ceilings for the data-in-hash transport (brief §6.1). SMS is the weak
 // link — long URLs get truncated/split by some gateways; mail clients tolerate
@@ -32,17 +40,52 @@ const SHELL_URL = new URL('../companion-view.html', import.meta.url).href;
 
 const els = {
   error: document.getElementById('page-error'),
+  blurb: document.getElementById('filter-blurb'),
+  tabs: document.getElementById('companion-type-tabs'),
   templates: document.getElementById('templates'),
   recipients: document.getElementById('recipients'),
   showArchived: document.getElementById('show-archived')
 };
 
+// The active package type drives everything on the page — which template card
+// shows, which contacts appear as recipients, and the bundle type "Prepare
+// link" builds. Read from ?type= (like the Contacts group tabs); default to the
+// first type when absent/unknown.
+const activeType = COMPANION_TYPES.includes(param('type')) ? param('type') : COMPANION_TYPES[0];
+
+// A sale is "open" until it reaches one of these terminal states — a current
+// family is one with a sale that is still in flight (reserved / deposit paid /
+// paid in full).
+const CLOSED_SALE_STATUSES = new Set(['delivered', 'returned', 'cancelled']);
+
 const ctx = {
   contacts: [],
-  salesByBuyer: new Map(),
-  partnerServiceCount: new Map(),
-  contractCountByContact: new Map()
+  // Contact-id membership sets, one per package type, recomputed on each load.
+  openSaleBuyerIds: new Set(),
+  partnerIds: new Set()
 };
+
+// Who lands in each package's recipient list. Same contact can satisfy more
+// than one — that's expected (a current family can also be a co-own partner).
+function inActiveType(contact) {
+  switch (activeType) {
+    case 'prospective': return contact.waitlist_status === 'active';
+    case 'family': return ctx.openSaleBuyerIds.has(contact.id);
+    case 'partner': return ctx.partnerIds.has(contact.id);
+    default: return false;
+  }
+}
+
+// The plain-language explanation shown above the template card, so the owner
+// knows exactly why a contact is (or isn't) in this package's list.
+function filterBlurb() {
+  switch (activeType) {
+    case 'prospective': return 'Contacts with an active waiting-list status.';
+    case 'family': return 'Contacts with an open sale — reserved, deposit paid, or paid in full (not delivered, returned, or cancelled).';
+    case 'partner': return 'Contacts on a current stud service (whose return date hasn’t passed), an active lease (whose end date hasn’t passed), or any co-own / other contract.';
+    default: return '';
+  }
+}
 
 function showError(msg) { els.error.innerHTML = `<div class="inline-error">${esc(msg)}</div>`; }
 function clearError() { els.error.innerHTML = ''; }
@@ -64,8 +107,24 @@ function templateCard(type) {
     </div>`;
 }
 
+// Highlight the active package tab (matches the Contacts group-tabs pattern).
+function renderTabs() {
+  els.tabs.querySelectorAll('.seg-tab').forEach((tab) => {
+    const tabType = new URL(tab.href).searchParams.get('type');
+    const isActive = tabType === activeType;
+    tab.classList.toggle('active', isActive);
+    if (isActive) tab.setAttribute('aria-current', 'page'); else tab.removeAttribute('aria-current');
+  });
+}
+
+function renderBlurb() {
+  els.blurb.innerHTML =
+    `<p class="muted" style="margin:0 0 12px;"><strong>${esc(companionTypeLabel(activeType))}:</strong> ${esc(filterBlurb())}</p>`;
+}
+
+// Only the active package type's template card renders — one audience at a time.
 function renderTemplates() {
-  els.templates.innerHTML = COMPANION_TYPES.map(templateCard).join('');
+  els.templates.innerHTML = templateCard(activeType);
   els.templates.querySelectorAll('[data-type]').forEach((card) => {
     const type = card.dataset.type;
     card.querySelector('.t-save').addEventListener('click', () => {
@@ -86,53 +145,40 @@ function renderTemplates() {
 // --- Recipients: type suggestion, note editing, link prep -----------------
 async function loadData() {
   const includeArchived = els.showArchived.checked;
-  const [contacts, sales] = await Promise.all([
+  const today = todayYMD();
+  const [contacts, sales, studServices, contracts] = await Promise.all([
     contactRepo.getAll({ includeArchived }),
-    saleRepo.getAll({ includeArchived: true })
-  ]);
-  ctx.contacts = contacts.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true }));
-
-  ctx.salesByBuyer = new Map();
-  for (const s of sales) {
-    if (s.is_archived) continue;
-    if (!ctx.salesByBuyer.has(s.buyer_contact_id)) ctx.salesByBuyer.set(s.buyer_contact_id, 0);
-    ctx.salesByBuyer.set(s.buyer_contact_id, ctx.salesByBuyer.get(s.buyer_contact_id) + 1);
-  }
-  // Partner signals: a stud service where they're the partner, or a
-  // lease/co_own/other contract naming them as counterparty.
-  const [studServices, contracts] = await Promise.all([
+    saleRepo.getAll({ includeArchived: true }),
     studServiceRepo.getAll({ includeArchived: true }),
     contractRepo.getAll({ includeArchived: true })
   ]);
-  ctx.partnerServiceCount = new Map();
+  ctx.contacts = contacts.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true }));
+
+  // Current families: buyers with a sale that hasn't reached a terminal state.
+  ctx.openSaleBuyerIds = new Set();
+  for (const s of sales) {
+    if (s.is_archived || !s.buyer_contact_id) continue;
+    if (s.status && !CLOSED_SALE_STATUSES.has(s.status)) ctx.openSaleBuyerIds.add(s.buyer_contact_id);
+  }
+
+  // Partners: a stud service whose return date hasn't passed (empty or future),
+  // a lease whose end date hasn't passed, or any co-own / other contract.
+  ctx.partnerIds = new Set();
   for (const ss of studServices) {
     if (ss.is_archived || !ss.partner_contact_id) continue;
-    ctx.partnerServiceCount.set(ss.partner_contact_id, (ctx.partnerServiceCount.get(ss.partner_contact_id) || 0) + 1);
+    if (!ss.returned_date || ss.returned_date >= today) ctx.partnerIds.add(ss.partner_contact_id);
   }
-  ctx.contractCountByContact = new Map();
   for (const c of contracts) {
     if (c.is_archived || !c.related_contact_id) continue;
-    ctx.contractCountByContact.set(c.related_contact_id, (ctx.contractCountByContact.get(c.related_contact_id) || 0) + 1);
+    if (c.contract_type === 'lease') {
+      if (!c.lease_end_date || c.lease_end_date >= today) ctx.partnerIds.add(c.related_contact_id);
+    } else if (c.contract_type === 'co_own' || c.contract_type === 'other') {
+      ctx.partnerIds.add(c.related_contact_id);
+    }
   }
-}
-
-function suggestType(contact) {
-  if (ctx.salesByBuyer.get(contact.id)) return 'family';
-  if (ctx.partnerServiceCount.get(contact.id) || ctx.contractCountByContact.get(contact.id)) return 'partner';
-  const roles = contact.contact_type || [];
-  if (roles.includes('buyer') || (contact.waitlist_status && contact.waitlist_status !== 'none')) return 'prospective';
-  if (roles.includes('breeder')) return 'partner';
-  return 'prospective';
-}
-
-function typeOptions(selected) {
-  return COMPANION_TYPES
-    .map((t) => `<option value="${esc(t)}"${t === selected ? ' selected' : ''}>${esc(companionTypeLabel(t))}</option>`)
-    .join('');
 }
 
 function recipientRow(contact) {
-  const suggested = suggestType(contact);
   const archivedTag = contact.is_archived ? ' <span class="badge badge-gray">Archived</span>' : '';
   return `
     <div class="card" data-id="${esc(contact.id)}" style="margin-top:12px;">
@@ -141,7 +187,6 @@ function recipientRow(contact) {
         <span class="muted">${esc(contact.email || contact.phone || 'no email/phone on file')}</span>
       </div>
       <div class="form-grid" style="margin-top:8px;">
-        <div class="field"><label>Bundle type</label><select class="r-type">${typeOptions(suggested)}</select></div>
         <div class="field field-wide"><label>Personal note (shown alongside the announcement)</label><textarea class="r-note">${esc(contact.companion_note || '')}</textarea></div>
       </div>
       <div style="margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
@@ -154,11 +199,13 @@ function recipientRow(contact) {
 }
 
 function renderRecipients() {
-  if (!ctx.contacts.length) {
-    els.recipients.innerHTML = `<div class="empty-state">No contacts yet.</div>`;
+  const matches = ctx.contacts.filter(inActiveType);
+  if (!matches.length) {
+    els.recipients.innerHTML =
+      `<div class="empty-state">No ${esc(companionTypeLabel(activeType).toLowerCase())} match this package right now.</div>`;
     return;
   }
-  els.recipients.innerHTML = ctx.contacts.map(recipientRow).join('');
+  els.recipients.innerHTML = matches.map(recipientRow).join('');
   els.recipients.querySelectorAll('[data-id]').forEach((row) => {
     const id = row.dataset.id;
     const contact = ctx.contacts.find((c) => c.id === id);
@@ -191,7 +238,8 @@ async function prepareLink(row, contact) {
   const linkBox = row.querySelector('.r-link');
   linkBox.innerHTML = `<span class="muted">Building…</span>`;
   try {
-    const type = row.querySelector('.r-type').value;
+    // Bundle type is the active package tab — no per-row picker anymore.
+    const type = activeType;
     // Persist any unsaved note first so the bundle reflects what's on screen.
     const note = row.querySelector('.r-note').value.trim();
     if (note !== (contact.companion_note || '')) {
@@ -243,6 +291,8 @@ async function refreshRecipients() {
 }
 
 async function main() {
+  renderTabs();
+  renderBlurb();
   renderTemplates();
   els.showArchived.addEventListener('change', refreshRecipients);
   await refreshRecipients();
