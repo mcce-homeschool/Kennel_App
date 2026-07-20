@@ -488,7 +488,11 @@ table, no schema, no `referenceRegistry.js` entry. Three modules: **`data/wizard
 being active, `isIntroStep()`, and the `HIGHLIGHT_STEPS` list the "Step n of N" counter uses),
 **`data/wizardSteps.js`** (the static ordered `WIZARD_STEPS` catalog — data only, like
 `vocab.js`), and **`assets/wizardUI.js`** (the box-shadow spotlight overlay, the cards, the
-nav "Take the tour" entry, and the free-navigation "Resume tour" pill). The catalog has two
+nav "Take the tour" entry, and the free-navigation "Resume tour" pill). The tour can also be
+relaunched from the **Import / Export** page's "Guided tour" section — a button that calls
+`restartWizard()` + `runWizardStep()` (its opening card is a page-agnostic intro, so it appears
+in place); it and the nav entry share the `isTourAvailable()` gate, so both hide once the sample
+data is cleared. The catalog has two
 step **kinds**: an **intro** step (`kind: 'tour-intro'` or `'hub-intro'`) is a centered,
 page-agnostic card with a single forward button (`step.button`, e.g. "Explore Today Hub →")
 — one tour-intro leads the tour, and a hub-intro precedes each hub's stops; a **highlight**

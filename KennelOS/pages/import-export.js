@@ -6,6 +6,8 @@ import { promptClearSampleData } from '../assets/sampleDataUI.js';
 import { hasMyKennelSetup, getMyKennelName } from '../data/kennelSetup.js';
 import { showKennelSetupModal, maybeShowKennelSetupPrompt } from '../assets/kennelSetupUI.js';
 import { getResetCounts, resetApp } from '../data/appReset.js';
+import { isTourAvailable, restartWizard } from '../data/wizardState.js';
+import { runWizardStep } from '../assets/wizardUI.js';
 import { esc, confirmModal } from '../assets/ui.js';
 
 const msg = document.getElementById('page-msg');
@@ -104,12 +106,36 @@ document.getElementById('btn-clear-sample').addEventListener('click', async () =
   if (result?.cleared) {
     flash(`Sample data cleared — ${result.counts.dogs} dog(s), ${result.counts.events} event(s), ${result.counts.contacts} contact(s), ${result.counts.kennels} kennel(s) removed.`);
     renderSampleDataStatus();
+    renderTourStatus(); // the tour rides the sample data, so it's gone now too
     renderKennelSetupStatus();
     maybeShowKennelSetupPrompt(); // offer it right away, same as a fresh page load would
   }
 });
 
 renderSampleDataStatus();
+
+// Guided tour — the tour anchors to specific sample records, so it's only
+// offerable while the "Thornfield Kennels" sample data is loaded (same gate as
+// the nav "more" menu's tour entry). The button restarts it from the top; the
+// opening card is a page-agnostic intro, so it just appears right here.
+function renderTourStatus() {
+  const status = document.getElementById('tour-status');
+  const btn = document.getElementById('btn-tour');
+  if (isTourAvailable()) {
+    status.textContent = 'Walk through KennelOS’s major features using the sample data. Starts from the beginning.';
+    btn.style.display = '';
+  } else {
+    status.textContent = 'Available only while the “Thornfield Kennels” sample data is loaded.';
+    btn.style.display = 'none';
+  }
+}
+
+document.getElementById('btn-tour').addEventListener('click', () => {
+  restartWizard();
+  runWizardStep();
+});
+
+renderTourStatus();
 
 async function renderKennelSetupStatus() {
   const status = document.getElementById('kennel-setup-status');
