@@ -84,9 +84,9 @@ async function main() {
 
   const record = source === 'sale' ? await saleRepo.getById(id) : await studServiceRepo.getById(id);
   if (!record) { root.innerHTML = '<p class="inv-empty">Record not found.</p>'; return; }
-  document.getElementById('inv-back').href = source === 'sale'
-    ? `sale.html?id=${encodeURIComponent(id)}`
-    : `stud-service.html?id=${encodeURIComponent(id)}`;
+  // The back button keeps its HTML default (financials.html?view=income) to
+  // match its "← Back to Financials" label — the generator always opens this
+  // page from the Financials hub.
 
   const dogId = source === 'sale' ? record.dog_id : record.our_dog_id;
   const recipientId = source === 'sale' ? record.buyer_contact_id : record.partner_contact_id;
