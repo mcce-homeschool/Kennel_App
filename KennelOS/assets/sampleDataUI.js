@@ -1,47 +1,10 @@
-// sampleDataUI.js — first-run "explore vs. blank" prompt and the persistent
-// sample-data banner (Sample Data & Reset brief v1, §4). Shared by app.js
+// sampleDataUI.js — the persistent sample-data banner and the shared
+// "Clear Sample Data" flow (Sample Data & Reset brief v1, §4). Shared by app.js
 // (every page) and pages/import-export.js (the "Clear Sample Data" control).
-import {
-  shouldOfferFirstRunPrompt, hasSampleData, seedSampleData, declineSampleData, clearSampleData
-} from '../data/sampleData.js';
+// The first-run "explore vs. blank" choice moved into assets/onboardingUI.js;
+// sample data is now seeded only as part of taking the guided tour.
+import { hasSampleData, clearSampleData } from '../data/sampleData.js';
 import { alertModal, confirmModal } from './ui.js';
-
-// Shown once, before anything else, when the browser has never made a choice.
-// Resolves 'seeded' | 'blank' | null (null = prompt wasn't offered at all) so
-// callers can chain the kennel-setup wizard onto the "blank" branch.
-export async function maybeShowFirstRunPrompt() {
-  if (!(await shouldOfferFirstRunPrompt())) return null;
-
-  return new Promise((resolve) => {
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.innerHTML = `
-      <div class="modal" role="dialog" aria-modal="true" style="max-width:480px; text-align:center;">
-        <h2 style="margin-top:0;">🐾 Welcome to KennelOS</h2>
-        <p class="muted">This app is empty. Would you like to explore it with a small sample kennel
-          (dogs, contacts, a pedigree, and a health timeline already filled in), or start blank with
-          your own records?</p>
-        <div class="form-actions" style="justify-content:center;">
-          <button class="btn btn-primary" data-act="seed">Explore with sample data</button>
-          <button class="btn" data-act="blank">Start with a blank kennel</button>
-        </div>
-        <p class="faint" style="margin-bottom:0;">Sample data can be cleared any time from Import / Export.</p>
-      </div>`;
-    document.body.appendChild(overlay);
-
-    overlay.querySelector('[data-act="blank"]').addEventListener('click', () => {
-      declineSampleData();
-      overlay.remove();
-      resolve('blank');
-    });
-    overlay.querySelector('[data-act="seed"]').addEventListener('click', async (e) => {
-      e.target.disabled = true;
-      e.target.textContent = 'Setting up…';
-      await seedSampleData();
-      location.reload(); // never resolves — the reload takes over
-    });
-  });
-}
 
 // Persistent small banner, injected right after the nav on every page, shown
 // only while sample data is loaded.

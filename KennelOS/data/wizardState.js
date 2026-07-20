@@ -30,8 +30,18 @@ export function currentStep() {
   return WIZARD_STEPS[getWizardStepIndex()] || null;
 }
 
+// An intro step (tour-intro / hub-intro) is a centered, page-agnostic card with a
+// single forward button; a highlight step spotlights a real element on its page.
+export function isIntroStep(step) {
+  return step?.kind === 'tour-intro' || step?.kind === 'hub-intro';
+}
+
+// The highlight steps in order — used for the "Step n of N" counter, which counts
+// only the real feature stops, not the intro cards between hubs.
+export const HIGHLIGHT_STEPS = WIZARD_STEPS.filter((s) => !isIntroStep(s));
+
 export function stepsForPage(pageKey) {
-  return WIZARD_STEPS.filter((s) => s.page.split('?')[0] === pageKey);
+  return WIZARD_STEPS.filter((s) => s.page && s.page.split('?')[0] === pageKey);
 }
 
 export function startWizard() {

@@ -519,31 +519,49 @@ table.data tr.row-detail .dl-meta { margin: 0; }
   z-index: 10000;
   background: transparent;
 }
+/* Intro cards and the missing-target fallback have nothing spotlit, so the dim
+   comes from the overlay itself rather than a target's box-shadow. */
+.wizard-overlay-dim { background: rgba(0, 0, 0, 0.6); }
 .wizard-spotlight-target {
   position: relative;
   z-index: 10001;
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6), 0 0 0 3px var(--accent) inset;
   border-radius: var(--radius-sm);
 }
-.wizard-tooltip {
-  position: fixed;
+/* The card shell: a header (step count + title), a scrollable body, and the
+   action row. Kept compact and — for highlight steps — pinned to the top so it
+   never covers the feature it describes (the target is scrolled just below it). */
+.wizard-card {
   z-index: 10002;
-  max-width: 320px;
+  display: flex;
+  flex-direction: column;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 16px;
+  padding: 16px 18px;
 }
-.wizard-tooltip-centered {
+.wizard-card-top {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(760px, calc(100vw - 24px));
+  max-height: 60vh;
+}
+.wizard-card-centered {
+  position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  width: min(520px, calc(100vw - 24px));
+  max-height: 80vh;
 }
+.wizard-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .wizard-step-count { color: var(--text-muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
 .wizard-tooltip-title { margin: 4px 0 8px; }
 .wizard-tooltip-body { margin: 0 0 14px; color: var(--text); }
-.wizard-tooltip-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.wizard-tooltip-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 .wizard-resume-pill {
   position: fixed;
   right: 20px;
@@ -559,3 +577,33 @@ table.data tr.row-detail .dl-meta { margin: 0; }
   cursor: pointer;
 }
 .wizard-resume-pill:hover { background: var(--accent-dark); }
+
+/* --- First-run onboarding cards (assets/onboardingUI.js) -----------------
+   A dimmed, non-dismissible overlay (no backdrop close) stacked above the modal
+   layer, reusing the modal look. Shown once on a fresh install. */
+.onboard-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(18, 26, 38, 0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 16px;
+  overflow-y: auto;
+}
+.onboard-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 40px rgba(15, 25, 40, 0.28);
+  padding: 24px;
+  width: 100%;
+  max-width: 520px;
+}
+.onboard-title { margin: 0 0 12px; }
+.onboard-subtitle { margin: 0 0 8px; }
+.onboard-body p { color: var(--text); }
+.onboard-list { margin: 12px 0; padding-left: 20px; }
+.onboard-list li { margin: 6px 0; }
+.onboard-rule { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+.onboard-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
