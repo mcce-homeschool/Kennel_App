@@ -1,7 +1,9 @@
 // wizardSteps.js — the guided tour's ordered step catalog (Wizard Runtime Spec
-// v1 §3), authored from Tutorial_Coverage_Matrix_v1.md §F (hub order) and §B
-// (in-hub order + per-stop teaching copy). Data only, like vocab.js — no DOM,
-// no logic. wizardState.js and wizardUI.js both import WIZARD_STEPS from here.
+// v1 §3). Hub order and in-hub order follow Tutorial_Coverage_Matrix_v1.md §F/§B;
+// the per-stop teaching copy tracks the KennelOS Tour Guide (user-facing wording,
+// plain text — cards render escaped, so no markdown/bullets/bold here). Data only,
+// like vocab.js — no DOM, no logic. wizardState.js and wizardUI.js both import
+// WIZARD_STEPS from here.
 //
 // Each step:
 //   id         stable string id (never array position).
@@ -30,15 +32,14 @@
 //              that may start collapsed — reuses the delegated card-toggle
 //              listener. dog/litter/etc. sections default to expanded when the
 //              seed populates them, so they need no reveal.
-//   title/body one idea per stop, from the matrix's "Teaches" column. Anchor
-//              records are named inline in the copy (spec §3.1).
+//   title/body one idea per stop, from the Tour Guide copy.
 
 export const WIZARD_STEPS = [
   // --- Tour intro (centered card, single button) -------------------------
   {
     id: 'tour-intro', kind: 'tour-intro', button: 'Start the tour →',
     title: 'Meet Thornfield Kennels',
-    body: 'To show you around with something real to look at, we’ve loaded a fictional sample kennel — Thornfield Kennels — a mature, operating program with several dogs, litters and records already filled in. Nothing here is yours; you can clear it any time from Import / Export. Let’s take a look.'
+    body: 'We’ve loaded a fictional sample kennel — Thornfield Kennels — with several dogs, litters and records already filled in so you have something real to explore. Nothing here is yours: once you finish the tour you can delete the sample data. If you leave the tour to explore on your own, a yellow “Clear sample data” banner stays at the top — click it whenever you’re ready to reset to a blank slate and load your own program.'
   },
 
   // --- Today -------------------------------------------------------------
@@ -51,233 +52,245 @@ export const WIZARD_STEPS = [
     id: 'today-reminders', hub: 'Today', page: 'today.html',
     selector: '[data-card="reminders"]', beforeShow: { openCard: 'reminders' },
     title: 'Reminders',
-    body: 'Reminders live on events, bucketed overdue / due-soon / upcoming — Juniper is overdue, Percy due soon, Birch upcoming. “Snooze” just edits the reminder date; there is no separate snooze field.'
+    body: 'Reminders track recurring events — like annual vet visits — so you know when the next one is due. Any event you give a future reminder date appears here automatically as the date gets close. From here you can log the new event, snooze the reminder for a while, or dismiss it if you no longer plan another occurrence.'
   },
   {
     id: 'today-active-litters', hub: 'Today', page: 'today.html',
     selector: '[data-card="active-litters"]', beforeShow: { openCard: 'active-litters' },
     title: 'Active litters',
-    body: 'One block per litter with an available puppy, its roster ordered available → undecided → sold with a sold/total tally. The Autumn litter (Ivy × Gunnar) is 1 of 3 sold: Wren available, Aster undecided, Cedar placed.'
+    body: 'Active litters are the ones that still have puppies available for sale. Each shows a placed-vs-total count and a “New Sale” button to log a sale directly and keep things moving. Once every pup is placed or marked as keeping, the litter drops off this list.'
   },
   {
     id: 'today-due-outs', hub: 'Today', page: 'today.html',
     selector: '[data-card="upcoming"]', beforeShow: { openCard: 'upcoming' },
     title: 'Due outs & upcoming',
-    body: 'Future-dated events surface here — Cedar’s scheduled pickup, Percy’s vet visit. “Open →” deep-links straight into the event to edit it in place.'
+    body: 'Unlike reminders, due outs are events you’ve already scheduled — a puppy pickup next week, or an annual vet visit. Use “Open” to edit the details, and you can reschedule or delete an event. Each one drops off the list once its date has passed.'
   },
   {
     id: 'today-away', hub: 'Today', page: 'today.html',
     selector: '[data-card="board"]', beforeShow: { openCard: 'board' },
     title: 'Away from home',
-    body: 'Whereabouts is derived from boarding and in-person stud events — Birch is at Ellen’s in Burlington, the location read from the partner’s address. Tap the row to expand contact / drop-off / return.'
+    body: 'This shows where any dogs that aren’t at home currently are — being boarded, or studded out — so you always know where every dog in your program is at any given time.'
   },
   {
     id: 'today-overview', hub: 'Today', page: 'today.html',
     selector: '[data-card="overview"]', beforeShow: { openCard: 'overview' },
     title: 'Kennel overview',
-    body: 'Status tiles by dog status — including a live “For sale” tile (Clover). Deceased is a status, not an archive: an archived record leaves the roster, a deceased dog stays on it.'
+    body: 'A quick count of your entire program’s stock at a glance.'
   },
   {
     id: 'today-nudges', hub: 'Today', page: 'today.html',
     selector: '[data-card="nudges"]', beforeShow: { openCard: 'nudges' },
     title: 'Nudges',
-    body: 'Derived suggestions the app surfaces from your data — seven rules fire on this seed (Poppy is old enough to promote, Sage’s heat could become a pairing, …). Nothing changes until you act; Dismiss just hides one.'
+    body: 'Nudges are your companion for keeping information consistent across the app. It’s a set of rules that surface suggestions — like moving a grown dog from puppy to breeding status, or reopening a litter after a puppy sale is canceled or returned.'
   },
 
   // --- Dogs --------------------------------------------------------------
   {
     id: 'dogs-intro', kind: 'hub-intro', hub: 'Dogs', button: 'Explore Dogs Hub →',
     title: 'Dogs',
-    body: 'The Dogs hub is your complete roster — breeding stock, puppies and outside dogs — each with a rich profile: identity, health tests, pedigree, and a full event history.'
+    body: 'This is the heart and soul of your kennel — the dogs that make up your program. From this hub you manage your stock, record events, view pedigrees, and see at a glance what contracts each dog has taken part in.'
   },
   {
     id: 'dogs-buckets', hub: 'Dogs', page: 'dogs.html',
     selector: '#dogs-bucket-tabs',
     title: 'The dog roster',
-    body: 'One Dog table holds puppies, breeding stock and external dogs — the seg-tabs bucket them (puppies / breeding by sex / not-breeding by status / external). A life-stage change is a status update on the same record, never a new one.'
+    body: 'The roster lists your entire stock with key details on each dog, plus curated life-stage toggles to focus on dogs at a certain stage. Open any dog’s profile straight from here.'
+  },
+  {
+    id: 'dogs-external', hub: 'Dogs', page: 'dogs.html',
+    selector: '#dogs-bucket-tabs',
+    title: 'External dogs',
+    body: 'External dogs are relevant to your program but owned by someone else — dogs you stud with, or the parents of your own dogs. Create an external record for dogs you plan to breed with, switch a puppy to external after you’ve sold it, and archive dogs used only to fill out a pedigree so they don’t clutter the list.'
   },
   {
     id: 'dogs-filters', hub: 'Dogs', page: 'dogs.html',
     selector: '#dog-list',
-    title: 'Filter, sort, archive, export',
-    body: 'Filter by status / disposition / sex / ownership / breed, click a column to sort, toggle “Show archived” (archive ≠ delete — Willow is archived, not gone), and export the roster to CSV right from the hub.'
+    title: 'Filter, sort, archive, and export',
+    body: 'Apply custom filters and sorts to pull exactly the dogs you need. Turn on “Show archived” to see archived dogs — handy for bringing back one you thought you were done with — and export your dog list as a spreadsheet.'
   },
   {
     id: 'dog-identity', hub: 'Dogs', page: 'dog.html', anchor: 'juniper',
     selector: '#profile-body',
-    title: 'Dog profile — identity',
-    body: 'Juniper’s profile carries the full identity set: registered name, registry, registration number, microchip, colour/markings and a URL. Edit in place with the Edit button.'
+    title: 'Dog profile: identity',
+    body: 'Record a dog’s details here — registered name and number, colors, and a URL that links out to a photo album or the dog’s own web page. Click “Edit” to add, remove, or change anything in this section.'
   },
   {
     id: 'dog-ownership', hub: 'Dogs', page: 'dog.html', anchor: 'gunnar',
     selector: '#profile-body',
-    title: 'Ownership & external dogs',
-    body: 'Gunnar is an external dog owned by Dana Ruiz — an owner is required for external and leased dogs. His “Kennel” points at Meadow Ridge, an outside kennel: we track other people’s kennels too, so any dog can be linked to its kennel, yours or not. The same profile handles your own dogs and outside ones.'
+    title: 'Origin, breeder & ownership',
+    body: 'See and record where a dog came from and who owns it. Dogs you’ve bred show their litter of origin with your kennel prefilled as owner; for dogs you’ve purchased, set the breeder kennel from the dropdown; and for dogs you no longer own, mark them external and fill in the owner and kennel details below.'
   },
   {
     id: 'dog-disposition', hub: 'Dogs', page: 'dog.html', anchor: 'fern',
     selector: '#profile-body',
-    title: 'Disposition — keeping vs. offering',
-    body: 'Disposition (Fern is “available”) is a puppy-only field: it shows only while status is Puppy and clears once the dog grows past it. It feeds the prospective-families view — keeping, available, placed, or undecided.'
+    title: 'Disposition',
+    body: 'Disposition is for puppies only — it captures your plan for a pup you’ve bred or bought. Marking one “available” flags your intent to sell it and drives the tools that help you sell, like listing it for potential buyers on Companion share-outs.'
   },
   {
     id: 'dog-coi', hub: 'Dogs', page: 'dog.html', anchor: 'juniper',
     selector: '#recorded-coi-section',
     title: 'Recorded COI',
-    body: 'This is a user-attested value, never computed by the app — Juniper’s is recorded as genomic, with the method and source stored beside it. The method field is a combobox of common values.'
+    body: 'If you know a dog’s COI, record it here to help you make informed decisions about potential breeding partners. Note that KennelOS does not attempt to calculate COI itself.'
   },
   {
     id: 'dog-planned-tests', hub: 'Dogs', page: 'dog.html', anchor: 'juniper',
     selector: '#planned-tests-section',
     title: 'Planned tests',
-    body: 'An undated intention, not a result — unioned with your kennel’s preferred tests. “+ Plan a test” adds or copies one. It’s advisory: nothing here is a logged health-test event.'
+    body: 'Record the tests you intend to run if your kennel regularly does genetic and breed-specific testing (like JHC). Once you log a test in the dog’s event history, it drops off the planned list automatically on the next refresh.'
   },
   {
     id: 'dog-health-tests', hub: 'Dogs', page: 'dog.html', anchor: 'daisy',
     selector: '#health-tests-section',
     title: 'Health-test summary',
-    body: 'A read-only roll-up of logged test events — no inference, just what you recorded. Daisy carries all twelve health-relevant event types, so her summary shows the full spread.'
+    body: 'Because a dog’s event history can get long, this view pulls out just the health-testing events — so you can see at a glance which tests you’ve performed and their results.'
   },
   {
     id: 'dog-timeline', hub: 'Dogs', page: 'dog.html', anchor: 'percy',
     selector: '#timeline-section',
     title: 'Event history',
-    body: 'Every dated fact — vet visits, boarding, notes — goes through one timeline. Percy’s boarding stay is a span event (a start and an end date), distinct from an instant event; a 🔗 links any event to its expense. “+ Add Event” opens the shared event form.'
+    body: 'This is the full list of dated events a dog has been through — its entire history from whelping or acquisition onward. Add new events with the “Add Event” button.'
+  },
+  {
+    id: 'dog-add-event', hub: 'Dogs', page: 'dog.html', anchor: 'percy',
+    selector: '#timeline-section',
+    title: 'Adding new events',
+    body: 'Event fields adapt to the event type: some offer helpful dropdowns or auto-filled values, others suggest entries as you type (a health test offers your planned test suite). You can also log the cost of an event straight to your Expenses table from here.'
   },
   {
     id: 'dog-derived', hub: 'Dogs', page: 'dog.html', anchor: 'juniper',
     selector: '#pairings-section',
     title: 'Derived relationship panels',
-    body: 'Pairings, Litters, Sales, Stud Services and Contracts appear here only when relevant, and they are all derived queries — the reverse of a stored link, never a mirror field. Juniper’s pairings and litters are read live from those tables.'
+    body: 'See the pairings, litters, sales, stud services and contracts your dog is associated with, all gathered in one place.'
   },
   {
     id: 'dog-pedigree', hub: 'Dogs', page: 'dog.html', anchor: 'juniper',
     selector: '#pedigree-section',
     title: 'Pedigree & offspring',
-    body: 'Ancestry runs up (Ash, Willow); offspring runs down (Fern, Birch, Hazel) — and offspring is a derived query, depth-capped, not a stored list. “Open full view →” for the standalone pedigree page.'
+    body: 'An interactive, branching tree showing a dog’s pedigree, its offspring, and how the dogs in your program relate to each other. Open the full view to switch between related dogs seamlessly.'
   },
 
   // --- Breeding ----------------------------------------------------------
   {
     id: 'breeding-intro', kind: 'hub-intro', hub: 'Breeding', button: 'Explore Breeding Hub →',
     title: 'Breeding',
-    body: 'The Breeding hub follows the whole chain — pairings, heat cycles, litters, and the puppies they produce — all derived and linked together.'
+    body: 'This is where you run your breeding program — record your dogs’ pairings and litters, and produce new dog records for the puppies they yield.'
   },
   {
     id: 'breeding-chain', hub: 'Breeding', page: 'breeding.html',
     selector: '#breeding-body',
     title: 'The breeding chain',
-    body: 'One consolidated view of the pairing → litter → puppies chain, all derived. Five pairing cards show first; with six seeded, a “Show 1 more pairing” toggle appears (pagination lives only here). Litters without a recorded pairing list separately.'
+    body: 'Your view of every pairing and litter your program has logged. You’ll typically start by adding a female’s heat cycle, then add pairing plans, record the litter, and create records for the resulting puppies. The most recent records show first.'
   },
   {
     id: 'breeding-log-heat', hub: 'Breeding', page: 'breeding.html',
     selector: '#log-heat-btn',
     title: 'Log a heat cycle',
-    body: 'Logging a heat picks a dam, then opens the shared event form to record the heat_cycle event. Sage’s concluded heat is what drives the “heat → pairing” nudge back on Today.'
+    body: 'Add a heat cycle to a dog’s event history here. When it finishes you’ll get a nudge to record a pairing, successful or failed. Logging heat cycles helps you track skips and remember when to expect the next one.'
   },
   {
     id: 'pairing-profile', hub: 'Breeding', page: 'pairing.html', anchor: 'pairingP2',
     selector: '#profile-section',
     title: 'A pairing',
-    body: 'Juniper × Gunnar is a planned pairing. Sire ≠ dam is a hard block; a sex mismatch warns; and setting the planned date prefills the expected due date at +63 days. Its litter, timeline and expenses are all on this page.'
+    body: '“Add New Pairing” opens the pairing screen, where you choose the sire and dam, record the date of the first tie (planned or already passed) and the last observed tie, and track pregnancy updates — tie dates, ultrasounds, notes — with the Add event button.'
   },
   {
     id: 'litter-profile', hub: 'Breeding', page: 'litter.html', anchor: 'autumnLitter',
     selector: '#profile-section',
     title: 'A litter',
-    body: 'The Autumn litter is priced per sex ($2,800 M / $3,000 F) with per-sex deposits and an accept-deposits date that feeds the prospective bundle. Whelp date prefills estimated-ready at +56 days.'
+    body: 'Once a pairing is recorded, create a litter. The litter record holds the general details that apply to the whole whelping — whelp date, when you’ll start accepting deposits, the litter registration number, born-alive and born-deceased counts, and expected prices for male and female pups. Tip: give the litter a nickname to tell apart litters from the same dam.'
   },
   {
     id: 'litter-roster', hub: 'Breeding', page: 'litter.html', anchor: 'autumnLitter',
     selector: '#roster-section',
     title: 'Puppy roster',
-    body: 'The roster is derived — every Dog whose litter_id is this litter — not a stored list. “+ Add Puppy” / “+ Add N Puppies” create them; “+ Log event for whole litter” cascades one event (like a weight check) across every pup.'
+    body: 'The puppies produced in this litter. Adding puppies creates new dog records — quick-add several at once with “Add N Puppies”, record details like sex and nicknames, and log an event across multiple pups (vaccinations, weight checks) so it lands in every selected pup’s history from one screen.'
   },
   {
     id: 'litter-income', hub: 'Breeding', page: 'litter.html', anchor: 'autumnLitter',
     selector: '#income-section',
-    title: 'Sales & income',
-    body: 'Per-puppy total value (price + transport + deferred boarding) with a running total — Cedar → Jamal is $3,300 including $250 transport and $250 boarding. The earned/anticipated split and net live in Reporting, not here.'
+    title: 'Expenses & income',
+    body: 'A quick view of the expenses and income a litter has accrued, so you can see the profit you’re making. For the full breakdown — calculations and income split out by type (deposit, purchase price, transport) — head to the Financials hub.'
   },
 
   // --- People ------------------------------------------------------------
   {
     id: 'people-intro', kind: 'hub-intro', hub: 'People', button: 'Explore People Hub →',
     title: 'People',
-    body: 'The People hub holds every contact — buyers, breeders, partners and service providers — plus the kennels you and others run, and each kennel’s program settings.'
+    body: 'Everything so far has been about the dogs; this hub is about the other half of a kennel — the people. Keep your contacts here — buyers, breeders, your dog-care team — and record kennel-level details for your own kennel or someone else’s.'
   },
   {
     id: 'contacts-groups', hub: 'People', page: 'contacts.html',
     selector: '#contacts-group-tabs',
     title: 'Contacts',
-    body: 'Buyers, breeders, partners and service providers are all Contacts — there is no separate Buyer table. The group seg-tabs sort them (Priya is a client, Ellen network); filters, sort and “Show archived” work as elsewhere.'
+    body: 'Every contact you’ve recorded, with pre-filtered buckets to help you find people quickly, plus further filtering and sorting options.'
   },
   {
     id: 'contact-profile', hub: 'People', page: 'contact.html', anchor: 'priya',
     selector: '#profile-body',
-    title: 'A contact',
-    body: 'contact_type is multi-valued, and referred_by auto-tags a referrer role. The companion note is buyer-facing (it surfaces on share-outs) — separate from your private notes. Dogs owned and sales-as-buyer show as derived cards below.'
+    title: 'Contact details',
+    body: 'Record a contact’s communication details — phone, email — along with things like their website or associated kennel. Remember that you are the contact for your own kennel, so record your own details to drive owner-related features across the app. You’ll also see the dogs a contact owns and the contracts they hold with you.'
   },
   {
     id: 'kennels-list', hub: 'People', page: 'kennels.html',
-    selector: '#k-name',
+    selector: '#kennel-list',
     title: 'Kennels',
-    body: 'The kennels list is identity CRUD only — name, prefix, location, website and an “own kennel” flag (Thornfield is mine, Meadow Ridge outside). Program configuration lives on a kennel’s own detail page.'
+    body: 'The kennels list holds every kennel you do business with, including your own. Add the ones you work with regularly and link each to its contact — your dogs carry owner and breeder-kennel links back to them.'
   },
   {
     id: 'kennel-config', hub: 'People', page: 'kennel.html', anchor: 'thornfield',
     selector: '#kennel-config',
     title: 'Kennel program config',
-    body: 'For your own kennels: a preferred-tests vocabulary (seven tests, feeding the planned-test combobox, with “Apply to dogs…”) and lifecycle-nudge thresholds — Thornfield promotes males at 14mo, females at 11mo, which is why Poppy’s promote nudge fires.'
+    body: 'Set kennel-wide preferences here — the health tests you generally administer, and your standard age for promoting a dog to the breeding roster.'
   },
   {
     id: 'kennel-expenses', hub: 'People', page: 'kennel.html', anchor: 'thornfield',
     selector: '#expenses-section',
     title: 'Kennel expenses',
-    body: 'Overhead costs that belong to the kennel itself (subject = kennel), kept in the same ledger component you’ll see on dogs, litters and pairings.'
+    body: 'Record kennel-wide expenses that don’t relate to an individual dog or litter — bulk dog-food purchases, facility costs, and the like.'
   },
 
   // --- Placements --------------------------------------------------------
   {
     id: 'placements-intro', kind: 'hub-intro', hub: 'Placements', button: 'Explore Placements Hub →',
     title: 'Placements & Contracts',
-    body: 'The Placements hub is where puppies find homes: sales and deposits, stud services, and the contracts that tie them together.'
+    body: 'This hub drives the business side of your program. Record puppies finding homes (sales), income from studding out your dogs (stud services), and your lease and co-own contracts.'
   },
   {
     id: 'sales-list', hub: 'Placements', page: 'sales.html',
     selector: '#sale-list',
-    title: 'Placements',
-    body: 'Sale cards grouped under the sold pup’s litter (dogs with no litter fall into “External acquisitions”). Placement type and sale status are badges; a Contract owns the link. Non-delivered sales can print a Puppy Record PDF.'
+    title: 'Sales',
+    body: 'An overview of the sales your kennel is making or has made. Adding a sale lets you record the terms agreed with the buyer, link it to a contract to track the legal record, and print puppy record details for any pup with an open sale.'
   },
   {
     id: 'sale-profile', hub: 'Placements', page: 'sale.html', anchor: 'cedarSale',
     selector: '#profile-section',
-    title: 'A sale — fees then dates',
-    body: 'Cedar’s sale: price $2,800, deposit $500, a $250 transport fee and deferred boarding ($25/day × 10), with a balance due date. Deposit → balance drives the lifecycle; post-save prompts chain co-owner, delivery, disposition and boarding follow-ups.'
+    title: 'Sale details',
+    body: 'The details of a sale for a particular puppy — sale type (show or pet), a price prefilled from the litter and editable, any transport or deferred pick-up boarding charge, and a status tracking where the sale is in its lifecycle. You can also create or link a contract specific to the sale here.'
   },
   {
     id: 'stud-list', hub: 'Placements', page: 'stud-services.html',
     selector: '#stud-service-list',
     title: 'Stud services',
-    body: 'Cards grouped by your own dog on either side — Birch outgoing, Juno incoming. Direction and type distinguish them, with an inline contract link on each.'
+    body: 'Agreements with other breeders for stud services, tracked whether you own the dam or the sire. Outgoing stud services generate income; for an incoming one, record it as an expense in the pairing history of the resulting pairing.'
   },
   {
     id: 'stud-profile', hub: 'Placements', page: 'stud-service.html', anchor: 'studServiceBirch',
     selector: '#profile-section',
-    title: 'A stud service',
-    body: 'Birch is outgoing, in-person, flat-plus-pick — fee_structure gates both pick_status and a pick_value estimate ($1,500 non-cash, kept out of the cash totals). An in-person, sent service also books the dog “away”. “+ Create Pairing” links one.'
+    title: 'Stud service details',
+    body: 'Like sales, each stud service expands to show its details. This one is an outgoing studding, where your dog is the sire — a status of “Arranged” means your dog hasn’t left yet to begin the studding (it’s in person). Record sent and return dates to mark the intended duration. Below the details you can create or link a contract and track whether it’s signed.'
   },
   {
     id: 'contracts-list', hub: 'Placements', page: 'contracts.html',
     selector: '#contract-list',
-    title: 'Contracts — the fallout list',
-    body: 'Sale and stud contracts live inline on their cards; this page lists only the rest — co-ownership, lease, other and unlinked. Sage’s breeding lease (signed) and Percy’s co-ownership (sent) are here.'
+    title: 'Other contracts',
+    body: 'Contracts that don’t fit neatly into a sale — like a co-ownership agreement or a lease — live on the Other Contracts tab. It’s your repository of the legal agreements you’ve made with other breeders and owners.'
   },
   {
     id: 'contract-profile', hub: 'Placements', page: 'contract.html', anchor: 'sageLeaseContract',
     selector: '#profile-section',
-    title: 'A contract',
-    body: 'Type-conditional fields: a lease hides sale/stud fields and shows lease dates and the counterparty (Dana). document_url surfaces on the share-out, and status moves freely — signed, sent, void, declined.'
+    title: 'Contract details',
+    body: 'A contract carries its own information — the dog, sale, or stud agreement it applies to, the date it was signed, and the counterparty. It also has a link field for the external URL where you store and sign the contract, and it can be sent to the other party through the Companion app if you like.'
   },
 
   // --- Financials --------------------------------------------------------
@@ -289,26 +302,20 @@ export const WIZARD_STEPS = [
   {
     id: 'fin-overview', hub: 'Financials', page: 'financials.html',
     selector: '#financials-view-tabs',
-    title: 'Financials — overview',
-    body: 'Four net tiles: earned income, anticipated income, total expenses, and Net (earned − spent). Toggle Overview / Income / Expenses up here. Income is entirely derived — there is no income table; it’s read from Sales and outgoing Stud Services.'
+    title: 'Financials overview',
+    body: 'Your at-a-glance view of where your kennel is receiving — and spending — its money. See your collected and anticipated revenue (completed versus still-in-progress sales and studs), your total expenditures, and the net profit or loss those numbers produce.'
   },
   {
     id: 'fin-breakdown', hub: 'Financials', page: 'financials.html',
     selector: '#summary-section',
-    title: 'Income & expense breakdown',
-    body: 'Income by component (deposits, balance, transport, deferred boarding, stud fees, pick value) beside expenses by category. In the Income view, a row → Adjust modal writes money/status/paid-date back; a component is earned once paid or advanced, else anticipated.'
-  },
-  {
-    id: 'fin-expenses', hub: 'Financials', page: 'financials.html',
-    selector: '#add-expense',
-    title: 'The expense ledger',
-    body: 'A category tab for each expense type plus All, over one ledger filterable by category / subject-type / year, newest first. “+ Add Expense” logs a cost against any subject — kennel, dog, litter, pairing or event.'
+    title: 'Income & expense toggles',
+    body: 'Here you’ll see the actual details of your income and expenses, and can make adjustments or add new items. Note that income is always derived from a sale or stud service — you can adjust existing values here, but anything completely missing has to be added first in the Placements & Contracts hub before it shows up.'
   },
   {
     id: 'fin-invoice', hub: 'Financials', page: 'financials.html',
     selector: '#gen-document',
-    title: 'Invoice / receipt',
-    body: 'Pick any income record (a sale or outgoing stud) to open a print-only invoice — per-line full/partial, due dates and accepted methods. Print → Save as PDF from the browser.'
+    title: 'Invoices & receipts',
+    body: 'Generate invoices (for money owed) and receipts (for money paid) right in the app, pre-filled from your existing sales and stud services. Choose full or partial amounts, decide which payment methods you’ll accept, and set due dates easily. Click Print to save a PDF to email or hand over in person.'
   },
 
   // --- More: Reports / Companion / Import-Export --------------------------
@@ -321,18 +328,18 @@ export const WIZARD_STEPS = [
     id: 'reports', hub: 'More', page: 'reports.html',
     selector: 'main',
     title: 'Reports',
-    body: 'Six analytics reports (litters over time, live-birth %, placements, litter P&L, stud services, health-test events) plus operational roster/scheduled views. Each is a filterable report with its own CSV export.'
+    body: 'The analytics — reports you can generate from information stored across the app and download as spreadsheets for your physical files.'
   },
   {
     id: 'companion', hub: 'More', page: 'companion.html',
     selector: '#companion-type-tabs',
-    title: 'Companion share-outs',
-    body: 'Read-only, no-account links for buyers and partners — the seg-tab is the bundle type (prospective, current families, partners). “What to include” only ever subtracts from the defaults; recipients derive from live waitlist, open sales and contracts.'
+    title: 'Companion app',
+    body: 'A place to generate snapshots of the information you want to share, in a format that looks like an app, without putting your business online. Three preconfigured Companion packages suit different audiences: pick the toggle, find the relevant contact, preview it, and send off a link. The recipient sees just what you sent, in a clean, readable format.'
   },
   {
     id: 'import-export', hub: 'More', page: 'import-export.html',
     selector: '#btn-backup',
-    title: 'Back up your data',
-    body: 'Everything lives in this browser — so before you start adding your own records, export a JSON backup here. Restore previews every change before committing, and seven CSV importers match-or-create by natural key with a dry-run preview. That’s the tour!'
+    title: 'Import / export',
+    body: 'Where you bring in CSV files to populate a large kennel all at once, and where you back up your entire dataset to protect against loss. There’s no cloud storage, so losing your phone means starting over — back up regularly and keep the file somewhere central, like a Drive or an email to yourself, for easy recovery.'
   }
 ];
