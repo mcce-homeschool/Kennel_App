@@ -549,6 +549,12 @@ table.data tr.row-detail .dl-meta { margin: 0; }
   width: min(760px, calc(100vw - 24px));
   max-height: 60vh;
 }
+/* Flip to the bottom for targets pinned so high on the page that the top card
+   would otherwise cover them (see scrollTargetBelowCard in wizardUI.js). */
+.wizard-card-top.wizard-card-bottom {
+  top: auto;
+  bottom: 12px;
+}
 .wizard-card-centered {
   position: fixed;
   top: 50%;

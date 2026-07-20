@@ -87,9 +87,11 @@ export function renderWizardMenuEntry() {
 // --- Overlay / spotlight / cards -----------------------------------------
 let mountedNodes = [];
 let spotlightEl = null;
+let reflowObserver = null; // re-positions the target as late-loading content settles
 
 function teardown() {
   renderToken++; // invalidate any in-flight target poll
+  if (reflowObserver) { reflowObserver.disconnect(); reflowObserver = null; }
   mountedNodes.forEach((n) => n.remove());
   mountedNodes = [];
   if (spotlightEl) {
@@ -166,15 +168,60 @@ function mountTopCard(step, target) {
   document.body.appendChild(card);
   mountedNodes.push(card);
   wireCardButtons(card);
-  scrollTargetBelowCard(card, target);
+  positionTarget(card, target);
+  // Content-heavy pages (a dog/litter profile) fill their sections in async, so
+  // the target's position keeps shifting after this first pass. Re-position on
+  // every reflow — otherwise the one-shot scroll lands on a stale position and
+  // the section ends up off-screen (the "one stop that doesn't scroll" bug).
+  observeReflow(card, target, renderToken);
 }
 
-// Move the spotlit target to just under the pinned card so both are visible.
-function scrollTargetBelowCard(card, target) {
+// Place the spotlit target relative to the pinned card so both stay visible.
+// Idempotent, so it can be re-run on reflow: a top card scrolls its target to sit
+// just below it; if the target's top can't clear the card (it lives near the page
+// top and the upward scroll is clamped at 0), the card flips to the bottom of the
+// viewport and the target is lifted to the top instead — after which re-runs keep
+// the target pinned near the top.
+function positionTarget(card, target) {
   const gap = 20;
+  if (card.classList.contains('wizard-card-bottom')) {
+    const lift = target.getBoundingClientRect().top - gap;
+    if (Math.abs(lift) > 2) window.scrollBy({ top: lift, behavior: 'auto' });
+    return;
+  }
   const desiredTop = card.getBoundingClientRect().bottom + gap;
   const delta = target.getBoundingClientRect().top - desiredTop;
   if (Math.abs(delta) > 2) window.scrollBy({ top: delta, behavior: 'auto' });
+
+  // If the target's *top* is still tucked under the card, the upward scroll was
+  // clamped at the page top — flip the card to the bottom and lift the target up.
+  // (A tall section whose top now sits just below the card is fine; only a
+  // genuinely-covered top triggers the flip, not a target taller than the viewport.)
+  const t = target.getBoundingClientRect();
+  const c = card.getBoundingClientRect();
+  if (t.top < c.bottom - 8 && t.bottom > c.top) {
+    card.classList.add('wizard-card-bottom');
+    const lift = target.getBoundingClientRect().top - gap;
+    if (Math.abs(lift) > 2) window.scrollBy({ top: lift, behavior: 'auto' });
+  }
+}
+
+// Watch the document for layout changes (async sections rendering in) and
+// re-position the target each time, until the next step tears down or a ~2.5s
+// budget elapses — enough for the heaviest profile page to finish, without an
+// observer that lingers and fights the user afterward.
+function observeReflow(card, target, token) {
+  if (typeof ResizeObserver === 'undefined') return;
+  const start = Date.now();
+  reflowObserver = new ResizeObserver(() => {
+    if (token !== renderToken) return; // superseded — teardown will disconnect
+    positionTarget(card, target);
+    if (Date.now() - start > 2500 && reflowObserver) {
+      reflowObserver.disconnect();
+      reflowObserver = null;
+    }
+  });
+  reflowObserver.observe(document.documentElement);
 }
 
 // Card contents. Intro steps show one primary button (step.button); highlight
