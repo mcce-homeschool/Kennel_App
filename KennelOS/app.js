@@ -7,9 +7,10 @@ import { renderNav } from './nav.js';
 import { requestPersistentStorage } from './data/db.js';
 import { wasPersistRequested, markPersistRequested } from './data/settings.js';
 import { expenseRepo } from './data/expenseRepo.js';
-import { maybeShowFirstRunPrompt, renderSampleBanner } from './assets/sampleDataUI.js';
+import { renderSampleBanner } from './assets/sampleDataUI.js';
 import { maybeShowKennelSetupPrompt, renderKennelBanner } from './assets/kennelSetupUI.js';
-import { maybeOfferWizardStart, renderWizardMenuEntry, runWizardStep } from './assets/wizardUI.js';
+import { renderWizardMenuEntry, runWizardStep } from './assets/wizardUI.js';
+import { runFirstRunOnboarding } from './assets/onboardingUI.js';
 
 async function firstRunPersistence() {
   if (wasPersistRequested()) return;
@@ -27,14 +28,13 @@ function registerServiceWorker() {
   navigator.serviceWorker.register(swUrl, { scope: new URL('./', import.meta.url) });
 }
 
-// The kennel-setup wizard follows the sample-data choice, not precedes it:
-// picking "Explore with sample data" reloads the page (Thornfield Kennels
-// already fills that role), so only the "blank kennel" branch — or a later
-// reload right after sample data gets cleared — ever reaches it.
+// First run shows the onboarding sequence (Welcome → tour offer → tour or
+// backups+New Kennel). On a non-fresh load it does nothing and returns false, so
+// we fall through to the kennel-setup prompt that fires on the load right after
+// sample data is cleared (shouldOfferKennelSetupPrompt gates it).
 async function firstRunFlow() {
-  const choice = await maybeShowFirstRunPrompt();
-  if (choice !== 'seeded') { maybeShowKennelSetupPrompt(); return; }
-  maybeOfferWizardStart(); // only reached on the 'seeded' branch (Wizard Runtime Spec v1 §6.1)
+  const handled = await runFirstRunOnboarding();
+  if (!handled) maybeShowKennelSetupPrompt();
 }
 
 function boot() {

@@ -100,9 +100,10 @@ KennelOS/
     puppyForm.js               Litter → puppy roster entry
     contactPicker.js           Inline "＋ New contact" decorator for pickers
     importView.js              Shared CSV import dry-run/commit UI
-    sampleDataUI.js            First-run sample-data prompt + banner
+    onboardingUI.js            First-run Welcome → tour-offer → backups/install cards (§11)
+    sampleDataUI.js            Sample-data banner + Clear-sample-data flow
     kennelSetupUI.js           Kennel-setup prompt/wizard + seed prefill
-    wizardUI.js                Guided-tour overlay/spotlight/tooltip + resume pill (§11)
+    wizardUI.js                Guided-tour overlay/spotlight/cards + resume pill (§11)
     expensePanel.js            Reusable per-subject expense ledger panel (§21)
   pages/                       One .js + .html per screen (see §13 catalog)
 ```
@@ -465,25 +466,41 @@ way.
 - **appReset.js** — `resetApp()` clears every table + all settings → the exact blank slate
   a never-visited browser sees.
 
-First-run flow (`app.js`): request durable storage once → offer sample data; if declined
-(or after sample data is later cleared), offer kennel setup. When sample data **is** seeded,
-`maybeOfferWizardStart()` then offers the **guided tour** (below).
+First-run flow (`app.js` → `runFirstRunOnboarding()` in **`assets/onboardingUI.js`**):
+request durable storage once, then — on a genuinely fresh install (`shouldOfferFirstRunPrompt()`)
+— show a short card sequence: a **non-dismissible Welcome** card (what the app is), then a
+**tour offer** ("Show me around!" / "No thanks, I'll explore"). The two branches:
+- **"Show me around!"** → seed the Thornfield sample data, `startWizard()`, and reload so the
+  destination page's `runWizardStep()` picks the tour up. Sample data is seeded **only** on
+  this path — it's no longer a user-facing "explore vs. blank" choice.
+- **"No thanks…"** → `declineSampleData()` (a blank kennel, no sample data ever), a
+  **backups + install-as-app** card, then the **New Kennel** kennel-setup modal.
 
-**Guided tour (first-run wizard).** A spotlight coach-mark tour of the seeded Thornfield
-packet — a pure UI/state feature that reads existing records (never writes app data) and
-persists its own progress in `localStorage` via `settings.js` (`wizardStatus` +
-`wizardStepIndex`), no Dexie table, no schema, no `referenceRegistry.js` entry. Three
-modules: **`data/wizardState.js`** (the status/index state machine + `isTourAvailable()`,
-which gates the tour on the Thornfield seed being the active dataset — same two settings
-signals as the sample-data banner), **`data/wizardSteps.js`** (the static ordered
-`WIZARD_STEPS` catalog, authored from `Tutorial_Coverage_Matrix_v1.md` §B/§F — data only,
-like `vocab.js`), and **`assets/wizardUI.js`** (the box-shadow spotlight overlay, tooltip,
-nav "Take the tour" entry, and free-navigation "Resume tour" pill). `app.js`'s shared
-`boot()` calls `runWizardStep()` unconditionally on every page — the only wizard hook; no
-page file is wizard-aware. Detail-page steps carry an `anchor` slug that `wizardUI.js`
-resolves to the current seed's real id at runtime via the `manifest.named` map the seed
-writes (the seed uses runtime `crypto.randomUUID()` ids, so links can only resolve
-per-seed). See `docs/Wizard_Runtime_Spec_v1.md` for the full design.
+On a non-fresh load the onboarding no-ops and `app.js` falls through to `maybeShowKennelSetupPrompt()`
+(which still fires on the load right after sample data is cleared). `sampleDataUI.js` now owns
+only the persistent banner + the shared Clear-sample-data flow.
+
+**Guided tour.** A spotlight coach-mark tour of the seeded Thornfield packet — a pure
+UI/state feature that reads existing records (never writes app data) and persists its own
+progress in `localStorage` via `settings.js` (`wizardStatus` + `wizardStepIndex`), no Dexie
+table, no schema, no `referenceRegistry.js` entry. Three modules: **`data/wizardState.js`**
+(the status/index state machine, `isTourAvailable()` gating the tour on the Thornfield seed
+being active, `isIntroStep()`, and the `HIGHLIGHT_STEPS` list the "Step n of N" counter uses),
+**`data/wizardSteps.js`** (the static ordered `WIZARD_STEPS` catalog — data only, like
+`vocab.js`), and **`assets/wizardUI.js`** (the box-shadow spotlight overlay, the cards, the
+nav "Take the tour" entry, and the free-navigation "Resume tour" pill). The catalog has two
+step **kinds**: an **intro** step (`kind: 'tour-intro'` or `'hub-intro'`) is a centered,
+page-agnostic card with a single forward button (`step.button`, e.g. "Explore Today Hub →")
+— one tour-intro leads the tour, and a hub-intro precedes each hub's stops; a **highlight**
+step (no `kind`) spotlights a real element and pins a compact card to the **top** of the
+viewport, scrolling its target to sit just below so the card never covers it (falls back to a
+centered card if the target never appears). `app.js`'s shared `boot()` calls `runWizardStep()`
+unconditionally on every page — the only wizard hook; no page file is wizard-aware.
+Detail-page highlight steps carry an `anchor` slug that `wizardUI.js` resolves to the current
+seed's real id at runtime via the `manifest.named` map the seed writes (the seed uses runtime
+`crypto.randomUUID()` ids, so links can only resolve per-seed). See
+`docs/Wizard_Runtime_Spec_v1.md` for the original design (the first-run trigger and the
+intro-card / pinned-top-card presentation postdate it).
 
 ---
 
@@ -549,8 +566,9 @@ implementation lives in `data/dateUtils.js`.
   `main()` calls this once after loading its record. `openEvent=<id>` opens that exact event
   in edit mode; `logEvent=<event_type>` opens a fresh event of that type. Wired into
   `dog.js`/`pairing.js`/`litter.js` main() alongside their `new=1` prefill params.
-- **puppyForm.js**, **importView.js**, **sampleDataUI.js**, **kennelSetupUI.js** — roster
-  entry, the CSV dry-run/commit UI, and the two first-run prompt/banners.
+- **puppyForm.js**, **importView.js**, **onboardingUI.js**, **sampleDataUI.js**,
+  **kennelSetupUI.js** — roster entry, the CSV dry-run/commit UI, the first-run onboarding
+  card sequence, the sample-data banner, and the kennel-setup modal.
 - **contactPicker.js** — `attachNewContactButton(selectEl, {onCreated})` decorates any
   contact `<select>` with a "＋ New" button: minimal inline-create modal (name required),
   creates via `contactRepo.create`, appends+selects the option, fires a native `change`
@@ -664,8 +682,9 @@ python3 -m http.server 8000      # or: npx serve
 
 There is no build, no test runner, and no linter wired in. Verification is: `node --check`
 for syntax, serving locally and exercising the flow in a browser, and the precache sanity
-check above. State resets via **Reset App to Start** (or clearing site data); sample data
-via the first-run prompt or Import/Export.
+check above. State resets via **Reset App to Start** (or clearing site data); sample data is
+seeded by taking the first-run **guided tour** ("Show me around!"), or restored from a JSON
+backup via Import/Export.
 
 ---
 

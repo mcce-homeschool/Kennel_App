@@ -5,10 +5,16 @@
 //
 // Each step:
 //   id         stable string id (never array position).
-//   hub        concise hub name; drives the "Next: {hub} →" button on the
-//              step *before* a hub's first step.
+//   kind       'tour-intro' | 'hub-intro' | omitted (a "highlight" step). Intro
+//              steps are centered, page-agnostic cards with a single forward
+//              button (no Back/Next/Skip); highlight steps spotlight a real
+//              element with Back/Next/Skip. The tour is: one tour-intro, then per
+//              hub a hub-intro card followed by that hub's highlight steps.
+//   button     (intro steps only) the single forward-button label.
+//   hub        concise hub name; labels the hub-intro card for that hub.
 //   page       bare page file (no path/query) — resolved to pages/<page> like
 //              nav.js's HUB_CHILDREN. Detail pages carry a separate `anchor`.
+//              Intro steps omit it — they render wherever the user currently is.
 //   anchor     (detail pages only) a slug key into the seed's manifest.named
 //              map (data/sampleData.js) — wizardUI.js resolves it to the
 //              *current* seed's real id at runtime and builds `?id=<id>`. The
@@ -26,14 +32,25 @@
 //              seed populates them, so they need no reveal.
 //   title/body one idea per stop, from the matrix's "Teaches" column. Anchor
 //              records are named inline in the copy (spec §3.1).
-//   isHubEntry true on a hub's first step (drives the hub-boundary button copy).
 
 export const WIZARD_STEPS = [
+  // --- Tour intro (centered card, single button) -------------------------
+  {
+    id: 'tour-intro', kind: 'tour-intro', button: 'Start the tour →',
+    title: 'Meet Thornfield Kennels',
+    body: 'To show you around with something real to look at, we’ve loaded a fictional sample kennel — Thornfield Kennels — a mature, operating program with several dogs, litters and records already filled in. Nothing here is yours; you can clear it any time from Import / Export. Let’s take a look.'
+  },
+
   // --- Today -------------------------------------------------------------
+  {
+    id: 'today-intro', kind: 'hub-intro', hub: 'Today', button: 'Explore Today Hub →',
+    title: 'Today',
+    body: 'The Today hub is your at-a-glance command center: everything that needs your attention right now — reminders, active litters, upcoming pickups, who’s away from home, and a quick read on the whole kennel — gathered in one place.'
+  },
   {
     id: 'today-reminders', hub: 'Today', page: 'today.html',
     selector: '[data-card="reminders"]', beforeShow: { openCard: 'reminders' },
-    title: 'Reminders', isHubEntry: true,
+    title: 'Reminders',
     body: 'Reminders live on events, bucketed overdue / due-soon / upcoming — Juniper is overdue, Percy due soon, Birch upcoming. “Snooze” just edits the reminder date; there is no separate snooze field.'
   },
   {
@@ -69,9 +86,14 @@ export const WIZARD_STEPS = [
 
   // --- Dogs --------------------------------------------------------------
   {
+    id: 'dogs-intro', kind: 'hub-intro', hub: 'Dogs', button: 'Explore Dogs Hub →',
+    title: 'Dogs',
+    body: 'The Dogs hub is your complete roster — breeding stock, puppies and outside dogs — each with a rich profile: identity, health tests, pedigree, and a full event history.'
+  },
+  {
     id: 'dogs-buckets', hub: 'Dogs', page: 'dogs.html',
     selector: '#dogs-bucket-tabs',
-    title: 'The dog roster', isHubEntry: true,
+    title: 'The dog roster',
     body: 'One Dog table holds puppies, breeding stock and external dogs — the seg-tabs bucket them (puppies / breeding by sex / not-breeding by status / external). A life-stage change is a status update on the same record, never a new one.'
   },
   {
@@ -137,9 +159,14 @@ export const WIZARD_STEPS = [
 
   // --- Breeding ----------------------------------------------------------
   {
+    id: 'breeding-intro', kind: 'hub-intro', hub: 'Breeding', button: 'Explore Breeding Hub →',
+    title: 'Breeding',
+    body: 'The Breeding hub follows the whole chain — pairings, heat cycles, litters, and the puppies they produce — all derived and linked together.'
+  },
+  {
     id: 'breeding-chain', hub: 'Breeding', page: 'breeding.html',
     selector: '#breeding-body',
-    title: 'The breeding chain', isHubEntry: true,
+    title: 'The breeding chain',
     body: 'One consolidated view of the pairing → litter → puppies chain, all derived. Five pairing cards show first; with six seeded, a “Show 1 more pairing” toggle appears (pagination lives only here). Litters without a recorded pairing list separately.'
   },
   {
@@ -175,9 +202,14 @@ export const WIZARD_STEPS = [
 
   // --- People ------------------------------------------------------------
   {
+    id: 'people-intro', kind: 'hub-intro', hub: 'People', button: 'Explore People Hub →',
+    title: 'People',
+    body: 'The People hub holds every contact — buyers, breeders, partners and service providers — plus the kennels you and others run, and each kennel’s program settings.'
+  },
+  {
     id: 'contacts-groups', hub: 'People', page: 'contacts.html',
     selector: '#contacts-group-tabs',
-    title: 'Contacts', isHubEntry: true,
+    title: 'Contacts',
     body: 'Buyers, breeders, partners and service providers are all Contacts — there is no separate Buyer table. The group seg-tabs sort them (Priya is a client, Ellen network); filters, sort and “Show archived” work as elsewhere.'
   },
   {
@@ -207,9 +239,14 @@ export const WIZARD_STEPS = [
 
   // --- Placements --------------------------------------------------------
   {
+    id: 'placements-intro', kind: 'hub-intro', hub: 'Placements', button: 'Explore Placements Hub →',
+    title: 'Placements & Contracts',
+    body: 'The Placements hub is where puppies find homes: sales and deposits, stud services, and the contracts that tie them together.'
+  },
+  {
     id: 'sales-list', hub: 'Placements', page: 'sales.html',
     selector: '#sale-list',
-    title: 'Placements', isHubEntry: true,
+    title: 'Placements',
     body: 'Sale cards grouped under the sold pup’s litter (dogs with no litter fall into “External acquisitions”). Placement type and sale status are badges; a Contract owns the link. Non-delivered sales can print a Puppy Record PDF.'
   },
   {
@@ -245,9 +282,14 @@ export const WIZARD_STEPS = [
 
   // --- Financials --------------------------------------------------------
   {
+    id: 'financials-intro', kind: 'hub-intro', hub: 'Financials', button: 'Explore Financials Hub →',
+    title: 'Financials',
+    body: 'The Financials hub is where the money lives — earned and anticipated income, expenses by category, your running net, and printable invoices and receipts.'
+  },
+  {
     id: 'fin-overview', hub: 'Financials', page: 'financials.html',
     selector: '#financials-view-tabs',
-    title: 'Financials — overview', isHubEntry: true,
+    title: 'Financials — overview',
     body: 'Four net tiles: earned income, anticipated income, total expenses, and Net (earned − spent). Toggle Overview / Income / Expenses up here. Income is entirely derived — there is no income table; it’s read from Sales and outgoing Stud Services.'
   },
   {
@@ -271,9 +313,14 @@ export const WIZARD_STEPS = [
 
   // --- More: Reports / Companion / Import-Export --------------------------
   {
+    id: 'more-intro', kind: 'hub-intro', hub: 'More', button: 'Explore More Hub →',
+    title: 'Reports, Companion & Backups',
+    body: 'Behind the More menu: analytics Reports, read-only Companion share-outs for buyers and partners, and Import / Export for backups and spreadsheet import.'
+  },
+  {
     id: 'reports', hub: 'More', page: 'reports.html',
     selector: 'main',
-    title: 'Reports', isHubEntry: true,
+    title: 'Reports',
     body: 'Six analytics reports (litters over time, live-birth %, placements, litter P&L, stud services, health-test events) plus operational roster/scheduled views. Each is a filterable report with its own CSV export.'
   },
   {

@@ -22,6 +22,7 @@ const PRECACHE_URLS = [
   'assets/importView.js',
   'assets/kennelSetupUI.js',
   'assets/listView.js',
+  'assets/onboardingUI.js',
   'assets/pedigree.js',
   'assets/puppyForm.js',
   'assets/reportView.js',
