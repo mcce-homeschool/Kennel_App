@@ -196,10 +196,16 @@ export async function openEventForm(opts) {
       </div>`;
 
     modal.querySelector('#ef-type').addEventListener('change', (e) => {
+      // The category the old type suggested — captured before we switch types so
+      // we can tell an untouched default from a deliberate override.
+      const prevDefault = defaultExpenseCategoryFor(draft.event_type);
       captureInputs();
       draft.event_type = e.target.value;
       // Auto-fill an empty title with the type label as a convenience.
       if (!draft.title) draft.title = descriptor(EVENT_TYPES, draft.event_type).label;
+      // Follow the new type's suggested cost category, unless the user has
+      // deliberately picked a different one (then leave their choice alone).
+      if (draft.expenseCategory === prevDefault) draft.expenseCategory = defaultExpenseCategoryFor(draft.event_type);
       render();
     });
     const relatedContactEl = modal.querySelector('#ef-related-contact');
