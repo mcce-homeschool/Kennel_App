@@ -396,7 +396,26 @@ Rules that shape everything:
 Per-entity natural keys: Dog = name+DOB; Contact = name; Pairing = sire+dam+planned;
 Litter = dam+sire+whelp; Sale = dog+buyer+sale_date; Event (dog-subject only) =
 dog+type+date (title tiebreak); StudService = our_dog+partner_dog+direction (no date, so
-any existing match is always routed to review).
+any existing match is always routed to review); Expense = subject+expense_date+amount+
+category+vendor (idempotent re-import — the same file updates, never duplicates).
+
+**Expense mapping (the Receipts-app import path, §21).** The ledger's external-tool
+in-road: a companion receipts/mileage app (or any spreadsheet) emits one row per cost and
+this brings it into the Expense ledger with the same dry-run discipline. Columns:
+`subject_type`, `subject_name`, `expense_date`, `amount`, `category`, `vendor`, `miles`,
+`mileage_rate`, `notes`. **Subject resolution** covers the two subjects a name-only tool
+can express: `subject_type='kennel'` (the default when blank — program overhead) resolves
+by kennel name, or by the configured "my kennel" / sole own kennel when `subject_name` is
+blank; `subject_type='dog'` resolves by registered/call name (an ambiguous name is flagged,
+never guessed). `litter`/`pairing` subjects have no name key, so those rows route to
+needs-review (log them from the record) — the same dog-only-scope posture as the Event
+importer. **Mileage:** a row with `miles` set is a mileage expense — `category` is forced to
+`mileage`, `mileage_rate` falls back to `settings.getMileageDefaults().rate` when blank, and
+`amount` is left for `expenseRepo` to derive (miles × rate), never taken from the file. The
+match index only considers **non-archived, non-event-linked** ledger rows, so a re-import can
+never clobber a cost captured from the event form. There is **no photo/attachment side** —
+KennelOS stores no images (§15); only the extracted money data crosses over, the receipt
+image stays in the source app.
 
 To add an entity to the importer: write one mapping object (`{entity, label,
 templateHeaders, requiredForCreate, loadExisting, buildIndex, classify, describe, repo,
@@ -619,7 +638,7 @@ Today cluster: `dashboard`, `reminders`, `upcoming`, `board`, `scheduled-placeme
 Reports: `litters-report`, `stud-services-report`, `placements-report`,
 `health-tests-report`, `litter-finances-report` (Litter P&L; `data/litterFinances.js`).
 Import pages: `dog-import`, `contact-import`, `pairing-import`, `litter-import`,
-`sale-import`, `event-import`, `stud-service-import`, `kennel-tests-import`.
+`sale-import`, `event-import`, `stud-service-import`, `expense-import`, `kennel-tests-import`.
 
 ---
 
@@ -1003,6 +1022,12 @@ bulk food, registration dues, marketing) lives on `subject_type='kennel'`; there
 **no `general` subject** — program overhead is logged against your own kennel, so there is never
 a null `subject_id`. Revenue is **not stored** here (it stays on `Sale.price`/`deposit_amount`
 and `StudService.fee_amount`); this table is costs only.
+
+The ledger has a **CSV import path** (the `expense` mapping in `csvImport.js`, reached from
+Import/Export → "Import expenses (CSV)"), so a companion receipts/mileage app — or any
+spreadsheet — can feed it with the standard dry-run + match-or-create preview. See §9 for the
+mapping (columns, subject resolution, mileage derivation, idempotent natural key). No photo
+crosses over — KennelOS stores no images (§15).
 
 ### Mileage / transport costs
 
