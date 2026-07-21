@@ -49,20 +49,40 @@ function weightTotalOz(details) {
 function fmtWeight(details) {
   const lbs = (details?.weight_lbs ?? '') !== '' ? Number(details.weight_lbs) : 0;
   const oz = (details?.weight_oz ?? '') !== '' ? Number(details.weight_oz) : 0;
-  return `${lbs} lb ${oz} oz`;
+  const t = String(details?.time_of_day || '').toUpperCase();
+  return `${lbs} lb ${oz} oz${t ? ` ${t}` : ''}`;
 }
-// The dog's most recent prior weight_check with a real weight, on or before the
-// new event's date, excluding the event being edited. Null when there's nothing
-// to compare against. getForSubject returns newest-first, so the first match is
-// the immediately-preceding weigh-in.
-async function findPriorWeightEvent(dogId, newDate, excludeId) {
+// Same-day AM/PM awareness: a weigh-in's place in the day is AM (0) before PM (1);
+// a blank time sits between so it never mis-sorts a real AM/PM. This lets us find
+// the TRUE preceding weight when two are logged on one day — a PM compares against
+// that morning's AM, and that AM compares against the prior day, not the later PM.
+function timeRank(details) {
+  const t = String(details?.time_of_day || '').toUpperCase();
+  return t === 'PM' ? 1 : (t === 'AM' ? 0 : 0.5);
+}
+// A total order over a dog's weigh-ins: date, then AM-before-PM, then capture time.
+function weighKey(ev) {
+  return { date: ev.event_date || '', rank: timeRank(ev.details), created: ev.created_at || '' };
+}
+function keyCmp(a, b) {
+  if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+  if (a.rank !== b.rank) return a.rank - b.rank;
+  if (a.created !== b.created) return a.created < b.created ? -1 : 1;
+  return 0;
+}
+// The dog's weigh-in (with a real weight) immediately preceding `newKey`,
+// excluding the event being edited. Null when nothing comes before it.
+async function findPriorWeighIn(dogId, newKey, excludeId) {
   const evs = await HistoryEvent.getForSubject('dog', dogId);
-  return evs.find((e) =>
-    e.event_type === 'weight_check' &&
-    e.id !== excludeId &&
-    (!newDate || (e.event_date || '') <= newDate) &&
-    weightTotalOz(e.details) != null
-  ) || null;
+  let best = null, bestKey = null;
+  for (const e of evs) {
+    if (e.event_type !== 'weight_check' || e.id === excludeId) continue;
+    if (weightTotalOz(e.details) == null) continue;
+    const k = weighKey(e);
+    if (keyCmp(k, newKey) >= 0) continue;            // not before the new entry
+    if (!bestKey || keyCmp(k, bestKey) > 0) { best = e; bestKey = k; }
+  }
+  return best;
 }
 
 export async function openEventForm(opts) {
@@ -311,11 +331,15 @@ export async function openEventForm(opts) {
       const targets = isCascade
         ? [...cascadeChecked].map((id) => ({ id, details: { ...draft.details, ...(draft.perTargetDetails[id] || {}) }, label: cascadeTargets.find((t) => t.id === id)?.label || 'This puppy' }))
         : [{ id: subjectId, details: draft.details, label: 'This dog' }];
+      // A new entry sorts after any existing same-day/same-time weigh-in (its
+      // capture time is "now"); an edit keeps its own place via created_at + id.
+      const newCreated = isEdit ? (event.created_at || '~~~~~~') : '~~~~~~';
       const drops = [];
       for (const t of targets) {
         const newOz = weightTotalOz(t.details);
         if (newOz == null) continue;
-        const prior = await findPriorWeightEvent(t.id, draft.event_date, isEdit ? event.id : null);
+        const newKey = { date: draft.event_date || '', rank: timeRank(t.details), created: newCreated };
+        const prior = await findPriorWeighIn(t.id, newKey, isEdit ? event.id : null);
         if (prior && newOz < weightTotalOz(prior.details)) {
           drops.push(`• ${t.label}: ${fmtWeight(t.details)} — down from ${fmtWeight(prior.details)}${prior.event_date ? ` on ${prior.event_date}` : ''}`);
         }
