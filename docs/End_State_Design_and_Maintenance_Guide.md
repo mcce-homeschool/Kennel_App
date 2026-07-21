@@ -1437,8 +1437,12 @@ one writer**, which is what makes the scheme conflict-free — preserve that inv
 - **Privacy is enforced at feed-build time**, same posture as `companionExport.js`:
   `ASSISTANT_DOG_FIELDS` is a positive allow-list (id, call/registered name, breed, sex,
   status, DOB/DOD, color/markings, url, is_archived — **no** microchip, registration,
-  ownership, parentage, prices), and only `subject_type === 'dog'` events ride along
-  (currently **all** event types, a deliberate "trim later" decision). Contacts, sales,
+  ownership, parentage, prices), plus four DERIVED display fields (`litter_id` as a
+  grouping key, `litter_nickname`, `sire_name`/`dam_name` as call-name copies — named
+  copies, never the litters table or parentage FKs). Only `subject_type === 'dog'`
+  events whose type is in **`ASSISTANT_EVENT_TYPES`** (vocab.js — currently
+  `weight_check`, `milestone`, `note`) ride along; the same list gates the assistant's
+  log form, so what the helper sees and what they can log never drift. Contacts, sales,
   financials, kennels, contracts never reach the assistant device at all — that, not UI
   hiding, is the security boundary (everything client-side is inspectable).
 - **Outbox import** (`fetchAssistantOutbox` → preview → `importAssistantEvents`) is the
@@ -1462,6 +1466,14 @@ one writer**, which is what makes the scheme conflict-free — preserve that inv
   event** creates a local event with `pending: 1`; **Send my updates** uploads all pending
   events as the outbox (rewritten wholesale each send). Only pending events can be
   deleted on the device — synced history is the owner's.
+- The dog list is **grouped by litter** (header: nickname + "Sire × Dam" from the derived
+  feed fields) with a **⚖ Weigh litter** button per group: one date + AM/PM, a lbs/oz row
+  per pup, one save → one pending `weight_check` per weighed pup (blank rows skipped).
+  Both this and single weigh-ins reproduce the main app's **weight-drop soft warning**:
+  `assistantStore.js` mirrors `eventForm.js`'s total-ounce comparison and
+  date→AM/PM→capture-time ordering (`getPriorWeighIn` scans synced + pending entries),
+  and a decrease prompts a collected "Save anyway?" confirm, never a hard block. Keep the
+  two implementations semantically in step if the main app's rule ever changes.
 - **Acknowledgment loop**: after the owner imports the outbox and later pushes a fresh
   feed, the feed carries those same event ids back; the feed sync's `bulkPut` overwrites
   the pending copies, clearing the flag. Until then pending events keep riding every

@@ -23,7 +23,7 @@ import { db } from './db.js';
 import { exportAll, restoreBackup, inspectBackup } from './importExport.js';
 import { dropboxUploadJson, dropboxDownloadJson, DROPBOX_PATHS } from './dropbox.js';
 import { setLastBackupDate } from './settings.js';
-import { EVENT_TYPES, descriptor } from './vocab.js';
+import { EVENT_TYPES, ASSISTANT_EVENT_TYPES, descriptor } from './vocab.js';
 
 // Bumped only if the feed/outbox shapes ever change incompatibly.
 export const ASSISTANT_FORMAT_VERSION = 1;
@@ -37,19 +37,39 @@ const ASSISTANT_DOG_FIELDS = [
   'date_of_birth', 'date_of_death', 'color_markings', 'url', 'is_archived'
 ];
 
-// Build the assistant feed: every dog (named-field copies only) plus every
-// dog-subject event, full records ("all events for now" — trim by filtering
-// here if that ever changes). Archived records ride along with their flag so
-// the assistant store can filter exactly like the main app does.
+// Build the assistant feed: every dog (named-field copies only) plus the
+// dog-subject events whose type is in the ASSISTANT_EVENT_TYPES allow-list
+// (vocab.js — one list gates what the assistant sees AND what it can log).
+// Archived records ride along with their flag so the assistant store can
+// filter exactly like the main app does.
+//
+// Beyond ASSISTANT_DOG_FIELDS, each dog carries three DERIVED display fields
+// so the assistant can group a litter and name its parents without ever
+// receiving the litters table or parentage FKs: `litter_id` (grouping key
+// only), `litter_nickname`, and `sire_name`/`dam_name` (call-name copies,
+// same "named copy, no record spread" posture as companion's dogCard).
 export async function buildAssistantFeed() {
   const dogs = await db.dogs.toArray();
-  const events = (await db.events.toArray()).filter((e) => e.subject_type === 'dog');
+  const litters = await db.litters.toArray();
+  const events = (await db.events.toArray())
+    .filter((e) => e.subject_type === 'dog' && ASSISTANT_EVENT_TYPES.includes(e.event_type));
+  const dogsById = new Map(dogs.map((d) => [d.id, d]));
+  const littersById = new Map(litters.map((l) => [l.id, l]));
+  const nameOf = (id) => {
+    const d = id ? dogsById.get(id) : null;
+    return d ? (d.call_name || d.registered_name || null) : null;
+  };
   return {
     format_version: ASSISTANT_FORMAT_VERSION,
     generated_at: new Date().toISOString(),
     dogs: dogs.map((d) => {
       const out = {};
       for (const f of ASSISTANT_DOG_FIELDS) out[f] = d[f] ?? null;
+      const litter = d.litter_id ? littersById.get(d.litter_id) : null;
+      out.litter_id = d.litter_id ?? null;
+      out.litter_nickname = litter ? (litter.nickname || null) : null;
+      out.sire_name = nameOf(d.sire_id);
+      out.dam_name = nameOf(d.dam_id);
       return out;
     }),
     events

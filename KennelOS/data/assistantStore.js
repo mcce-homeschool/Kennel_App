@@ -117,6 +117,63 @@ export async function deletePendingEvent(id) {
   await assistantDb.events.delete(id);
 }
 
+// --- Weight-drop lookup ------------------------------------------------------
+// Mirrors assets/eventForm.js's soft warning: a weigh-in below the dog's
+// previous weight is worth a second look, never a hard block. Same semantics —
+// total ounces (lbs×16 + oz), and a total order over weigh-ins of date, then
+// AM-before-PM (blank between), then capture time, so a PM entry compares
+// against that morning's AM and an AM against the prior day.
+
+export function weightTotalOz(details) {
+  if (!details) return null;
+  const lbs = details.weight_lbs;
+  const oz = details.weight_oz;
+  const hasLbs = lbs !== '' && lbs != null && Number.isFinite(Number(lbs));
+  const hasOz = oz !== '' && oz != null && Number.isFinite(Number(oz));
+  if (!hasLbs && !hasOz) return null;
+  return (hasLbs ? Number(lbs) : 0) * 16 + (hasOz ? Number(oz) : 0);
+}
+
+export function fmtWeight(details) {
+  const lbs = (details?.weight_lbs ?? '') !== '' ? Number(details.weight_lbs) : 0;
+  const oz = (details?.weight_oz ?? '') !== '' ? Number(details.weight_oz) : 0;
+  const t = String(details?.time_of_day || '').toUpperCase();
+  return `${lbs} lb ${oz} oz${t ? ` ${t}` : ''}`;
+}
+
+function timeRank(details) {
+  const t = String(details?.time_of_day || '').toUpperCase();
+  return t === 'PM' ? 1 : (t === 'AM' ? 0 : 0.5);
+}
+
+export function weighKey(ev) {
+  return { date: ev.event_date || '', rank: timeRank(ev.details), created: ev.created_at || '' };
+}
+
+function keyCmp(a, b) {
+  if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+  if (a.rank !== b.rank) return a.rank - b.rank;
+  if (a.created !== b.created) return a.created < b.created ? -1 : 1;
+  return 0;
+}
+
+// The dog's weigh-in (with a real weight) immediately preceding `newKey`,
+// across BOTH synced history and still-pending local entries — a second pup
+// weighed this morning must compare against this morning, not last week.
+export async function getPriorWeighIn(dogId, newKey) {
+  const evs = await getTimeline(dogId);
+  let best = null;
+  let bestKey = null;
+  for (const e of evs) {
+    if (e.event_type !== 'weight_check') continue;
+    if (weightTotalOz(e.details) == null) continue;
+    const k = weighKey(e);
+    if (keyCmp(k, newKey) >= 0) continue;
+    if (!bestKey || keyCmp(k, bestKey) > 0) { best = e; bestKey = k; }
+  }
+  return best;
+}
+
 // The outbox object to upload: every still-pending event, `pending` marker
 // stripped (it's this device's bookkeeping, not part of the record).
 export async function buildOutbox() {
