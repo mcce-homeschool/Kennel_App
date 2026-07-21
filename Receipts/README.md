@@ -56,6 +56,16 @@ the browser, works offline as an installable PWA.
 **The photos stay here.** KennelOS stores no images by design, so this app is your
 archive of the original receipt pictures; only the extracted numbers cross over.
 
+- **💾 Backup / Restore** (Settings → Backup) — downloads a single `.zip` with every
+  entry **and every photo's original bytes**, plus your settings (businesses,
+  categories, vehicles, drivers). This is the only real data-loss protection for the
+  photos — the CSV export carries numbers only, and Photos → PDF is a flattened,
+  non-restorable printout. Save the file somewhere off this device (a cloud-synced
+  folder, another computer); the download itself doesn't protect you if it never
+  leaves the phone. Restore reads a `.zip` back in and upserts by id — safe to run on
+  a fresh device or to re-run without duplicating anything. Settings shows how long
+  it's been since your last backup next to the button.
+
 ## How the pieces fit
 
 ```
@@ -69,6 +79,8 @@ Receipts/
     entryRepo.js    CRUD for captured costs (receipts + trips)
     photoRepo.js    image storage (Blob + thumbnail) — the photo archive
     csvExport.js    builds the KennelOS-compatible CSV (columns match the importer)
+    backup.js       full backup/restore — entries + photo bytes bundled as a .zip
+    zip.js          minimal dependency-free ZIP reader/writer (store method only)
     ocr.js          offline receipt reading via vendored Tesseract.js
     vocab.js        categories/subjects — MIRRORS KennelOS's vocab (keep in sync)
     settings.js     default kennel name + mileage rate (localStorage)

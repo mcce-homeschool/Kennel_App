@@ -56,5 +56,18 @@ export const photoRepo = {
 
   async remove(id) {
     if (id) await db.photos.delete(id);
+  },
+
+  // Every photo row, for backup export. Includes the Blob — caller streams it
+  // into the archive rather than holding many in memory at once where it can.
+  async getAll() {
+    return db.photos.toArray();
+  },
+
+  // Upsert a full row as-is (id, blob, mime, thumbnail, created_at) — used only
+  // by backup restore, which is repopulating known-good records, not creating
+  // new ones (so it skips the id/thumbnail generation in create()).
+  async putRaw(record) {
+    await db.photos.put(record);
   }
 };
