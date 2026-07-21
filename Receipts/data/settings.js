@@ -22,7 +22,8 @@ const KEYS = {
   vehicles: 'receipts.vehicles',
   drivers: 'receipts.drivers',
   lastVehicle: 'receipts.lastVehicle',
-  lastDriver: 'receipts.lastDriver'
+  lastDriver: 'receipts.lastDriver',
+  lastBackupDate: 'receipts.lastBackupDate'
 };
 
 const DEFAULTS = { kennelName: '', mileageRate: 0.70 };
@@ -148,3 +149,13 @@ export function getLastVehicle() { return localStorage.getItem(KEYS.lastVehicle)
 export function setLastVehicle(v) { localStorage.setItem(KEYS.lastVehicle, String(v ?? '').trim()); }
 export function getLastDriver() { return localStorage.getItem(KEYS.lastDriver) || ''; }
 export function setLastDriver(v) { localStorage.setItem(KEYS.lastDriver, String(v ?? '').trim()); }
+
+// --- Backup ----------------------------------------------------------------
+// When a full backup (entries + photos) was last downloaded, so the Settings
+// screen can show "last backup: N days ago" next to the button.
+export function getLastBackupDate() {
+  return localStorage.getItem(KEYS.lastBackupDate); // ISO string or null
+}
+export function setLastBackupDate(iso = new Date().toISOString()) {
+  localStorage.setItem(KEYS.lastBackupDate, iso);
+}

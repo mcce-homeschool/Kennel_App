@@ -7,7 +7,7 @@
 // (~7 MB) are deliberately NOT precached — they are runtime-cached on first scan
 // by the fetch handler below, so install stays fast/reliable and OCR still works
 // offline after you've scanned once. If you change those files, bump CACHE_NAME.
-const CACHE_NAME = 'receipts-shell-v5';
+const CACHE_NAME = 'receipts-shell-v6';
 
 const PRECACHE_URLS = [
   './',
@@ -24,6 +24,8 @@ const PRECACHE_URLS = [
   'data/settings.js',
   'data/csvExport.js',
   'data/ocr.js',
+  'data/zip.js',
+  'data/backup.js',
   'vendor/dexie.min.mjs',
   'assets/icons/favicon-32.png',
   'assets/icons/apple-touch-icon.png',

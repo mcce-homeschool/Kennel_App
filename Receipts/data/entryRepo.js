@@ -152,5 +152,12 @@ export const entryRepo = {
       const e = await db.entries.get(id);
       if (e) await db.entries.update(id, { exported_at: stampIso, updated_at: nowIso() });
     }
+  },
+
+  // Upsert a full row as-is — used only by backup restore, which is
+  // repopulating known-good records (already validated when first saved), not
+  // taking fresh form input.
+  async putRaw(row) {
+    await db.entries.put(row);
   }
 };

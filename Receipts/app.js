@@ -14,6 +14,7 @@ import {
   getVehicles, addVehicle, removeVehicle, getDrivers, addDriver, removeDriver,
   getLastVehicle, setLastVehicle, getLastDriver, setLastDriver
 } from './data/settings.js';
+import { downloadBackup, inspectBackup, restoreBackup, lastBackupLabel } from './data/backup.js';
 import * as ocr from './data/ocr.js';
 import { printReceiptsPdf } from './assets/pdfView.js';
 import { esc, fmtMoney, fmtDate, todayYMD, toast, openModal } from './assets/ui.js';
@@ -723,6 +724,20 @@ function openSettings() {
     </form>
 
     <div class="settings-section">
+      <h3>Backup</h3>
+      <p class="hint">Everything — receipts, trips, and the actual photos — bundled into one file. KennelOS never sees the images, so this is the only copy; save it somewhere off this device (cloud folder, another computer) for real data-loss protection.</p>
+      <div class="form-actions" style="margin-top:0;">
+        <button type="button" class="btn btn-soft" id="backup-download-btn">⬇ Download backup</button>
+        <label class="btn btn-soft">
+          ⬆ Restore from backup
+          <input type="file" accept=".zip" id="backup-restore-input" hidden>
+        </label>
+        <span class="spacer"></span>
+        <span class="muted" id="backup-last-label"></span>
+      </div>
+    </div>
+
+    <div class="settings-section">
       <h3>Businesses</h3>
       <p class="hint">Tag each entry with a business so you can scope an export (e.g. only kennel expenses). Names stay in this app — they never go to KennelOS.</p>
       <ul class="tag-list" id="biz-list"></ul>
@@ -766,6 +781,60 @@ function openSettings() {
     setKennelName(ev.target.kennelName.value);
     setMileageRate(ev.target.mileageRate.value);
     toast('Saved');
+  });
+
+  // --- Backup / restore ---
+  const lastBackupLabelEl = el.querySelector('#backup-last-label');
+  const downloadBtn = el.querySelector('#backup-download-btn');
+  const restoreInput = el.querySelector('#backup-restore-input');
+  lastBackupLabelEl.textContent = lastBackupLabel();
+
+  downloadBtn.addEventListener('click', async () => {
+    downloadBtn.disabled = true;
+    downloadBtn.textContent = 'Building…';
+    try {
+      const { entryCount, photoCount } = await downloadBackup();
+      lastBackupLabelEl.textContent = lastBackupLabel();
+      toast(`Backup saved — ${entryCount} entries, ${photoCount} photos`);
+    } catch (err) {
+      toast(err.message || 'Backup failed', 'err');
+    } finally {
+      downloadBtn.disabled = false;
+      downloadBtn.textContent = '⬇ Download backup';
+    }
+  });
+
+  restoreInput.addEventListener('change', async (ev) => {
+    const file = ev.target.files?.[0];
+    restoreInput.value = '';
+    if (!file) return;
+    let inspected;
+    try {
+      inspected = await inspectBackup(file);
+    } catch (err) {
+      toast(err.message || 'Could not read that file', 'err');
+      return;
+    }
+    const { manifest, entries, photoMeta } = inspected;
+    const when = manifest.created_at ? fmtDate(manifest.created_at.slice(0, 10)) : 'an unknown date';
+    const { el: confirmEl, close: closeConfirm } = openModal(`
+      <div class="modal-head"><h2>Restore this backup?</h2></div>
+      <p class="muted">Backup from <strong>${esc(when)}</strong> — ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}, ${photoMeta.length} photo${photoMeta.length === 1 ? '' : 's'}.</p>
+      <p class="muted">This adds to what's already here — matching items are updated in place, nothing already on this device is removed.</p>
+      <div class="form-actions"><span class="spacer"></span>
+        <button class="btn" data-close>Cancel</button>
+        <button class="btn btn-primary" id="really-restore">Restore</button>
+      </div>`);
+    confirmEl.querySelector('#really-restore').addEventListener('click', async () => {
+      closeConfirm();
+      try {
+        const { entryCount, photoCount } = await restoreBackup(inspected);
+        toast(`Restored ${entryCount} entries, ${photoCount} photos`);
+        renderList();
+      } catch (err) {
+        toast(err.message || 'Restore failed', 'err');
+      }
+    });
   });
 
   // --- Businesses, categories, vehicles & drivers ---
