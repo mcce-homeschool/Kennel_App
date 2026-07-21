@@ -131,6 +131,8 @@ function openAddExpense(onSaved) {
           <input id="af-date" type="date" value="${esc(todayYMD())}"></div>
         <div class="field"><label>Vendor</label>
           <input id="af-vendor" type="text" placeholder="Who was paid"></div>
+        <div class="field"><label>Receipt #</label>
+          <input id="af-receipt" type="text" placeholder="e.g. R-0007 (ties to a photo receipt)"></div>
         <div class="field field-wide"><label>Notes</label><textarea id="af-notes"></textarea></div>
       </div>
       <div id="af-error"></div>
@@ -155,6 +157,7 @@ function openAddExpense(onSaved) {
         subject_id: subjSel.value,
         expense_date: modal.querySelector('#af-date').value,
         vendor: modal.querySelector('#af-vendor').value.trim(),
+        receipt_number: modal.querySelector('#af-receipt').value.trim(),
         notes: modal.querySelector('#af-notes').value,
         ...mileage.payloadBits()
       });
@@ -214,7 +217,7 @@ function initExpenses() {
   const view = createReportView({
     mount: document.getElementById('report-mount'),
     csvFilename: `financials-${bucket ? bucket + '-' : ''}${new Date().toISOString().slice(0, 10)}.csv`,
-    search: { placeholder: 'Search subject, vendor, or notes…', text: (x) => `${subjectLabel(x)} ${x.vendor || ''} ${x.notes || ''}` },
+    search: { placeholder: 'Search subject, vendor, receipt #, or notes…', text: (x) => `${subjectLabel(x)} ${x.vendor || ''} ${x.receipt_number || ''} ${x.notes || ''}` },
     filters: [
       { id: 'category', label: 'Category', options: EXPENSE_CATEGORIES, match: (x, v) => x.category === v },
       { id: 'subject_type', label: 'Attached to', options: EXPENSE_SUBJECT_TYPES, match: (x, v) => x.subject_type === v },
@@ -227,6 +230,7 @@ function initExpenses() {
       { header: 'Attached to', value: (x) => subjectTypeLabel(x.subject_type) },
       { header: 'Subject', value: (x) => subjectLabel(x) },
       { header: 'Vendor', value: (x) => x.vendor || '' },
+      { header: 'Receipt #', value: (x) => x.receipt_number || '' },
       { header: 'Notes', value: (x) => x.notes || '' }
     ],
     onRowClick: (x) => {

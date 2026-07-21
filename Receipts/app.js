@@ -6,13 +6,18 @@
 import { entryRepo, effectiveAmount } from './data/entryRepo.js';
 import { photoRepo } from './data/photoRepo.js';
 import { buildCsv, downloadCsv, summarize } from './data/csvExport.js';
-import { EXPENSE_CATEGORIES, SUBJECT_TYPES, categoryLabel } from './data/vocab.js';
-import { getKennelName, setKennelName, getMileageRate, setMileageRate } from './data/settings.js';
+import { EXPENSE_CATEGORIES, SUBJECT_TYPES, categoryLabel, categoryList } from './data/vocab.js';
+import {
+  getKennelName, setKennelName, getMileageRate, setMileageRate,
+  getBusinesses, addBusiness, removeBusiness, getDefaultBusiness, setDefaultBusiness,
+  getCustomCategories, addCustomCategory, removeCustomCategory
+} from './data/settings.js';
 import * as ocr from './data/ocr.js';
 import { esc, fmtMoney, fmtDate, todayYMD, toast, openModal } from './assets/ui.js';
 
 let ocrAvailable = false;
 let filterMode = 'all'; // 'all' | 'unexported'
+let filterBusiness = ''; // '' = all businesses
 
 // ---- Register the service worker (PWA / offline) ----
 if ('serviceWorker' in navigator) {
@@ -78,6 +83,8 @@ function cardHtml(e) {
     ? `${e.miles ?? '?'} mi × ${fmtMoney(e.mileage_rate)}`
     : (e.vendor ? esc(e.vendor) : categoryLabel(e.category));
   const exportedTag = e.exported_at ? `<span class="tag tag-exported">exported</span>` : '';
+  const bizTag = e.business ? `<span class="tag tag-biz">${esc(e.business)}</span>` : '';
+  const rcpt = e.receipt_number ? `<span class="card-rcpt">${esc(e.receipt_number)}</span>` : '';
   return `<button class="card" data-open="${esc(e.id)}">
     <div class="card-thumb ${isTrip ? 'is-trip' : ''}" data-thumb="${esc(e.id)}">${isTrip ? '🚗' : '🧾'}</div>
     <div class="card-body">
@@ -89,14 +96,26 @@ function cardHtml(e) {
         <span class="chip chip-${esc(e.category)}">${esc(categoryLabel(e.category))}</span>
         <span class="card-subject">${subj}</span>
       </div>
-      <div class="card-meta">${meta}${exportedTag}</div>
+      <div class="card-meta">${rcpt}${meta}${bizTag}${exportedTag}</div>
     </div>
   </button>`;
 }
 
 // ---------------------------------------------------- shared form bits ----
 function categoryOptions(selected) {
-  return EXPENSE_CATEGORIES.map((c) => `<option value="${esc(c.value)}"${c.value === selected ? ' selected' : ''}>${esc(c.label)}</option>`).join('');
+  const list = categoryList(getCustomCategories());
+  // Ensure an entry's current (possibly since-removed) category still appears.
+  if (selected && !list.some((c) => c.value === selected)) list.push({ value: selected, label: selected });
+  return list.map((c) => `<option value="${esc(c.value)}"${c.value === selected ? ' selected' : ''}>${esc(c.label)}${c.custom ? ' (custom)' : ''}</option>`).join('');
+}
+
+function businessOptions(selected, { includeNone = true, noneLabel = '— none —' } = {}) {
+  const list = getBusinesses();
+  const opts = includeNone ? [`<option value=""${!selected ? ' selected' : ''}>${esc(noneLabel)}</option>`] : [];
+  for (const b of list) opts.push(`<option value="${esc(b)}"${b === selected ? ' selected' : ''}>${esc(b)}</option>`);
+  // Keep an entry's current business visible even if it was later removed.
+  if (selected && !list.includes(selected)) opts.push(`<option value="${esc(selected)}" selected>${esc(selected)}</option>`);
+  return opts.join('');
 }
 function subjectTypeOptions(selected) {
   return SUBJECT_TYPES.map((s) => `<option value="${esc(s.value)}"${s.value === selected ? ' selected' : ''}>${esc(s.label)}</option>`).join('');
@@ -133,6 +152,27 @@ function readSubject(form) {
     ? form.subject_name_dog.value.trim()
     : form.subject_name_kennel.value.trim();
   return { subject_type, subject_name };
+}
+
+// Business (this app's own bucket) + Receipt # (auto-assigned on save if blank).
+function metaFields(entry) {
+  const bizHint = getBusinesses().length ? '' : ' <span class="hint">— add businesses in ⚙ Settings</span>';
+  return `
+    <div class="grid2">
+      <label>Business${bizHint}
+        <select name="business">${businessOptions(entry ? entry.business : getDefaultBusiness())}</select>
+      </label>
+      <label>Receipt #
+        <input type="text" name="receipt_number" value="${esc(entry?.receipt_number || '')}" placeholder="${entry ? '' : 'auto — R-####'}" autocomplete="off">
+      </label>
+    </div>`;
+}
+
+function readMeta(form) {
+  return {
+    business: form.business.value,
+    receipt_number: form.receipt_number.value.trim()
+  };
 }
 
 // ------------------------------------------------------- receipt form ----
@@ -175,6 +215,7 @@ function openReceiptForm(entry) {
         <input type="text" name="vendor" value="${esc(entry?.vendor || '')}" placeholder="e.g. Tractor Supply" autocomplete="off">
       </label>
       ${subjectFields(entry)}
+      ${metaFields(entry)}
       <label>Notes
         <textarea name="notes" rows="2" placeholder="Optional">${esc(entry?.notes || '')}</textarea>
       </label>
@@ -256,7 +297,8 @@ function openReceiptForm(entry) {
       vendor: form.vendor.value,
       notes: form.notes.value,
       photo_id: photoId,
-      ...readSubject(form)
+      ...readSubject(form),
+      ...readMeta(form)
     };
     try {
       if (isNew) await entryRepo.create(data); else await entryRepo.update(entry.id, data);
@@ -295,6 +337,7 @@ function openTripForm(entry) {
       </label>
       <div class="mileage-preview muted" id="mileage-preview"></div>
       ${subjectFields(entry)}
+      ${metaFields(entry)}
       <label>Purpose / notes
         <input type="text" name="notes" value="${esc(entry?.notes || '')}" placeholder="e.g. Vet run — Juno, or delivering a puppy" autocomplete="off">
       </label>
@@ -349,7 +392,8 @@ function openTripForm(entry) {
       mileage_rate: form.mileage_rate.value,
       notes: form.notes.value,
       photo_id: photoId,
-      ...readSubject(form)
+      ...readSubject(form),
+      ...readMeta(form)
     };
     try {
       if (isNew) await entryRepo.create(data); else await entryRepo.update(entry.id, data);
@@ -392,10 +436,18 @@ function confirmDelete(entry, closeParent) {
 async function openExport() {
   const all = await entryRepo.getAll();
   if (!all.length) { toast('Nothing to export yet'); return; }
-  const unexported = all.filter((e) => !e.exported_at);
 
-  const sAll = summarize(all);
-  const sNew = summarize(unexported);
+  const businesses = getBusinesses();
+  const bizSelect = businesses.length
+    ? `<label>Business to include
+        <select id="exp-business">
+          <option value="__all">All businesses</option>
+          ${businesses.map((b) => `<option value="${esc(b)}"${b === getDefaultBusiness() ? ' selected' : ''}>${esc(b)}</option>`).join('')}
+          <option value="__none">(No business)</option>
+        </select>
+        <span class="hint">Scope the file — e.g. only your kennel expenses. Business names don’t go into the CSV.</span>
+      </label>`
+    : '';
 
   const { el, close } = openModal(`
     <div class="modal-head">
@@ -403,31 +455,52 @@ async function openExport() {
       <button class="icon-btn" data-close aria-label="Close">✕</button>
     </div>
     <p class="muted">Downloads a CSV you load in KennelOS under <strong>Import / Export → Import expenses (CSV)</strong>. The photos stay here — KennelOS stores the numbers, this app keeps your originals.</p>
-    <div class="export-choices">
-      <label class="radio-card">
-        <input type="radio" name="scope" value="unexported" ${unexported.length ? 'checked' : 'disabled'}>
-        <div>
-          <strong>Not yet exported</strong>
-          <span class="muted">${sNew.count} item${sNew.count === 1 ? '' : 's'} · ${sNew.receipts} receipt(s), ${sNew.trips} trip(s) · ${fmtMoney(sNew.total)}</span>
-        </div>
-      </label>
-      <label class="radio-card">
-        <input type="radio" name="scope" value="all" ${unexported.length ? '' : 'checked'}>
-        <div>
-          <strong>Everything</strong>
-          <span class="muted">${sAll.count} item${sAll.count === 1 ? '' : 's'} · ${sAll.receipts} receipt(s), ${sAll.trips} trip(s) · ${fmtMoney(sAll.total)}</span>
-        </div>
-      </label>
-    </div>
+    <div class="form">${bizSelect}</div>
+    <div class="export-choices" id="exp-choices"></div>
     <label class="check"><input type="checkbox" id="mark-exported" checked> Mark these as exported</label>
     <div class="form-actions"><span class="spacer"></span>
       <button class="btn" data-close>Cancel</button>
       <button class="btn btn-primary" id="do-export">⬇ Download CSV</button>
     </div>`);
 
+  const bizEl = el.querySelector('#exp-business');
+  const choicesEl = el.querySelector('#exp-choices');
+
+  // Apply the chosen business filter to a set of entries.
+  function scopedByBusiness(list) {
+    const b = bizEl?.value || '__all';
+    if (b === '__all') return list;
+    if (b === '__none') return list.filter((e) => !e.business);
+    return list.filter((e) => e.business === b);
+  }
+
+  function currentSets() {
+    const scoped = scopedByBusiness(all);
+    return { all: scoped, unexported: scoped.filter((e) => !e.exported_at) };
+  }
+
+  function renderChoices() {
+    const { all: a, unexported: u } = currentSets();
+    const sA = summarize(a), sU = summarize(u);
+    choicesEl.innerHTML = `
+      <label class="radio-card">
+        <input type="radio" name="scope" value="unexported" ${u.length ? 'checked' : 'disabled'}>
+        <div><strong>Not yet exported</strong>
+          <span class="muted">${sU.count} item${sU.count === 1 ? '' : 's'} · ${sU.receipts} receipt(s), ${sU.trips} trip(s) · ${fmtMoney(sU.total)}</span></div>
+      </label>
+      <label class="radio-card">
+        <input type="radio" name="scope" value="all" ${u.length ? '' : 'checked'}>
+        <div><strong>Everything in scope</strong>
+          <span class="muted">${sA.count} item${sA.count === 1 ? '' : 's'} · ${sA.receipts} receipt(s), ${sA.trips} trip(s) · ${fmtMoney(sA.total)}</span></div>
+      </label>`;
+  }
+  renderChoices();
+  bizEl?.addEventListener('change', renderChoices);
+
   el.querySelector('#do-export').addEventListener('click', async () => {
+    const { all: a, unexported: u } = currentSets();
     const scope = el.querySelector('input[name=scope]:checked')?.value || 'all';
-    const rows = scope === 'unexported' ? unexported : all;
+    const rows = scope === 'unexported' ? u : a;
     if (!rows.length) { toast('Nothing in that selection'); return; }
     const csv = buildCsv(rows);
     downloadCsv(`kennelos-expenses-${todayYMD()}.csv`, csv);
@@ -457,20 +530,76 @@ function openSettings() {
         <span class="hint">Prefilled on new trips. Use the same rate you use in KennelOS.</span>
       </label>
       <div class="form-actions"><span class="spacer"></span>
-        <button type="button" class="btn" data-close>Cancel</button>
-        <button type="submit" class="btn btn-primary">Save</button>
+        <button type="submit" class="btn btn-primary">Save these</button>
       </div>
     </form>
+
+    <div class="settings-section">
+      <h3>Businesses</h3>
+      <p class="hint">Tag each entry with a business so you can scope an export (e.g. only kennel expenses). Names stay in this app — they never go to KennelOS.</p>
+      <ul class="tag-list" id="biz-list"></ul>
+      <div class="add-row">
+        <input type="text" id="biz-add-input" placeholder="Add a business…" autocomplete="off">
+        <button class="btn btn-soft" id="biz-add-btn" type="button">Add</button>
+      </div>
+      <label style="margin-top:10px;">Default for new entries
+        <select id="biz-default"></select>
+      </label>
+    </div>
+
+    <div class="settings-section">
+      <h3>Custom categories</h3>
+      <p class="hint">Your own categories, on top of the KennelOS ones. KennelOS files anything it doesn’t recognize under “Other”, so these suit non-kennel businesses you scope out of the KennelOS export.</p>
+      <ul class="tag-list" id="cat-list"></ul>
+      <div class="add-row">
+        <input type="text" id="cat-add-input" placeholder="Add a category…" autocomplete="off">
+        <button class="btn btn-soft" id="cat-add-btn" type="button">Add</button>
+      </div>
+    </div>
+
     <div class="about muted">
       <p><strong>Receipts</strong> — a companion to KennelOS. All data stays on this device. ${ocrAvailable ? 'Offline receipt scanning is ready.' : 'Receipt scanning isn’t available on this device — enter details by hand.'}</p>
     </div>`);
+
   el.querySelector('#sform').addEventListener('submit', (ev) => {
     ev.preventDefault();
     setKennelName(ev.target.kennelName.value);
     setMileageRate(ev.target.mileageRate.value);
-    close();
-    toast('Settings saved');
+    toast('Saved');
   });
+
+  // --- Businesses (live add/remove) ---
+  const bizList = el.querySelector('#biz-list');
+  const bizDefault = el.querySelector('#biz-default');
+  function renderBiz() {
+    const list = getBusinesses();
+    bizList.innerHTML = list.length
+      ? list.map((b) => `<li><span>${esc(b)}</span><button type="button" class="chip-x" data-biz="${esc(b)}" aria-label="Remove">✕</button></li>`).join('')
+      : '<li class="muted">None yet.</li>';
+    bizDefault.innerHTML = `<option value="">— none —</option>` + list.map((b) => `<option value="${esc(b)}"${b === getDefaultBusiness() ? ' selected' : ''}>${esc(b)}</option>`).join('');
+    bizList.querySelectorAll('[data-biz]').forEach((btn) => btn.addEventListener('click', () => { removeBusiness(btn.dataset.biz); renderBiz(); }));
+  }
+  el.querySelector('#biz-add-btn').addEventListener('click', () => {
+    const input = el.querySelector('#biz-add-input');
+    if (input.value.trim()) { addBusiness(input.value); input.value = ''; renderBiz(); }
+  });
+  bizDefault.addEventListener('change', () => { setDefaultBusiness(bizDefault.value); toast('Default business set'); });
+  renderBiz();
+
+  // --- Custom categories (live add/remove) ---
+  const catList = el.querySelector('#cat-list');
+  function renderCats() {
+    const list = getCustomCategories();
+    catList.innerHTML = list.length
+      ? list.map((c) => `<li><span>${esc(c)}</span><button type="button" class="chip-x" data-cat="${esc(c)}" aria-label="Remove">✕</button></li>`).join('')
+      : '<li class="muted">None yet — the KennelOS categories are always available.</li>';
+    catList.querySelectorAll('[data-cat]').forEach((btn) => btn.addEventListener('click', () => { removeCustomCategory(btn.dataset.cat); renderCats(); }));
+  }
+  el.querySelector('#cat-add-btn').addEventListener('click', () => {
+    const input = el.querySelector('#cat-add-input');
+    if (input.value.trim()) { addCustomCategory(input.value); input.value = ''; renderCats(); }
+  });
+  renderCats();
 }
 
 init();

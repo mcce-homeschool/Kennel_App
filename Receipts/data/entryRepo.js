@@ -16,6 +16,7 @@
 //   created_at, updated_at, is_archived
 import { db } from './db.js';
 import { photoRepo } from './photoRepo.js';
+import { nextReceiptNumber, getDefaultBusiness } from './settings.js';
 
 function nowIso() { return new Date().toISOString(); }
 
@@ -65,6 +66,11 @@ function normalize(data) {
     amount: isTrip ? null : numOrNull(data.amount),
     miles: isTrip ? numOrNull(data.miles) : null,
     mileage_rate: isTrip ? numOrNull(data.mileage_rate) : null,
+    // The receipt number ties this entry to its KennelOS row (assigned on create
+    // if blank). `business` buckets the entry for this app's own filtering/export
+    // scoping — it deliberately does NOT ride to KennelOS.
+    receipt_number: String(data.receipt_number || '').trim(),
+    business: String(data.business || '').trim(),
     photo_id: data.photo_id || null
   };
 }
@@ -87,6 +93,10 @@ export const entryRepo = {
   async create(data) {
     const norm = normalize(data);
     validate(norm);
+    // Auto-assign a receipt number if none was supplied, and default the business
+    // to the configured default when the caller left it blank.
+    if (!norm.receipt_number) norm.receipt_number = nextReceiptNumber();
+    if (!norm.business && !('business' in data)) norm.business = getDefaultBusiness();
     const row = { id: crypto.randomUUID(), ...norm, exported_at: null, is_archived: false, created_at: nowIso(), updated_at: nowIso() };
     await db.entries.put(row);
     return row;

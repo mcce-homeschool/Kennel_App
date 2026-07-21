@@ -37,6 +37,17 @@ export function categoryLabel(value) {
   return EXPENSE_CATEGORIES.find((c) => c.value === value)?.label || value || 'Other';
 }
 
+// The full category list for the picker: the KennelOS-mirrored built-ins plus
+// any custom categories the user added (each custom one is its own value+label;
+// it exports as-is and KennelOS maps an unrecognized category to "Other").
+export function categoryList(custom = []) {
+  const builtinValues = new Set(EXPENSE_CATEGORIES.map((c) => c.value));
+  const extra = custom
+    .filter((name) => name && !builtinValues.has(name))
+    .map((name) => ({ value: name, label: name, custom: true }));
+  return [...EXPENSE_CATEGORIES, ...extra];
+}
+
 export function subjectTypeLabel(value) {
   return SUBJECT_TYPES.find((s) => s.value === value)?.label || value || 'Kennel';
 }

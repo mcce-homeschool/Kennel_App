@@ -1095,9 +1095,14 @@ function amtKey(n) {
 // deliberately allowed to be blank (a mileage/trip row carries none), so this
 // joins directly with a NUL separator rather than via nkParts (which rejects
 // every empty part).
-function expenseNk(subjectType, subjectId, date, amount, category, vendor) {
+// When a row carries a `receipt_number` (the Receipts companion app stamps one on
+// every entry), that IS the key — the same receipt always maps to the same ledger
+// row, so re-import updates it in place even if its amount/date/subject changed.
+function expenseNk(subjectType, subjectId, date, amount, category, vendor, receiptNumber) {
+  const rn = (receiptNumber || '').trim().toLowerCase();
+  if (rn) return `rcpt ${rn}`;
   if (!subjectType || !subjectId || !date || amount == null) return null;
-  return [subjectType, subjectId, date, amtKey(amount), category || 'other', (vendor || '').trim().toLowerCase()].join(' ');
+  return [subjectType, subjectId, date, amtKey(amount), category || 'other', (vendor || '').trim().toLowerCase()].join(' ');
 }
 
 const EXPENSE_MAPPING = {
@@ -1105,7 +1110,7 @@ const EXPENSE_MAPPING = {
   label: 'Expenses',
   templateHeaders: [
     'subject_type', 'subject_name', 'expense_date', 'amount', 'category',
-    'vendor', 'miles', 'mileage_rate', 'notes'
+    'vendor', 'miles', 'mileage_rate', 'receipt_number', 'notes'
   ],
   requiredForCreate: ['subject_id', 'expense_date'],
 
@@ -1142,7 +1147,7 @@ const EXPENSE_MAPPING = {
     const byKey = new Map();
     for (const e of existing) {
       if (e.is_archived || e.event_id) continue; // only manual/imported ledger rows
-      const key = expenseNk(e.subject_type, e.subject_id, e.expense_date, e.amount, e.category, e.vendor);
+      const key = expenseNk(e.subject_type, e.subject_id, e.expense_date, e.amount, e.category, e.vendor, e.receipt_number);
       if (key) byKey.set(key, e);
     }
     return {
@@ -1231,11 +1236,13 @@ const EXPENSE_MAPPING = {
 
     const vendor = col(row, 'vendor', 'merchant', 'payee');
     if (vendor) record.vendor = vendor;
+    const receiptNo = col(row, 'receipt_number', 'receipt_no', 'receipt', 'receipt_#');
+    if (receiptNo) record.receipt_number = receiptNo;
     const notes = col(row, 'notes', 'memo', 'description');
     if (notes) record.notes = notes;
 
     // --- Natural key → match-or-create ---
-    const key = expenseNk(record.subject_type, record.subject_id, record.expense_date, effectiveAmount, record.category, record.vendor);
+    const key = expenseNk(record.subject_type, record.subject_id, record.expense_date, effectiveAmount, record.category, record.vendor, record.receipt_number);
     let status_ = 'create';
     let match = null;
     if (!key) {

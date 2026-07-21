@@ -130,7 +130,7 @@ commonly blank at entry time.
 | **Contract** | `contract_type` | `status` (defaults `draft`), `related_sale_id`, `related_stud_service_id`, `related_dog_id` (canonical Dog link, used only for `lease`/`co_own`/`other` types — where no linked Sale/StudService reaches a dog; forced `null` for other types via `contractRepo.DOG_LINK_TYPES`/`normalizeLinks`), `related_contact_id` (canonical counterparty link — lessee/co-owner/partner — for the same `lease`/`co_own`/`other` types via `CONTACT_LINK_TYPES`; sale/stud contracts reach their counterparty through the linked Sale/StudService, so it stays `null` there; scopes a contract into the **partner** companion bundle, §20), `document_url` (plain, unindexed — a share link to the signed document, e.g. a Drive "anyone with the link" URL; carried as a *pointer* into the buyer bundle, §20), `signed_date`, `lease_start_date`/`lease_end_date` (lease type; UI shows them and hides Related sale/stud fields when `contract_type='lease'`), `title`, `terms_summary`, `notes`. Generic across sale/stud/co-ownership/lease. Leaf for its own hard-delete (nothing points *at* a contract), but it points *at* its Dog via `related_dog_id` (guarded under `DOG_REFERENCES`) and its counterparty via `related_contact_id` (guarded under `CONTACT_REFERENCES`). |
 | **StudService** | `direction`, `our_dog_id`, `partner_dog_id`, `partner_contact_id`, `status` | `pairing_id`, `fee_amount`, `fee_structure`, `pick_status` (plain, unindexed — suggested `pending`/`claimed`, free text allowed; meaningful **only** when `fee_structure ∈ {pick_of_litter, flat_plus_pick}`, forced `null` otherwise; feeds the partner companion bundle's compensation, §20), `pick_value_amount` (plain, unindexed decimal — the breeder's own estimated dollar value of the pick puppy, for income tracking; gated the same way as `pick_status`; deliberately **separate** from `fee_amount` (the actual cash); internal only — never in the partner bundle), `result_notes`, `type` (`in_person`/`ai` — coarse physical-travel flag; `in_person` + `sent_date`/`returned_date` window feeds the away-board, §19), `referred_by_contact_id` (indexed FK → the referring Contact; `CONTACT_REFERENCES`; on save `studServiceRepo` auto-tags `stud_referrer` via `contactRepo.ensureType`), `payment_method`/`payment_reference`/`invoice_number`/`invoice_notes` (plain, unindexed — invoice/receipt document fields, mirroring Sale's; only the outgoing direction is invoiceable, since incoming stud is an expense; §24), plus optional logistics dates. Covers both `incoming` and `outgoing`. |
 | **Event** | `subject_type`, `subject_id`, `event_type`, `event_date`, `title` | `event_end_date`, `reminder_date`, `reminder_dismissed`, `related_dog_id`, `related_contact_id`, `details{}`, `notes`. See §8. **No `cost` field** — a cost entered on the event form is written to the Expense ledger (`expenses.event_id` = the event) and read back via `expenseRepo.getByEvent`; see the Expense row and §21. |
-| **Expense** | `subject_type` (`dog`/`litter`/`pairing`/`kennel`), `subject_id`, `amount`, `category`, `expense_date` | `event_id` (nullable FK → the Event a cost was captured from — the one canonical event↔cost link; reverse is `expenseRepo.getByEvent`), `miles`/`mileage_rate` (plain, unindexed — a **mileage** expense: when `miles` is set, `amount` is **derived** = `miles × mileage_rate` in `expenseRepo.normalize`, never entered directly; both null on a flat expense. Default rate prefilled from `settings.getMileageDefaults()`; §21), `vendor`, `notes`. The Financials ledger: the single home for money spent. Polymorphic like Event; `kennel`-subject rows are kennel-wide overhead. Leaf entity (`EXPENSE_REFERENCES` empty). See §21. |
+| **Expense** | `subject_type` (`dog`/`litter`/`pairing`/`kennel`), `subject_id`, `amount`, `category`, `expense_date` | `event_id` (nullable FK → the Event a cost was captured from — the one canonical event↔cost link; reverse is `expenseRepo.getByEvent`), `miles`/`mileage_rate` (plain, unindexed — a **mileage** expense: when `miles` is set, `amount` is **derived** = `miles × mileage_rate` in `expenseRepo.normalize`, never entered directly; both null on a flat expense. Default rate prefilled from `settings.getMileageDefaults()`; §21), `vendor`, `receipt_number` (plain, unindexed — a human-facing receipt/reference number that ties a ledger row back to a paper/photo receipt, e.g. the number the Receipts companion app stamps on each capture; shown/edited on both expense forms and the Financials ledger, searchable there, and the idempotent key on CSV re-import when present, §9), `notes`. The Financials ledger: the single home for money spent. Polymorphic like Event; `kennel`-subject rows are kennel-wide overhead. Leaf entity (`EXPENSE_REFERENCES` empty). See §21. |
 
 ### 4.2 Relationship direction — the sixth design principle
 
@@ -376,7 +376,9 @@ The overdue/due-soon boundary (`DUE_SOON_DAYS = 30`) is duplicated as a UI const
 ## 9. CSV import (`data/csvImport.js`)
 
 Generic, entity-agnostic match-or-create engine used through the shared
-`assets/importView.js` UI. Every import is a **dry-run preview** (create / update /
+`assets/importView.js` UI (the **expense** importer is the one exception — it reuses this
+engine for parsing/classification but renders its own subject-attach review screen; see the
+Expense mapping below). Every import is a **dry-run preview** (create / update /
 needs-review) before any write.
 
 Flow: `parseCsv` (PapaParse; headers → lower_snake_case, values trimmed) →
@@ -403,19 +405,32 @@ category+vendor (idempotent re-import — the same file updates, never duplicate
 in-road: a companion receipts/mileage app (or any spreadsheet) emits one row per cost and
 this brings it into the Expense ledger with the same dry-run discipline. Columns:
 `subject_type`, `subject_name`, `expense_date`, `amount`, `category`, `vendor`, `miles`,
-`mileage_rate`, `notes`. **Subject resolution** covers the two subjects a name-only tool
-can express: `subject_type='kennel'` (the default when blank — program overhead) resolves
-by kennel name, or by the configured "my kennel" / sole own kennel when `subject_name` is
-blank; `subject_type='dog'` resolves by registered/call name (an ambiguous name is flagged,
-never guessed). `litter`/`pairing` subjects have no name key, so those rows route to
-needs-review (log them from the record) — the same dog-only-scope posture as the Event
-importer. **Mileage:** a row with `miles` set is a mileage expense — `category` is forced to
-`mileage`, `mileage_rate` falls back to `settings.getMileageDefaults().rate` when blank, and
-`amount` is left for `expenseRepo` to derive (miles × rate), never taken from the file. The
-match index only considers **non-archived, non-event-linked** ledger rows, so a re-import can
-never clobber a cost captured from the event form. There is **no photo/attachment side** —
-KennelOS stores no images (§15); only the extracted money data crosses over, the receipt
-image stays in the source app.
+`mileage_rate`, `receipt_number`, `notes`. **Subject resolution** covers the two subjects a
+name-only tool can express: `subject_type='kennel'` (the default when blank — program
+overhead) resolves by kennel name, or by the configured "my kennel" / sole own kennel when
+`subject_name` is blank; `subject_type='dog'` resolves by registered/call name (an ambiguous
+name is flagged, never guessed). `litter`/`pairing` subjects have no name key, so the CSV
+can't name them — **but the expense importer's review UI lets you attach any row to a litter/
+pairing (or reassign its dog/kennel) by hand before commit** (see below). **Mileage:** a row
+with `miles` set is a mileage expense — `category` is forced to `mileage`, `mileage_rate`
+falls back to `settings.getMileageDefaults().rate` when blank, and `amount` is left for
+`expenseRepo` to derive (miles × rate), never taken from the file. **Idempotent key:** when a
+row carries a `receipt_number`, that IS the natural key (`rcpt <n>`), so the same receipt
+always maps to the same ledger row and re-import updates it in place even if amount/date/
+subject changed; without one, the key is the composite subject+date+amount+category+vendor.
+Either way the match index only considers **non-archived, non-event-linked** ledger rows, so
+a re-import can never clobber a cost captured from the event form. There is **no
+photo/attachment side** — KennelOS stores no images (§15); only the extracted money data (and
+the `receipt_number` back-pointer) crosses over, the receipt image stays in the source app.
+
+**The expense importer has its own review screen** (`pages/expense-import.js`) — the one
+importer that does **not** use the shared `assets/importView.js`. Because an Expense is
+polymorphic (every row must attach to a subject), it reuses the parse + `buildPlan('expense',…)`
+engine for all field parsing / classification / receipt-number keying, but renders its own
+table so each row gets an editable **"Attach to"** control (subject-type dropdown + subject
+picker, prefilled from the CSV's name resolution, reassignable to any dog/litter/pairing/
+kennel) before commit. Commit writes straight through `expenseRepo.create`/`update` with the
+chosen subject. This is the "relate each imported expense to a dog or litter" surface.
 
 To add an entity to the importer: write one mapping object (`{entity, label,
 templateHeaders, requiredForCreate, loadExisting, buildIndex, classify, describe, repo,

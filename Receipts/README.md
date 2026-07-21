@@ -16,8 +16,21 @@ the browser, works offline as an installable PWA.
   KennelOS figures it, so a trip becomes a clean deductible-mileage expense.
 - **⬆ Export to KennelOS** — download a CSV of everything (or just what you haven't
   exported yet). Load it in KennelOS under **Import / Export → Import expenses (CSV)**,
-  which shows a dry-run preview before saving. Re-importing the same file **updates
-  rather than duplicates**.
+  which shows a preview where you can **attach each expense to a dog, litter, pairing,
+  or your kennel** before saving. Re-importing the same file **updates rather than
+  duplicates**.
+
+- **🔢 Receipt numbers** — every entry is auto-stamped with a receipt number
+  (`R-0001`, `R-0002`, …). KennelOS now has a matching **Receipt #** field, so at tax
+  time you can relate a ledger line back to its photo here.
+
+- **🏷 Businesses** — tag each entry with a business (configure the list in Settings).
+  Use this app for more than the kennel and still **scope an export to just kennel
+  expenses**. Business names are this app's own bucketing — they never go to KennelOS.
+
+- **Categories** — the picker mirrors KennelOS's categories exactly; you can also add
+  your **own custom categories** in Settings (KennelOS files anything it doesn't
+  recognize under "Other", so custom ones suit non-kennel businesses).
 
 **The photos stay here.** KennelOS stores no images by design, so this app is your
 archive of the original receipt pictures; only the extracted numbers cross over.
@@ -47,8 +60,11 @@ Receipts/
 The CSV columns are exactly KennelOS's `expense` importer headers:
 
 ```
-subject_type, subject_name, expense_date, amount, category, vendor, miles, mileage_rate, notes
+subject_type, subject_name, expense_date, amount, category, vendor, miles, mileage_rate, receipt_number, notes
 ```
+
+`receipt_number` rides across (it's what ties the ledger row back to this app's entry
+and photo). `business` does **not** — it only scopes which entries an export includes.
 
 - A **receipt** row sets `amount` and `category`; `miles`/`mileage_rate` are blank.
 - A **trip** row sets `miles` + `mileage_rate` and leaves `amount` blank — KennelOS

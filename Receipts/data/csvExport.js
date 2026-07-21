@@ -13,7 +13,10 @@
 //    configured "my kennel".
 import { effectiveAmount } from './entryRepo.js';
 
-const HEADERS = ['subject_type', 'subject_name', 'expense_date', 'amount', 'category', 'vendor', 'miles', 'mileage_rate', 'notes'];
+// `receipt_number` rides so KennelOS can tie the imported row back to this app's
+// entry (and its photo). `business` deliberately does NOT — it's this app's own
+// bucketing dimension, used only to scope which entries an export includes.
+const HEADERS = ['subject_type', 'subject_name', 'expense_date', 'amount', 'category', 'vendor', 'miles', 'mileage_rate', 'receipt_number', 'notes'];
 
 // RFC-4180-ish quoting: wrap in quotes if the value has a comma, quote, or
 // newline, and double any embedded quotes.
@@ -34,6 +37,7 @@ function rowFor(entry) {
     vendor: isTrip ? '' : (entry.vendor || ''),
     miles: isTrip ? (entry.miles != null ? entry.miles : '') : '',
     mileage_rate: isTrip ? (entry.mileage_rate != null ? entry.mileage_rate : '') : '',
+    receipt_number: entry.receipt_number || '',
     notes: entry.notes || ''
   };
 }
