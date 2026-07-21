@@ -185,7 +185,8 @@ function detailFieldsHtml(typeDef) {
     } else {
       input = `<input data-detail="${esc(f.key)}" type="text">`;
     }
-    return `<div class="field"><label>${esc(f.label)}</label>${input}</div>`;
+    const isRequired = typeDef.value === 'weight_check' && f.key === 'time_of_day';
+    return `<div class="field"><label>${esc(f.label)}${isRequired ? ' <span class="req">*</span>' : ''}</label>${input}</div>`;
   }).join('');
 }
 
@@ -242,6 +243,19 @@ async function openLogModal(dog) {
       const val = el.value.trim();
       if (val !== '') details[el.dataset.detail] = el.type === 'number' ? Number(val) : val;
     }
+    if (typeSel.value === 'weight_check') {
+      // Same defaulting as the main app's event form: a half-filled-in weight
+      // (only lbs or only oz) saves 0 for the other rather than staying blank.
+      const hasLbs = details.weight_lbs != null;
+      const hasOz = details.weight_oz != null;
+      if (hasLbs && !hasOz) details.weight_oz = 0;
+      else if (hasOz && !hasLbs) details.weight_lbs = 0;
+      const t = String(details.time_of_day || '').toUpperCase();
+      if (t !== 'AM' && t !== 'PM') {
+        overlay.querySelector('#log-error').innerHTML = '<div class="inline-error">AM/PM is required for a weight check.</div>';
+        return;
+      }
+    }
     const eventDate = overlay.querySelector('#log-date').value;
     try {
       // Same soft warning as the main app's event form: a weigh-in below the
@@ -295,7 +309,7 @@ function openWeighLitterModal(group) {
       ${group.parents ? `<p class="muted" style="margin-top:-8px;">${esc(group.parents)}</p>` : ''}
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <div class="field"><label>Date</label><input id="wl-date" type="date" value="${esc(todayYMD())}"></div>
-        <div class="field"><label>AM/PM</label>
+        <div class="field"><label>AM/PM <span class="req">*</span></label>
           <select id="wl-time"><option value=""></option><option>AM</option><option>PM</option></select></div>
       </div>
       <table class="data" style="width:100%;">
@@ -328,6 +342,10 @@ function openWeighLitterModal(group) {
       const details = {};
       if (lbs !== '') details.weight_lbs = Number(lbs);
       if (oz !== '') details.weight_oz = Number(oz);
+      // A half-filled-in weight (only lbs or only oz) saves 0 for the other
+      // rather than staying blank.
+      if (lbs !== '' && oz === '') details.weight_oz = 0;
+      else if (oz !== '' && lbs === '') details.weight_lbs = 0;
       if (time_of_day) details.time_of_day = time_of_day;
       if (weightTotalOz(details) == null) continue; // blank row = not weighed today
       entries.push({ dog, details });
@@ -339,6 +357,10 @@ function openWeighLitterModal(group) {
     }
     if (!event_date) {
       errBox.innerHTML = '<div class="inline-error">Date is required.</div>';
+      return;
+    }
+    if (!time_of_day) {
+      errBox.innerHTML = '<div class="inline-error">AM/PM is required for a weight check.</div>';
       return;
     }
     try {

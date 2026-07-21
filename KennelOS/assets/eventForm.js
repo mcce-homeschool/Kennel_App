@@ -60,6 +60,15 @@ function timeRank(details) {
   const t = String(details?.time_of_day || '').toUpperCase();
   return t === 'PM' ? 1 : (t === 'AM' ? 0 : 0.5);
 }
+// A weight_check saves lbs and oz independently — if only one was filled in,
+// the other defaults to 0 rather than staying blank (a blank reads as "not
+// weighed", which a half-filled-in weight is not).
+function applyWeightDefaults(details) {
+  const hasLbs = details.weight_lbs !== undefined && details.weight_lbs !== null && details.weight_lbs !== '';
+  const hasOz = details.weight_oz !== undefined && details.weight_oz !== null && details.weight_oz !== '';
+  if (hasLbs && !hasOz) details.weight_oz = 0;
+  else if (hasOz && !hasLbs) details.weight_lbs = 0;
+}
 // A total order over a dog's weigh-ins: date, then AM-before-PM, then capture time.
 function weighKey(ev) {
   return { date: ev.event_date || '', rank: timeRank(ev.details), created: ev.created_at || '' };
@@ -162,8 +171,9 @@ export async function openEventForm(opts) {
       return `<div class="field"><label>${esc(f.label)}</label><input data-detail="${esc(f.key)}" type="text" list="${dlId}" value="${esc(v)}"><datalist id="${dlId}">${opts}</datalist></div>`;
     }
     if (f.type === 'select') {
+      const isRequired = typeDef.value === 'weight_check' && f.key === 'time_of_day';
       const opts = (f.options || []).map((o) => `<option value="${esc(o)}"${o === v ? ' selected' : ''}>${esc(o)}</option>`).join('');
-      return `<div class="field"><label>${esc(f.label)}</label><select data-detail="${esc(f.key)}"><option value="">— select —</option>${opts}</select></div>`;
+      return `<div class="field"><label>${esc(f.label)}${isRequired ? ' <span class="req">*</span>' : ''}</label><select data-detail="${esc(f.key)}"><option value="">— select —</option>${opts}</select></div>`;
     }
     const inputType = f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text';
     const stepAttr = f.type === 'number' && f.step ? ` step="${esc(f.step)}"` : '';
@@ -309,6 +319,10 @@ export async function openEventForm(opts) {
       if (val !== '') draft.perTargetDetails[id][key] = Number(val);
       else delete draft.perTargetDetails[id][key];
     });
+    if (draft.event_type === 'weight_check') {
+      applyWeightDefaults(draft.details);
+      for (const id of Object.keys(draft.perTargetDetails)) applyWeightDefaults(draft.perTargetDetails[id]);
+    }
   }
 
   function showError(msg) {
@@ -324,6 +338,15 @@ export async function openEventForm(opts) {
     // Soft warning: reminder should not precede the event.
     if (draft.reminder_date && draft.event_date && draft.reminder_date < draft.event_date) {
       if (!(await confirmModal({ title: 'Reminder is before the event date', message: 'Reminder date is before the event date. Save anyway?', confirmLabel: 'Save anyway', cancelLabel: 'Cancel' }))) return;
+    }
+    // Hard requirement: AM/PM must be picked for a weight check (it's what lets
+    // same-day weigh-ins sort correctly — see timeRank above).
+    if (draft.event_type === 'weight_check') {
+      const t = String(draft.details.time_of_day || '').toUpperCase();
+      if (t !== 'AM' && t !== 'PM') {
+        showError('AM/PM is required for a weight check.');
+        return;
+      }
     }
     // Soft warning: weight below the dog's previous weigh-in. Checked PER DOG,
     // so a litter-wide bulk weight-add lists exactly which puppies dropped.
