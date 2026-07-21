@@ -25,11 +25,14 @@ function detailRows(e) {
   const subj = e.subject_type === 'dog'
     ? (e.subject_name || 'Dog')
     : (e.subject_name || 'Kennel');
+  const odo = (e.odometer_start != null || e.odometer_end != null)
+    ? `${e.odometer_start ?? '?'} → ${e.odometer_end ?? '?'}` : '';
   const rows = [
     ['Receipt #', e.receipt_number],
     ['Date', fmtDate(e.entry_date)],
     ['Amount', fmtMoney(effectiveAmount(e))],
     e.kind === 'trip' ? ['Mileage', `${e.miles ?? '?'} mi × ${fmtMoney(e.mileage_rate)}/mi`] : ['Vendor', e.vendor],
+    ...(e.kind === 'trip' ? [['Odometer', odo], ['Vehicle', e.vehicle], ['Driver', e.driver]] : []),
     ['Category', categoryLabel(e.category)],
     ['Attached to', `${subjectTypeLabel(e.subject_type)}${subj ? ` — ${subj}` : ''}`],
     ['Business', e.business],
@@ -39,8 +42,15 @@ function detailRows(e) {
 }
 
 // Build the print view for the given entries and trigger Print → Save as PDF.
-// `title` labels the run (e.g. the business name) in the document header.
-export async function printReceiptsPdf(entries, title = 'Receipts') {
+// Options:
+//   title   — labels the run (e.g. the business name) in the document header.
+//   from/to — the YYYY-MM-DD date range the selection was filtered to (shown on
+//             the summary page when set).
+//   summary — when true (default), prepend a summary page with the count, date
+//             range, and TOTAL of the included receipts. The per-receipt "Save as
+//             PDF" passes false (no cover for a single receipt).
+export async function printReceiptsPdf(entries, opts = {}) {
+  const { title = 'Receipts', from = '', to = '', summary = true } = (typeof opts === 'string') ? { title: opts } : opts;
   const withPhotos = entries.filter((e) => e.photo_id);
   if (!withPhotos.length) { toast('No photos in this selection', 'err'); return; }
 
@@ -54,9 +64,24 @@ export async function printReceiptsPdf(entries, title = 'Receipts') {
   }
   if (!pages.length) { toast('No photos in this selection', 'err'); return; }
 
+  // Total over the receipts actually included in the PDF.
+  const total = pages.reduce((sum, { e }) => sum + (effectiveAmount(e) || 0), 0);
+  const rangeText = (from || to) ? `${from ? fmtDate(from) : '…'} – ${to ? fmtDate(to) : '…'}` : 'All dates';
+
+  const coverHtml = (summary && pages.length > 1) ? `
+    <section class="pdf-page pdf-cover">
+      <h1>${esc(title)}</h1>
+      <table class="pdf-summary">
+        <tr><th>Receipts</th><td>${pages.length}</td></tr>
+        <tr><th>Date range</th><td>${esc(rangeText)}</td></tr>
+        <tr class="pdf-total"><th>Total</th><td>${esc(fmtMoney(total))}</td></tr>
+      </table>
+      <p class="pdf-generated">Generated ${esc(fmtDate(new Date().toISOString().slice(0, 10)))}</p>
+    </section>` : '';
+
   const root = document.createElement('div');
   root.className = 'pdf-root';
-  root.innerHTML = pages.map(({ e, dataUrl }) => `
+  root.innerHTML = coverHtml + pages.map(({ e, dataUrl }) => `
     <section class="pdf-page">
       <div class="pdf-head">
         <span class="pdf-title">${esc(title)}</span>
@@ -64,7 +89,7 @@ export async function printReceiptsPdf(entries, title = 'Receipts') {
       </div>
       <div class="pdf-imgwrap"><img src="${dataUrl}" alt="receipt"></div>
       <table class="pdf-meta">${detailRows(e)}</table>
-    </section>`).join('');
+    </section>`).join('') + ((summary && pages.length === 1) ? `<p class="pdf-single-total">Total: ${esc(fmtMoney(total))}</p>` : '');
 
   document.body.appendChild(root);
   document.body.classList.add('printing');

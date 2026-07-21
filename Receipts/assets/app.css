@@ -229,6 +229,13 @@ h1, h2 { margin: 0; }
   .pdf-meta { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 12px; }
   .pdf-meta th { text-align: left; width: 34mm; color: #444; font-weight: 700; padding: 3px 8px 3px 0; vertical-align: top; white-space: nowrap; }
   .pdf-meta td { padding: 3px 0; color: #000; }
+  .pdf-cover h1 { font-size: 22px; margin: 0 0 18px; }
+  .pdf-summary { border-collapse: collapse; font-size: 14px; }
+  .pdf-summary th { text-align: left; color: #444; font-weight: 700; padding: 6px 24px 6px 0; }
+  .pdf-summary td { padding: 6px 0; color: #000; font-weight: 600; }
+  .pdf-summary .pdf-total th, .pdf-summary .pdf-total td { font-size: 18px; border-top: 2px solid #000; padding-top: 10px; }
+  .pdf-generated { margin-top: 22px; color: #666; font-size: 12px; }
+  .pdf-single-total { margin-top: 10px; font-weight: 700; font-size: 15px; color: #000; text-align: right; }
 }
 
 /* ---- toast ---- */
