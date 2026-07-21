@@ -8,16 +8,21 @@ the browser, works offline as an installable PWA.
 
 ## What it does
 
-- **📷 Receipts** — capture a photo (camera on mobile, file picker on desktop). The
-  image is stored on-device, and offline OCR pre-fills **amount, date, and vendor**
-  for you to confirm. Pick a category (the same categories KennelOS uses) and whether
-  the cost is kennel-wide overhead or for a specific dog.
+- **📷 Receipts** — capture a photo (camera on mobile) or **upload an existing
+  photo/screenshot** from your library or files — either way works as the starting
+  point. The image is stored on-device, and offline OCR pre-fills **amount, date, and
+  vendor** for you to confirm. Pick a category (the same categories KennelOS uses) and
+  whether the cost is kennel-wide overhead or for a specific dog.
 - **🚗 Trips** — log mileage (miles × rate). Enter **start/end odometer** and the miles
   compute themselves (or type miles directly), and record the **vehicle** and **driver**
   (each a separately saved list, remembered as you type and prefilled next time). The
   dollar amount is figured the same way KennelOS figures it, so a trip becomes a clean
   deductible-mileage expense. Odometer/vehicle/driver stay in this app for your mileage
   log — the KennelOS export carries only miles × rate.
+- **Receipts / Trips toggle** — the main list shows one kind at a time (never mixed),
+  newest first. A light **Filter** panel narrows it further by date range (or a quick
+  last‑7/30/90‑days pick), business, and — depending on the toggle — category (receipts)
+  or vehicle (trips).
 - **⬆ Export to KennelOS** — download a CSV of everything (or just what you haven't
   exported yet). Load it in KennelOS under **Import / Export → Import expenses (CSV)**,
   which shows a preview where you can **attach each expense to a dog, litter, pairing,
