@@ -13,6 +13,7 @@ import {
   getCustomCategories, addCustomCategory, removeCustomCategory
 } from './data/settings.js';
 import * as ocr from './data/ocr.js';
+import { printReceiptsPdf } from './assets/pdfView.js';
 import { esc, fmtMoney, fmtDate, todayYMD, toast, openModal } from './assets/ui.js';
 
 let ocrAvailable = false;
@@ -257,7 +258,7 @@ function openReceiptForm(entry) {
     if (ocrAvailable) runScan(file);
   });
 
-  el.querySelector('#view-photo').addEventListener('click', () => viewPhoto(photoId));
+  el.querySelector('#view-photo').addEventListener('click', () => viewPhoto(photoId, entry));
   scanBtn.addEventListener('click', async () => {
     const p = await photoRepo.get(photoId);
     if (p?.blob) runScan(p.blob);
@@ -380,7 +381,7 @@ function openTripForm(entry) {
     el.querySelector('#tview-photo').style.display = '';
     toast('Photo attached');
   });
-  el.querySelector('#tview-photo').addEventListener('click', () => viewPhoto(photoId));
+  el.querySelector('#tview-photo').addEventListener('click', () => viewPhoto(photoId, entry));
   if (!isNew) el.querySelector('#tdel-btn').addEventListener('click', () => confirmDelete(entry, close));
 
   form.addEventListener('submit', async (ev) => {
@@ -408,11 +409,13 @@ function openTripForm(entry) {
 }
 
 // ---------------------------------------------------------- helpers -------
-async function viewPhoto(photoId) {
+async function viewPhoto(photoId, entry) {
   if (!photoId) return;
   const url = await photoRepo.getObjectUrl(photoId);
   if (!url) return;
-  const { close } = openModal(`<div class="photo-full"><img src="${url}" alt="receipt photo"><div class="form-actions"><span class="spacer"></span><button class="btn" data-close>Close</button></div></div>`, () => URL.revokeObjectURL(url));
+  const pdfBtn = entry ? `<button class="btn btn-soft" id="photo-pdf">🖼 Save as PDF</button>` : '';
+  const { el, close } = openModal(`<div class="photo-full"><img src="${url}" alt="receipt photo"><div class="form-actions">${pdfBtn}<span class="spacer"></span><button class="btn" data-close>Close</button></div></div>`, () => URL.revokeObjectURL(url));
+  el.querySelector('#photo-pdf')?.addEventListener('click', () => printReceiptsPdf([entry], entry.business || 'Receipt'));
 }
 
 function confirmDelete(entry, closeParent) {
@@ -457,10 +460,12 @@ async function openExport() {
     <p class="muted">Downloads a CSV you load in KennelOS under <strong>Import / Export → Import expenses (CSV)</strong>. The photos stay here — KennelOS stores the numbers, this app keeps your originals.</p>
     <div class="form">${bizSelect}</div>
     <div class="export-choices" id="exp-choices"></div>
-    <label class="check"><input type="checkbox" id="mark-exported" checked> Mark these as exported</label>
-    <div class="form-actions"><span class="spacer"></span>
+    <label class="check"><input type="checkbox" id="mark-exported" checked> Mark these as exported (CSV only)</label>
+    <div class="form-actions">
+      <button class="btn btn-soft" id="do-pdf" title="Save the receipt photos as a PDF">🖼 Photos → PDF</button>
+      <span class="spacer"></span>
       <button class="btn" data-close>Cancel</button>
-      <button class="btn btn-primary" id="do-export">⬇ Download CSV</button>
+      <button class="btn btn-primary" id="do-export">⬇ CSV for KennelOS</button>
     </div>`);
 
   const bizEl = el.querySelector('#exp-business');
@@ -510,6 +515,15 @@ async function openExport() {
     close();
     toast(`Exported ${rows.length} item${rows.length === 1 ? '' : 's'}`);
     renderList();
+  });
+
+  el.querySelector('#do-pdf').addEventListener('click', async () => {
+    const { all: a, unexported: u } = currentSets();
+    const scope = el.querySelector('input[name=scope]:checked')?.value || 'all';
+    const rows = scope === 'unexported' ? u : a;
+    const bizLabel = (bizEl && bizEl.value !== '__all' && bizEl.value !== '__none') ? bizEl.value : 'Receipts';
+    close();
+    await printReceiptsPdf(rows, bizLabel);
   });
 }
 

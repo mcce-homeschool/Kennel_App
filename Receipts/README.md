@@ -32,6 +32,12 @@ the browser, works offline as an installable PWA.
   your **own custom categories** in Settings (KennelOS files anything it doesn't
   recognize under "Other", so custom ones suit non-kennel businesses).
 
+- **🖼 Photos → PDF** — save the receipt photos as a PDF for your records: a tidy
+  one-receipt-per-page document (image + number, date, amount, vendor, category,
+  business, subject, notes). Available from the Export dialog (honoring the same
+  business/scope filters) and per-receipt from the photo viewer. Uses the browser's
+  own Print → Save as PDF — no library, fully offline.
+
 **The photos stay here.** KennelOS stores no images by design, so this app is your
 archive of the original receipt pictures; only the extracted numbers cross over.
 
