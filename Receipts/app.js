@@ -194,8 +194,12 @@ function openReceiptForm(entry) {
         <div class="photo-preview" id="photo-preview">${photoId ? '' : '<span class="muted">No photo yet</span>'}</div>
         <div class="photo-actions">
           <label class="btn btn-soft">
-            📷 ${photoId ? 'Replace photo' : 'Add photo'}
+            📷 ${photoId ? 'Retake' : 'Take photo'}
             <input type="file" accept="image/*" capture="environment" id="photo-input" hidden>
+          </label>
+          <label class="btn btn-soft">
+            🖼 ${photoId ? 'Replace' : 'Upload photo'}
+            <input type="file" accept="image/*" id="photo-input-upload" hidden>
           </label>
           <button type="button" class="btn btn-soft" id="scan-btn" ${photoId ? '' : 'disabled'} style="${ocrAvailable ? '' : 'display:none;'}">✨ Scan text</button>
           <button type="button" class="btn btn-link" id="view-photo" style="${photoId ? '' : 'display:none;'}">View</button>
@@ -247,8 +251,7 @@ function openReceiptForm(entry) {
   }
   if (photoId) showThumb(photoId);
 
-  el.querySelector('#photo-input').addEventListener('change', async (ev) => {
-    const file = ev.target.files?.[0];
+  async function handlePhotoFile(file) {
     if (!file) return;
     const newId = await photoRepo.create(file);
     createdPhotos.push(newId);
@@ -256,9 +259,11 @@ function openReceiptForm(entry) {
     await showThumb(photoId);
     scanBtn.disabled = false;
     el.querySelector('#view-photo').style.display = '';
-    // Auto-scan on a fresh capture if OCR is available.
+    // Auto-scan on a fresh photo (captured or uploaded) if OCR is available.
     if (ocrAvailable) runScan(file);
-  });
+  }
+  el.querySelector('#photo-input').addEventListener('change', (ev) => handlePhotoFile(ev.target.files?.[0]));
+  el.querySelector('#photo-input-upload').addEventListener('change', (ev) => handlePhotoFile(ev.target.files?.[0]));
 
   el.querySelector('#view-photo').addEventListener('click', () => viewPhoto(photoId, entry));
   scanBtn.addEventListener('click', async () => {
@@ -363,8 +368,10 @@ function openTripForm(entry) {
         <input type="text" name="notes" value="${esc(entry?.notes || '')}" placeholder="e.g. Vet run — Juno, or delivering a puppy" autocomplete="off">
       </label>
       <div class="photo-actions">
-        <label class="btn btn-soft">📷 ${photoId ? 'Replace photo' : 'Add photo (optional)'}
+        <label class="btn btn-soft">📷 ${photoId ? 'Retake' : 'Take photo (optional)'}
           <input type="file" accept="image/*" capture="environment" id="tphoto-input" hidden></label>
+        <label class="btn btn-soft">🖼 ${photoId ? 'Replace' : 'Upload photo (optional)'}
+          <input type="file" accept="image/*" id="tphoto-input-upload" hidden></label>
         <button type="button" class="btn btn-link" id="tview-photo" style="${photoId ? '' : 'display:none;'}">View</button>
       </div>
       <div class="form-actions">
@@ -403,14 +410,15 @@ function openTripForm(entry) {
   form.odometer_end.addEventListener('input', recomputeMilesFromOdo);
   updatePreview();
 
-  el.querySelector('#tphoto-input').addEventListener('change', async (ev) => {
-    const file = ev.target.files?.[0];
+  async function handleTripPhotoFile(file) {
     if (!file) return;
     photoId = await photoRepo.create(file);
     createdPhotos.push(photoId);
     el.querySelector('#tview-photo').style.display = '';
     toast('Photo attached');
-  });
+  }
+  el.querySelector('#tphoto-input').addEventListener('change', (ev) => handleTripPhotoFile(ev.target.files?.[0]));
+  el.querySelector('#tphoto-input-upload').addEventListener('change', (ev) => handleTripPhotoFile(ev.target.files?.[0]));
   el.querySelector('#tview-photo').addEventListener('click', () => viewPhoto(photoId, entry));
   if (!isNew) el.querySelector('#tdel-btn').addEventListener('click', () => confirmDelete(entry, close));
 
