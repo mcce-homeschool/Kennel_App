@@ -31,6 +31,40 @@ const TEST_VOCAB_FIELDS = { genetic_test: 'panel_name', breed_specific_test: 'te
 // user pick which targets get the SAME payload, and save writes one independent
 // Event per checked target (no cascade record, no stored link between them).
 // `subjectId` is unused in this mode. The single-subject path is unchanged.
+
+// --- Weight-check regression guard ---------------------------------------
+// A weight_check whose value is below the dog's previous weight is a soft
+// warning (a puppy losing weight is worth a second look), never a hard block —
+// so it lives here in the UI, not the repo (invariant: soft/interactive checks
+// are the page's job). Weights are compared as total ounces (lbs×16 + oz).
+function weightTotalOz(details) {
+  if (!details) return null;
+  const lbs = details.weight_lbs;
+  const oz = details.weight_oz;
+  const hasLbs = lbs !== '' && lbs != null && Number.isFinite(Number(lbs));
+  const hasOz = oz !== '' && oz != null && Number.isFinite(Number(oz));
+  if (!hasLbs && !hasOz) return null;
+  return (hasLbs ? Number(lbs) : 0) * 16 + (hasOz ? Number(oz) : 0);
+}
+function fmtWeight(details) {
+  const lbs = (details?.weight_lbs ?? '') !== '' ? Number(details.weight_lbs) : 0;
+  const oz = (details?.weight_oz ?? '') !== '' ? Number(details.weight_oz) : 0;
+  return `${lbs} lb ${oz} oz`;
+}
+// The dog's most recent prior weight_check with a real weight, on or before the
+// new event's date, excluding the event being edited. Null when there's nothing
+// to compare against. getForSubject returns newest-first, so the first match is
+// the immediately-preceding weigh-in.
+async function findPriorWeightEvent(dogId, newDate, excludeId) {
+  const evs = await HistoryEvent.getForSubject('dog', dogId);
+  return evs.find((e) =>
+    e.event_type === 'weight_check' &&
+    e.id !== excludeId &&
+    (!newDate || (e.event_date || '') <= newDate) &&
+    weightTotalOz(e.details) != null
+  ) || null;
+}
+
 export async function openEventForm(opts) {
   const { subjectType, subjectId, event = null, prefill = null, cascadeTargets = null, onSaved, onCancel } = opts;
   const types = eventTypesFor(subjectType);
@@ -270,6 +304,31 @@ export async function openEventForm(opts) {
     // Soft warning: reminder should not precede the event.
     if (draft.reminder_date && draft.event_date && draft.reminder_date < draft.event_date) {
       if (!(await confirmModal({ title: 'Reminder is before the event date', message: 'Reminder date is before the event date. Save anyway?', confirmLabel: 'Save anyway', cancelLabel: 'Cancel' }))) return;
+    }
+    // Soft warning: weight below the dog's previous weigh-in. Checked PER DOG,
+    // so a litter-wide bulk weight-add lists exactly which puppies dropped.
+    if (draft.event_type === 'weight_check' && subjectType === 'dog') {
+      const targets = isCascade
+        ? [...cascadeChecked].map((id) => ({ id, details: { ...draft.details, ...(draft.perTargetDetails[id] || {}) }, label: cascadeTargets.find((t) => t.id === id)?.label || 'This puppy' }))
+        : [{ id: subjectId, details: draft.details, label: 'This dog' }];
+      const drops = [];
+      for (const t of targets) {
+        const newOz = weightTotalOz(t.details);
+        if (newOz == null) continue;
+        const prior = await findPriorWeightEvent(t.id, draft.event_date, isEdit ? event.id : null);
+        if (prior && newOz < weightTotalOz(prior.details)) {
+          drops.push(`• ${t.label}: ${fmtWeight(t.details)} — down from ${fmtWeight(prior.details)}${prior.event_date ? ` on ${prior.event_date}` : ''}`);
+        }
+      }
+      if (drops.length) {
+        const many = drops.length > 1;
+        const ok = await confirmModal({
+          title: `Weight decreased${many ? ` (${drops.length} dogs)` : ''}`,
+          message: `${many ? 'These weigh-ins are' : 'This weigh-in is'} below the previous weight for the same dog:\n\n${drops.join('\n')}\n\nSave anyway?`,
+          confirmLabel: 'Save anyway', cancelLabel: 'Go back', danger: true
+        });
+        if (!ok) return;
+      }
     }
     const basePayload = {
       subject_type: subjectType,

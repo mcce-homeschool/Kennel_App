@@ -350,6 +350,15 @@ shared test vocabulary; `testTokensOf(event)` derives the test-name token(s).
 puppy gets its own weight inputs while `time_of_day` stays a single shared field. Add a
 type to that map to give any other field the same per-puppy treatment.
 
+**Weight-regression warning** (`eventForm.js` `save()`): saving a `weight_check` whose
+value is **below the same dog's previous weigh-in** raises a soft confirm ("Weight
+decreased — Save anyway?"), never a hard block (soft/interactive checks are the page's job,
+not the repo's, per §6). It's checked **per dog**, so a litter-wide bulk weight-add lists
+exactly which puppies dropped (and by how much). Comparison is total ounces (`lbs×16 + oz`)
+against the most recent prior `weight_check` for that dog on or before the new event's date
+(`findPriorWeightEvent`, excluding the event being edited); a weight with no prior to
+compare against, or one that held/rose, saves silently.
+
 ### eventRepo reads (all siblings — deliberately never fused)
 
 - `getForSubject(type, id)` — the timeline, newest first (compound index).
