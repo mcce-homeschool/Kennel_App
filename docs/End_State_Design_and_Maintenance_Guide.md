@@ -90,6 +90,12 @@ KennelOS/
     assistantSync.js           Owner-side Dropbox flows: backup push/pull,
                                assistant feed builder, outbox import (§26)
     assistantStore.js          KennelAssistant's OWN Dexie db + its data layer (§26)
+    papersDropbox.js           SECOND Dropbox client — reads the Kennel Papers app
+                               folder for the Documents viewer (§26.1)
+    papersSnapshot.js          Downloads/unzips the newest Kennel Papers backup in
+                               memory; text-only list cache; no DB writes (§26.1)
+    zip.js                     Store-only ZIP reader/writer (readZip), for reading
+                               a Kennel Papers backup .zip (§26.1)
     appReset.js                Full "reset to first run" teardown
     sampleData.js              "Thornfield Kennels" demo seed/clear
     seedImport.js              Optional breed+test vocabulary seed
@@ -1499,3 +1505,37 @@ one writer**, which is what makes the scheme conflict-free — preserve that inv
 - No new tables, FKs, or `referenceRegistry.js` entries in the **main** schema: imported
   assistant events are ordinary Event rows, and the assistant db is a separate database
   on a separate device.
+
+## 26.1 Documents viewer — reading Kennel Papers from inside KennelOS
+
+A **read-only** "Documents" page (`pages/documents.html` + `pages/documents.js`, in the
+**More** menu, plus a "📄 Documents" button on the dog page) that shows the document files
+kept in the sibling **Kennel Papers** app (pedigrees, health tests, registrations,
+contracts), grouped by dog. It reads; it never writes, edits, uploads, or deletes — Kennel
+Papers stays the sole owner of documents. Full spec:
+`docs/KennelOS_Documents_Viewer_Build_Spec_v1.md`.
+
+**The "no attachments table" rule (§15) is preserved.** No Dexie table, entity, repo, or FK
+is added; `db.js` and `referenceRegistry.js` are untouched. Document **bytes never enter
+IndexedDB** — the whole Kennel Papers backup `.zip` is downloaded and unzipped **into
+memory** on Refresh (`data/papersSnapshot.js`), and viewing/downloading a PDF slices those
+in-memory bytes into a throwaway object URL. The only persisted state is a small
+**text-only** list cache (`settings.js`, key `kennelOS.papersSnapshot` — documents + lean
+dog/file metadata, no bytes, no thumbnails) so the list renders offline with per-type icons.
+
+**Second Dropbox connection.** KennelOS's own `data/dropbox.js` is App-folder scoped to
+`/Apps/KennelOS/` and cannot see the Kennel Papers folder. So `data/papersDropbox.js` is a
+**separate** PKCE client using the **Kennel Papers app key** (`fvmtvesy1u1l0xf`, scoped to
+`/Apps/Kennel Papers/`), with its own settings namespace (`kennelOS.papersDropbox`) so the
+two connections never collide. It requests only `files.content.read` and only calls
+`list_folder` + `files/download`. The `?code=` redirect is handled solely by `documents.js`
+(app.js doesn't touch Dropbox), so there's no clash with the main connect flow.
+
+- **Dog join is by id** — a Kennel Papers `document.dog_id` equals a KennelOS `Dog.id`, so
+  no matching is needed. Documents for a dog not (yet) in KennelOS appear under an
+  "Unmatched" group behind a toggle, never dropped silently.
+- **One-time setup:** register the Documents page URL(s) (deployed + `localhost/pages/
+  documents.html`) as OAuth Redirect URIs on the **Kennel Papers** Dropbox app.
+- **Precache:** `pages/documents.html`, `pages/documents.js`, `data/papersDropbox.js`,
+  `data/papersSnapshot.js`, `data/zip.js` are in `sw.js`. Dropbox calls are cross-origin, so
+  the cache-first handler ignores them (§12).
