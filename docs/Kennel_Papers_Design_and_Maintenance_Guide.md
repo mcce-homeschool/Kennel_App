@@ -491,7 +491,9 @@ Escaping: every user value in hand-built HTML goes through `esc()`.
 - No **merge** of already-PDF documents into one file (photos→one multi-page PDF **is**
   supported; merging existing PDFs needs a heavier lib). Deferrable.
 - No PDF editing, e-signing, or annotation.
-- No write-back into KennelOS (there is no document import target there, by design).
+- No write-back into KennelOS (there is no document import target there, by design). Note:
+  KennelOS *reads* these backups in a read-only "Documents" viewer (End-State guide §26.1) —
+  that's read-out **from** Kennel Papers, not write-back **into** it; this app is unchanged.
 - No true background upload (iOS limitation, §9).
 - No multi-user / sharing beyond handing someone a dog-pack `.zip`.
 - No custom document types (resolved in §12 — the five built-ins are fixed).
