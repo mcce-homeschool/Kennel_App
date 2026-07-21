@@ -81,7 +81,11 @@ function normalize(data) {
     mileage_rate: isMileage ? rate : null,
     amount: (isMileage && rate != null) ? round2(miles * rate) : Number(data.amount),
     category: data.category || 'other',
-    event_id: data.event_id || null
+    event_id: data.event_id || null,
+    // A human-facing receipt/reference number (plain, unindexed) that ties this
+    // ledger row back to a paper/photo receipt — e.g. the number the Receipts
+    // companion app stamps on each capture. Trimmed to null when blank.
+    receipt_number: (data.receipt_number == null ? '' : String(data.receipt_number)).trim() || null
   };
 }
 

@@ -19,9 +19,12 @@ import { litterRepo } from './litterRepo.js';
 import { saleRepo } from './saleRepo.js';
 import { HistoryEvent } from './eventRepo.js';
 import { studServiceRepo } from './studServiceRepo.js';
+import { expenseRepo, mileageAmount } from './expenseRepo.js';
+import { getMyKennelId, getMileageDefaults } from './settings.js';
 import {
   SEX, OWNERSHIP_TYPE, DOG_STATUS, CONTACT_TYPE, PAIRING_TYPE, PAIRING_METHOD, PAIRING_STATUS,
-  LITTER_STATUS, PLACEMENT_TYPE, SALE_STATUS, eventTypesFor, STUD_SERVICE_DIRECTION, FEE_STRUCTURE, STUD_SERVICE_STATUS
+  LITTER_STATUS, PLACEMENT_TYPE, SALE_STATUS, eventTypesFor, STUD_SERVICE_DIRECTION, FEE_STRUCTURE, STUD_SERVICE_STATUS,
+  EXPENSE_CATEGORIES, EXPENSE_SUBJECT_TYPES
 } from './vocab.js';
 
 // --- Parsing --------------------------------------------------------------
@@ -82,6 +85,17 @@ function normDate(raw) {
 function splitList(raw) {
   if (!raw) return [];
   return raw.split(/[;,|]/).map((s) => s.trim()).filter(Boolean);
+}
+
+// Parse a money / numeric cell tolerantly: strips a leading currency symbol and
+// thousands separators ("$1,234.50" → 1234.5). Returns a finite Number, or null
+// when blank/unparseable (the caller decides how loud to be). Never negative-
+// coerces; a "-5" stays -5 so the repo's own non-negative check can flag it.
+function parseMoney(raw) {
+  if (raw == null || String(raw).trim() === '') return null;
+  const cleaned = String(raw).replace(/[$£€\s,]/g, '');
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
 }
 
 // Name -> existing Dog lookup shared by the Pairing/Litter mappings to resolve
@@ -1048,9 +1062,227 @@ const STUD_SERVICE_MAPPING = {
   repo: studServiceRepo
 };
 
+// =========================================================================
+// Expense mapping (Receipts-app import path)
+// =========================================================================
+// The ledger's external-tool import path: a companion receipts/mileage app (or
+// any spreadsheet) emits one row per cost and this brings it into the Expense
+// ledger with the same dry-run + match-or-create discipline as every other
+// mapping. There is no photo/attachment side (KennelOS stores none, §15) — only
+// the extracted money data crosses over; the image stays in the source app.
+//
+// Subject resolution (polymorphic Expense subject, §21): supports the two
+// subjects an external tool can name — `kennel` (program overhead, the default
+// when the column is blank) resolved by kennel name (or your configured "my
+// kennel" when unnamed), and `dog` resolved by registered/call name. `litter`
+// and `pairing` subjects have no name key, so those rows go to needs-review
+// (log them from the record itself), mirroring the Event importer's dog-only
+// scope.
+//
+// Natural key (idempotent re-import): subject + expense_date + amount +
+// category + vendor. Re-importing the same file updates rather than duplicates.
+// The match index only considers non-archived, NON-event-linked ledger rows, so
+// a re-import can never clobber a cost captured from the event form.
+const EXPENSE_CATEGORY_VALUES = EXPENSE_CATEGORIES.map((c) => c.value);
+const EXPENSE_SUBJECT_VALUES = EXPENSE_SUBJECT_TYPES.map((s) => s.value);
+
+function amtKey(n) {
+  return n == null ? '' : Number(n).toFixed(2);
+}
+
+// The natural-key string for an expense given its resolved parts. Any missing
+// part (no subject, no date, no amount) yields null — a keyless row. Vendor is
+// deliberately allowed to be blank (a mileage/trip row carries none), so this
+// joins directly with a NUL separator rather than via nkParts (which rejects
+// every empty part).
+// When a row carries a `receipt_number` (the Receipts companion app stamps one on
+// every entry), that IS the key — the same receipt always maps to the same ledger
+// row, so re-import updates it in place even if its amount/date/subject changed.
+function expenseNk(subjectType, subjectId, date, amount, category, vendor, receiptNumber) {
+  const rn = (receiptNumber || '').trim().toLowerCase();
+  if (rn) return `rcpt ${rn}`;
+  if (!subjectType || !subjectId || !date || amount == null) return null;
+  return [subjectType, subjectId, date, amtKey(amount), category || 'other', (vendor || '').trim().toLowerCase()].join(' ');
+}
+
+const EXPENSE_MAPPING = {
+  entity: 'expense',
+  label: 'Expenses',
+  templateHeaders: [
+    'subject_type', 'subject_name', 'expense_date', 'amount', 'category',
+    'vendor', 'miles', 'mileage_rate', 'receipt_number', 'notes'
+  ],
+  requiredForCreate: ['subject_id', 'expense_date'],
+
+  async loadExisting() {
+    const [expenses, kennels, dogs] = await Promise.all([
+      expenseRepo.getAll({ includeArchived: true }),
+      kennelRepo.getAll({ includeArchived: true }),
+      dogRepo.getAll({ includeArchived: true })
+    ]);
+    this._kennelByName = new Map();
+    this._ownKennels = [];
+    for (const k of kennels) {
+      if (k.kennel_name) this._kennelByName.set(k.kennel_name.trim().toLowerCase(), k);
+      if (k.is_own_kennel && !k.is_archived) this._ownKennels.push(k);
+    }
+    this._kennelById = new Map(kennels.map((k) => [k.id, k]));
+    // Dog name index; a name that resolves to more than one dog is ambiguous
+    // (tracked so classify can flag it instead of guessing).
+    this._dogByName = new Map();
+    this._dogAmbiguous = new Set();
+    for (const d of dogs) {
+      for (const nm of [d.registered_name, d.call_name]) {
+        const key = nm?.trim().toLowerCase();
+        if (!key) continue;
+        if (this._dogByName.has(key) && this._dogByName.get(key).id !== d.id) this._dogAmbiguous.add(key);
+        else this._dogByName.set(key, d);
+      }
+    }
+    this._dogById = new Map(dogs.map((d) => [d.id, d]));
+    return expenses;
+  },
+
+  buildIndex(existing) {
+    const byKey = new Map();
+    for (const e of existing) {
+      if (e.is_archived || e.event_id) continue; // only manual/imported ledger rows
+      const key = expenseNk(e.subject_type, e.subject_id, e.expense_date, e.amount, e.category, e.vendor, e.receipt_number);
+      if (key) byKey.set(key, e);
+    }
+    return {
+      byKey,
+      kennelByName: this._kennelByName,
+      ownKennels: this._ownKennels,
+      kennelById: this._kennelById,
+      dogByName: this._dogByName,
+      dogAmbiguous: this._dogAmbiguous,
+      dogById: this._dogById
+    };
+  },
+
+  classify(row, index, i) {
+    const reasons = [];
+    const record = {};
+
+    // --- Subject type (default kennel = program overhead) ---
+    const subjRaw = col(row, 'subject_type', 'subject');
+    let subjectType = subjRaw ? normEnum(EXPENSE_SUBJECT_TYPES, subjRaw) : 'kennel';
+    if (subjectType === null) { reasons.push(`Unrecognized subject_type "${subjRaw}".`); }
+    else record.subject_type = subjectType;
+
+    // --- Subject resolution → subject_id ---
+    const subjectName = col(row, 'subject_name', 'subject_id', 'kennel_name', 'dog_name', 'dog_registered_name');
+    let subjectDisplay = subjectName;
+    if (subjectType === 'kennel') {
+      if (subjectName) {
+        const hit = index.kennelByName.get(subjectName.toLowerCase());
+        if (hit) record.subject_id = hit.id;
+        else reasons.push(`Kennel "${subjectName}" not found.`);
+      } else {
+        // Blank kennel name → the configured "my kennel", else the sole own kennel.
+        const myId = getMyKennelId();
+        const mine = myId ? index.kennelById.get(myId) : null;
+        if (mine) { record.subject_id = mine.id; subjectDisplay = mine.kennel_name; }
+        else if (index.ownKennels.length === 1) { record.subject_id = index.ownKennels[0].id; subjectDisplay = index.ownKennels[0].kennel_name; }
+        else reasons.push('No subject_name and no single "my kennel" to default to — name the kennel in subject_name.');
+      }
+    } else if (subjectType === 'dog') {
+      if (subjectName) {
+        const key = subjectName.toLowerCase();
+        if (index.dogAmbiguous.has(key)) reasons.push(`Dog "${subjectName}" matches more than one dog — rename or import from the dog's page.`);
+        else {
+          const hit = index.dogByName.get(key);
+          if (hit) record.subject_id = hit.id;
+          else reasons.push(`Dog "${subjectName}" not found.`);
+        }
+      } else reasons.push('subject_type "dog" needs a subject_name.');
+    } else if (subjectType === 'litter' || subjectType === 'pairing') {
+      reasons.push(`${subjectType} expenses can't be imported from CSV (no name key) — log them from the ${subjectType}'s page.`);
+    }
+
+    // --- Date ---
+    const dateRaw = col(row, 'expense_date', 'date');
+    const expenseDate = normDate(dateRaw);
+    if (expenseDate === null) reasons.push(`Unrecognized expense_date "${dateRaw}".`);
+    else if (expenseDate) record.expense_date = expenseDate;
+
+    // --- Mileage vs flat amount ---
+    // Miles present ⇒ a mileage expense: amount is DERIVED by expenseRepo from
+    // miles × rate, category is forced to `mileage`, and amount is never set here.
+    const miles = parseMoney(col(row, 'miles', 'distance'));
+    const rateRaw = col(row, 'mileage_rate', 'rate', 'rate_per_mile');
+    let effectiveAmount = null; // used only for the natural key
+    if (miles != null) {
+      record.miles = miles;
+      let rate = parseMoney(rateRaw);
+      if (rate == null) rate = getMileageDefaults().rate ?? null;
+      if (rate == null) reasons.push('Mileage row needs a mileage_rate (and no default rate is set).');
+      else record.mileage_rate = rate;
+      record.category = 'mileage';
+      effectiveAmount = mileageAmount(miles, rate);
+    } else {
+      const amount = parseMoney(col(row, 'amount', 'total', 'cost'));
+      if (amount == null) reasons.push('No amount (and no miles) — nothing to record.');
+      else { record.amount = amount; effectiveAmount = amount; }
+      // Category (flat rows only; mileage forced above).
+      const catRaw = col(row, 'category');
+      if (catRaw) {
+        const cat = normEnum(EXPENSE_CATEGORIES, catRaw);
+        if (cat) record.category = cat;
+        else reasons.push(`Unrecognized category "${catRaw}" — defaulted to Other.`); // soft: repo defaults to 'other'
+      }
+    }
+
+    const vendor = col(row, 'vendor', 'merchant', 'payee');
+    if (vendor) record.vendor = vendor;
+    const receiptNo = col(row, 'receipt_number', 'receipt_no', 'receipt', 'receipt_#');
+    if (receiptNo) record.receipt_number = receiptNo;
+    const notes = col(row, 'notes', 'memo', 'description');
+    if (notes) record.notes = notes;
+
+    // --- Natural key → match-or-create ---
+    const key = expenseNk(record.subject_type, record.subject_id, record.expense_date, effectiveAmount, record.category, record.vendor, record.receipt_number);
+    let status_ = 'create';
+    let match = null;
+    if (!key) {
+      status_ = 'review';
+    } else {
+      match = index.byKey.get(key) || null;
+      status_ = match ? 'update' : 'create';
+    }
+    // Any unresolved subject / bad date / missing amount already pushed a reason;
+    // force those rows to review so nothing half-formed is silently created.
+    if (reasons.some((r) => !r.includes('defaulted to Other'))) status_ = 'review';
+
+    const catLabel = EXPENSE_CATEGORIES.find((c) => c.value === (record.category || 'other'))?.label || 'Other';
+    const amtShow = effectiveAmount != null ? `$${Number(effectiveAmount).toFixed(2)}` : '—';
+    const display = `${subjectDisplay || '(no subject)'} · ${catLabel} · ${amtShow}${expenseDate ? ` (${expenseDate})` : ''}`;
+    return {
+      index: i, raw: row, entity: 'expense', display,
+      record, changes: { ...record },
+      status: status_, match, matchLabel: match ? EXPENSE_MAPPING.describe(match) : '',
+      reasons,
+      decision: status_ === 'review' ? 'skip' : status_,
+      decisionTarget: match ? match.id : null
+    };
+  },
+
+  describe(e) {
+    const catLabel = EXPENSE_CATEGORIES.find((c) => c.value === e.category)?.label || e.category || 'Expense';
+    let subj = '';
+    if (e.subject_type === 'kennel') subj = this._kennelById?.get(e.subject_id)?.kennel_name || 'kennel';
+    else if (e.subject_type === 'dog') { const d = this._dogById?.get(e.subject_id); subj = d?.registered_name || d?.call_name || 'dog'; }
+    else subj = e.subject_type || '';
+    return `${subj ? subj + ' · ' : ''}${catLabel} · $${Number(e.amount || 0).toFixed(2)} — ${e.expense_date || 'no date'}` + (e.is_archived ? ' (archived)' : '');
+  },
+
+  repo: expenseRepo
+};
+
 const MAPPINGS = {
   dog: DOG_MAPPING, contact: CONTACT_MAPPING, pairing: PAIRING_MAPPING, litter: LITTER_MAPPING,
-  sale: SALE_MAPPING, event: EVENT_MAPPING, stud_service: STUD_SERVICE_MAPPING
+  sale: SALE_MAPPING, event: EVENT_MAPPING, stud_service: STUD_SERVICE_MAPPING, expense: EXPENSE_MAPPING
 };
 
 export function getMapping(entity) {

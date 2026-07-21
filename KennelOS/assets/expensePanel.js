@@ -102,6 +102,7 @@ function openExpenseForm({ subjectType, subjectId, expense = null, onSaved }) {
     category: expense?.category || 'other',
     expense_date: expense?.expense_date || todayYMD(),
     vendor: expense?.vendor || '',
+    receipt_number: expense?.receipt_number || '',
     notes: expense?.notes || ''
   };
 
@@ -121,6 +122,8 @@ function openExpenseForm({ subjectType, subjectId, expense = null, onSaved }) {
           <input id="xf-date" type="date" value="${esc(draft.expense_date)}"></div>
         <div class="field"><label>Vendor</label>
           <input id="xf-vendor" type="text" value="${esc(draft.vendor)}" placeholder="Who was paid"></div>
+        <div class="field"><label>Receipt #</label>
+          <input id="xf-receipt" type="text" value="${esc(draft.receipt_number)}" placeholder="e.g. R-0007 (ties to a photo receipt)"></div>
         <div class="field field-wide"><label>Notes</label>
           <textarea id="xf-notes">${esc(draft.notes)}</textarea></div>
       </div>
@@ -145,6 +148,7 @@ function openExpenseForm({ subjectType, subjectId, expense = null, onSaved }) {
       subject_id: subjectId,
       expense_date: modal.querySelector('#xf-date').value,
       vendor: modal.querySelector('#xf-vendor').value.trim(),
+      receipt_number: modal.querySelector('#xf-receipt').value.trim(),
       notes: modal.querySelector('#xf-notes').value,
       ...mileage.payloadBits()
     };
@@ -203,7 +207,8 @@ export function renderExpensePanel(opts) {
     body.innerHTML = `<ul class="linked-list" style="margin:0; padding:0; list-style:none;">` + visible.map((x, i) => {
       const mileageMeta = x.miles != null
         ? `${esc(x.miles)} mi × ${esc(fmtMoney(x.mileage_rate ?? 0))}/mi` : '';
-      const meta = [mileageMeta, x.vendor ? esc(x.vendor) : '', x.notes ? esc(x.notes) : ''].filter(Boolean).join(' — ');
+      const receiptMeta = x.receipt_number ? `Receipt ${esc(x.receipt_number)}` : '';
+      const meta = [mileageMeta, x.vendor ? esc(x.vendor) : '', receiptMeta, x.notes ? esc(x.notes) : ''].filter(Boolean).join(' — ');
       const eventTag = x.event_id ? ' <span class="badge badge-gray" title="Captured from an event">🔗 event</span>' : '';
       const logBtn = (!x.event_id && EVENTABLE.has(subjectType))
         ? `<button class="btn btn-sm" data-act="log-event" data-idx="${i}" title="Create a linked event for this cost">Log event →</button>` : '';
